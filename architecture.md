@@ -27,6 +27,7 @@ This lets you add new airlines without changing core API contracts.
 3. **Airline Adapter Layer (`airlines/*.py`)**
    - `airlines/elal.py`: El Al flow using `undetected-chromedriver` targeting the legacy `elalextra.net/info/awb.asp` page for stability and session consistency.
    - `airlines/lufthansa.py`: Lufthansa eTracking flow using `undetected-chromedriver` and custom JavaScript-based text extraction to bypass Shadow DOM and React-rendered content.
+   - `airlines/delta.py`: Delta Cargo flow using `undetected-chromedriver` at `deltacargo.com/Cargo/trackShipment` with form submission and table/text parsing.
    - `airlines/common.py`: Shared AWB normalization and parsing helpers.
 
 4. **Shared Schema Layer (`models.py`)**
@@ -45,6 +46,7 @@ This lets you add new airlines without changing core API contracts.
 ```bash
 curl -s "http://localhost:8000/track/elal/11463874650"
 curl -s "http://localhost:8000/track/lufthansa/02021483976"
+curl -s "http://localhost:8000/track/delta/00610949890"
 ```
 
 ### Legacy El Al Endpoint
@@ -99,6 +101,7 @@ docker run -d -p 8000:8000 --name tracker_test tracker
 curl -s "http://localhost:8000/health"
 curl -s "http://localhost:8000/track/elal/63883363"
 curl -s "http://localhost:8000/track/lufthansa/02021483976"
+curl -s "http://localhost:8000/track/delta/00610949890"
 ```
 
 ## Extension Pattern
