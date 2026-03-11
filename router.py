@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airlines import DeltaTracker, ElAlTracker, LufthansaTracker
+from airlines import AFKLMTracker, DeltaTracker, ElAlTracker, LufthansaTracker
 from models import TrackingResponse
 
 
@@ -12,6 +12,10 @@ TRACKERS = {
     "lh": LufthansaTracker(),
     "delta": DeltaTracker(),
     "dl": DeltaTracker(),
+    "afklm": AFKLMTracker(),
+    "af": AFKLMTracker(),
+    "kl": AFKLMTracker(),
+    "klm": AFKLMTracker(),
 }
 
 
