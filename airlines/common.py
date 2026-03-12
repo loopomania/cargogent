@@ -114,6 +114,11 @@ def track_trace_query(awb: str) -> Optional[str]:
         )
         response.raise_for_status()
         html = response.text
+        
+        # Save track trace response for debug
+        with open("track_trace_debug.html", "w") as f:
+            f.write(html)
+            
         soup = BeautifulSoup(html, "html.parser")
 
         # Check for iframe first

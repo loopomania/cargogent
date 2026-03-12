@@ -1,3 +1,4 @@
+# CargoGent tracking service. Build with: docker build -t cargogent .
 FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 ENV DEBIAN_FRONTEND=noninteractive

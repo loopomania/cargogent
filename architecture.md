@@ -91,9 +91,13 @@ curl -s "http://localhost:8000/track/delta/00610949890"
 ## Local / Docker Usage
 
 ### Build and Run
+
+Docker image name: **`cargogent`**.
+
 ```bash
-docker build -t tracker .
-docker run -d -p 8000:8000 --name tracker_test tracker
+cd AWBTrackers
+docker build -t cargogent .
+docker run -d -p 8000:8000 --name cargogent_tracker cargogent
 ```
 
 ### Quick Tests
