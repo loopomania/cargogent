@@ -204,12 +204,19 @@ class DeltaTracker(AirlineTracker):
                 elif "booked" in act_low:
                     status_code = "BKD"
                     
+                # Extract flight number (DL0235/08JAN26 or DL 0235 patterns)
+                flight = None
+                flt_match = re.search(r'\b(DL|AA|UA|AF|KL|LH|BA|EK|QR|TK|EY|CX|AY|SK|DX|IB|AC|AM|LA|AR|CM|AV|G3|JJ|VX|B6|AS|NK|F9|WN)\s*(\d{3,4})\b', activity, re.IGNORECASE)
+                if flt_match:
+                    flight = f"{flt_match.group(1).upper()}{flt_match.group(2)}"
+
                 events.append(
                     TrackingEvent(
                         status_code=status_code,
                         location=location,
                         date=f"{date_str} {time_str}",
-                        description=activity[:200]
+                        description=activity[:200],
+                        flight=flight,
                     )
                 )
             
@@ -232,33 +239,120 @@ class DeltaTracker(AirlineTracker):
                 )
         return events
     async def track(self, awb: str) -> TrackingResponse:
+        """
+        Bypass strategy: non-headless Chrome with DISPLAY=:99 (Xvfb virtual display).
+
+        Akamai Bot Manager detects headless Chrome via canvas fingerprinting,
+        webgl, and browser property signals. Running in a virtual framebuffer
+        (Xvfb) avoids these signals since the browser renders normally.
+        We navigate directly to the URL with awbNumber as a query param —
+        Delta's Angular router auto-triggers the search without form interaction.
+        """
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.action_chains import ActionChains
+
         prefix, serial = normalize_awb(awb, default_prefix="006")
         awb_fmt = f"{prefix}-{serial}"
         awb_clean = f"{prefix}{serial}"
-        message = "Delta Cargo API is currently strictly protected by Akamai Bot Manager and blocking automated requests. A commercial proxy or specialized API is required."
-        blocked = True
+        # Serial only (without 006 prefix) for form input — Delta auto-prefixes
+        awb_serial = serial
+
+        message = "Success"
+        blocked = False
         events: List[TrackingEvent] = []
-        source_url = "https://www.deltacargo.com/Cargo/trackShipment"
-        trace = ["delta_akamai_hard_block"]
-        
-        # Track-trace fallback is also blocked / non-functional for Delta as of now.
-        # Direct curl_cffi calls return 403 Forbidden.
-        # Playwright stealth returns 403 Forbidden.
-        # We fail gracefully.
+        page_text = ""
+        html = ""
+        trace = []
+        tz_offset = -int(time.timezone / 60)  # local UTC offset in minutes
+
+        source_url = (
+            f"https://www.deltacargo.com/Cargo/trackShipment"
+            f"?awbNumber={awb_clean}&timeZoneOffset={tz_offset}"
+        )
+
+        opts = uc.ChromeOptions()
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--window-size=1920,1080")
+        opts.add_argument("--disable-gpu")
+        # CRITICAL: do NOT use headless=True — Akamai detects it.
+        # The Docker container runs Xvfb on DISPLAY=:99 for virtual rendering.
+
+        driver = None
+        try:
+            driver = uc.Chrome(options=opts, headless=False, use_subprocess=True)
+            driver.set_page_load_timeout(90)
+            trace.append("chrome_started")
+
+            driver.get(source_url)
+            trace.append("page_loaded")
+
+            # Wait for Angular to render and Akamai JS to run
+            time.sleep(20)
+
+            html = driver.page_source
+            page_text = driver.execute_script("return document.body ? document.body.innerText : '';") or ""
+
+            trace.append(f"html_length:{len(html)}")
+
+            if is_bot_blocked_html(html) or "access denied" in html.lower() or "edgesuite" in html.lower():
+                blocked = True
+                message = "Bot protection or session validation blocked the request."
+                trace.append("akamai_blocked")
+            else:
+                trace.append("page_not_blocked")
+                message = "Successfully loaded tracking data."
+
+        except Exception as exc:
+            message = f"Delta tracking failed: {exc}"
+            blocked = True
+            trace.append(f"exception:{str(exc)[:80]}")
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+
+        if not blocked:
+            events = self._extract_events_from_text(page_text)
+            trace.append(f"events_extracted:{len(events)}")
+
+        # Summarize origin/destination/flight
+        origin, destination, status, flight = None, None, None, None
+        if events:
+            locs = [e.location for e in events if e.location and len(e.location) == 3]
+            if locs:
+                origin = locs[0]
+                destination = locs[-1]
+            status = events[-1].status_code
+            flight = next((e.flight for e in reversed(events) if e.flight), None)
+
+        # Fallback: extract origin/destination from raw text patterns
+        if not origin and page_text:
+            for label, attr in [("from", "origin"), ("Origin", "origin"),
+                                 ("to", "destination"), ("Destination", "destination")]:
+                m = re.search(r"\b" + label + r"[:\s]+([A-Z]{3})\b", page_text, re.IGNORECASE)
+                if m:
+                    if attr == "origin":
+                        origin = m.group(1).upper()
+                    else:
+                        destination = m.group(1).upper()
 
         return TrackingResponse(
             airline=self.name,
             awb=awb_fmt,
-            origin=None,
-            destination=None,
-            status=None,
-            flight=None,
+            origin=origin,
+            destination=destination,
+            status=status,
+            flight=flight,
             events=events,
             message=message,
             blocked=blocked,
             raw_meta={
                 "source_url": source_url,
                 "event_count": len(events),
-                "trace": trace
+                "trace": trace,
             },
         )
