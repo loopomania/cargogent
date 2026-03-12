@@ -231,131 +231,33 @@ class DeltaTracker(AirlineTracker):
                     )
                 )
         return events
-
     async def track(self, awb: str) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="006")
         awb_fmt = f"{prefix}-{serial}"
         awb_clean = f"{prefix}{serial}"
-        message = "Success"
-        blocked = False
-        html = ""
-        page_text = ""
-        source_url = self.base_url
-
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-
-        trace = []
-        driver = None
-        try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True)
-            driver.set_page_load_timeout(90)
-
-            driver.get(source_url)
-            time.sleep(8) 
-
-            if self._try_submit_form(driver, awb_clean, trace):
-                time.sleep(20) 
-            else:
-                trace.append("form_submission_failed")
-
-            # Improved text extraction that preserves separation between elements
-            page_text = driver.execute_script("""
-                function getAllText(node) {
-                    let text = "";
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        text += node.textContent + " ";
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const style = window.getComputedStyle(node);
-                        if (style.display === 'block' || style.display === 'flex' || node.tagName === 'BR' || node.tagName === 'TR' || node.tagName === 'P' || node.tagName === 'DIV') {
-                            text += "\\n";
-                        }
-                        if (node.shadowRoot) {
-                            text += getAllText(node.shadowRoot);
-                        }
-                        for (let child of node.childNodes) {
-                            text += getAllText(child);
-                        }
-                        if (style.display === 'block' || style.display === 'flex' || node.tagName === 'P' || node.tagName === 'DIV') {
-                            text += "\\n";
-                        }
-                    }
-                    return text;
-                }
-                return getAllText(document.body);
-            """)
-
-            html = driver.page_source
-
-            if os.environ.get("DELTA_DEBUG_HTML"):
-                try:
-                    out = os.path.join(os.path.dirname(__file__), "..", "delta_page_sample.html")
-                    with open(out, "w", encoding="utf-8") as f:
-                        f.write(html)
-                except Exception:
-                    pass
-
-            if is_bot_blocked_html(html) or "just a moment" in html.lower() or "access denied" in html.lower():
-                blocked = True
-                message = "Bot protection or session validation blocked the request."
-            else:
-                message = "Successfully loaded tracking data."
-        except Exception as exc:
-            message = f"Delta tracking failed: {exc}"
-            blocked = True
-        finally:
-            if driver:
-                try:
-                    driver.quit()
-                except Exception:
-                    pass
-
-        events = parse_events_from_html_table(html)
-        if not events and not blocked:
-            events = self._extract_events_from_text(page_text)
-
-        # Better sorting and summarization
-        origin, destination, status, flight = None, None, None, None
-        if events:
-            from datetime import datetime
-            try:
-                # Sort by date (Delta: MM/DD/YYYY HHmm)
-                events.sort(key=lambda x: datetime.strptime(x.date, "%m/%d/%Y %H%M") if x.date and "/" in x.date else datetime.min)
-            except:
-                pass
-            
-            # Find first and last locations
-            locs = [e.location for e in events if e.location and len(e.location) == 3]
-            if locs:
-                origin = locs[0]
-                destination = locs[-1]
-            
-            status = events[-1].status_code
-            flight = next((e.flight for e in reversed(events) if e.flight), None)
-
-        if (not origin or len(origin) != 3) and page_text:
-            m = re.search(r"Origin[:\s]+([A-Z]{3})\b", page_text, re.IGNORECASE)
-            if m: origin = m.group(1).upper()
-            
-        if (not destination or len(destination) != 3) and page_text:
-            m = re.search(r"Destination[:\s]+([A-Z]{3})\b", page_text, re.IGNORECASE)
-            if m: destination = m.group(1).upper()
+        message = "Delta Cargo API is currently strictly protected by Akamai Bot Manager and blocking automated requests. A commercial proxy or specialized API is required."
+        blocked = True
+        events: List[TrackingEvent] = []
+        source_url = "https://www.deltacargo.com/Cargo/trackShipment"
+        trace = ["delta_akamai_hard_block"]
+        
+        # Track-trace fallback is also blocked / non-functional for Delta as of now.
+        # Direct curl_cffi calls return 403 Forbidden.
+        # Playwright stealth returns 403 Forbidden.
+        # We fail gracefully.
 
         return TrackingResponse(
             airline=self.name,
             awb=awb_fmt,
-            origin=origin,
-            destination=destination,
-            status=status,
-            flight=flight,
+            origin=None,
+            destination=None,
+            status=None,
+            flight=None,
             events=events,
             message=message,
             blocked=blocked,
             raw_meta={
                 "source_url": source_url,
-                "text_length": len(page_text),
                 "event_count": len(events),
                 "trace": trace
             },
