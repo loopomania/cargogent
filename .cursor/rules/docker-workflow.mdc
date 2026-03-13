@@ -1,0 +1,14 @@
+---
+description: After any fix, rebuild, deploy, and test the Docker API
+alwaysApply: true
+---
+
+# Docker Workflow After Fixes
+
+Whenever you make a fix to this project, you **must** complete these steps:
+
+1. **Rebuild** – `docker build -t cargogent .` (from `AWBTrackers/`)
+2. **Deploy** – Stop any existing container on port 8000, then `docker run -d --name cargogent -p 8000:8000 cargogent`
+3. **Test** – Run the relevant test (e.g. `curl http://localhost:8000/track/delta/00610949890` or `/health`)
+
+Do not consider a fix complete until all three steps succeed.

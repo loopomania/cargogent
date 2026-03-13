@@ -1,0 +1,36 @@
+Testing Delta Tracker on 006-38686476...
+
+Result:
+Status: None
+Origin: None
+Destination: None
+Flight: None
+Message: Delta tracking failed: Message: unknown error: cannot connect to chrome at 127.0.0.1:53854
+from session not created: This version of ChromeDriver only supports Chrome version 114
+Current browser version is 145.0.7632.160
+Stacktrace:
+0   undetected_chromedriver             0x0000000106f7a6b8 undetected_chromedriver + 4937400
+1   undetected_chromedriver             0x0000000106f71b73 undetected_chromedriver + 4901747
+2   undetected_chromedriver             0x0000000106b2f616 undetected_chromedriver + 435734
+3   undetected_chromedriver             0x0000000106b61d10 undetected_chromedriver + 642320
+4   undetected_chromedriver             0x0000000106b58f98 undetected_chromedriver + 606104
+5   undetected_chromedriver             0x0000000106ba0a08 undetected_chromedriver + 899592
+6   undetected_chromedriver             0x0000000106b9febf undetected_chromedriver + 896703
+7   undetected_chromedriver             0x0000000106b96de3 undetected_chromedriver + 859619
+8   undetected_chromedriver             0x0000000106b64d7f undetected_chromedriver + 654719
+9   undetected_chromedriver             0x0000000106b660de undetected_chromedriver + 659678
+10  undetected_chromedriver             0x0000000106f362ad undetected_chromedriver + 4657837
+11  undetected_chromedriver             0x0000000106f3b130 undetected_chromedriver + 4677936
+12  undetected_chromedriver             0x0000000106f41def undetected_chromedriver + 4705775
+13  undetected_chromedriver             0x0000000106f3c05a undetected_chromedriver + 4681818
+14  undetected_chromedriver             0x0000000106f0e92c undetected_chromedriver + 4495660
+15  undetected_chromedriver             0x0000000106f59838 undetected_chromedriver + 4802616
+16  undetected_chromedriver             0x0000000106f599b7 undetected_chromedriver + 4802999
+17  undetected_chromedriver             0x0000000106f6a99f undetected_chromedriver + 4872607
+18  libsystem_pthread.dylib             0x00007ff805f8ce05 _pthread_start + 115
+19  libsystem_pthread.dylib             0x00007ff805f88857 thread_start + 15
+
+Blocked: True
+Trace: []
+
+Events:

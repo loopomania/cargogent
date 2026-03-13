@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airlines import AFKLMTracker, CargoPalTracker, DeltaTracker, ElAlTracker, LufthansaTracker, UnitedTracker
+from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, DeltaTracker, ElAlTracker, LufthansaTracker, UnitedTracker
 from models import TrackingResponse
 
 
@@ -21,6 +21,8 @@ TRACKERS = {
     "cargopal": CargoPalTracker(),
     "pal": CargoPalTracker(),
     "pr": CargoPalTracker(),
+    "cathay": CathayTracker(),
+    "cx": CathayTracker(),
 }
 
 # AWB prefix (first 3 digits) -> airline key for router detection
@@ -31,6 +33,7 @@ AWB_PREFIX_TO_AIRLINE: dict[str, str] = {
     "057": "afklm",  # Air France
     "074": "afklm",  # KLM
     "016": "united",
+    "160": "cathay",
 }
 
 
