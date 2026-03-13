@@ -1,0 +1,74 @@
+[
+    {
+        "airline": "Cathay",
+        "awb": "160-83499253",
+        "status": "31 Jan",
+        "events_count": 10,
+        "duration": "60.53s",
+        "success": true,
+        "message": "ok"
+    },
+    {
+        "airline": "United",
+        "awb": "016-52822770",
+        "status": "DLV",
+        "events_count": 12,
+        "duration": "11.70s",
+        "success": true,
+        "message": "Successfully loaded tracking data."
+    },
+    {
+        "airline": "El Al",
+        "awb": "114-64169324",
+        "status": "DLV",
+        "events_count": 4,
+        "duration": "20.34s",
+        "success": true,
+        "message": "Success"
+    },
+    {
+        "airline": "Lufthansa",
+        "awb": "020-21483976",
+        "status": "NFD",
+        "events_count": 5,
+        "duration": "19.89s",
+        "success": true,
+        "message": "Successfully loaded tracking data."
+    },
+    {
+        "airline": "Delta",
+        "awb": "006-12345678",
+        "status": null,
+        "events_count": 0,
+        "duration": "24.27s",
+        "success": true,
+        "message": "Successfully loaded tracking data."
+    },
+    {
+        "airline": "PAL",
+        "awb": "079-66119856",
+        "status": null,
+        "events_count": 0,
+        "duration": "31.29s",
+        "success": true,
+        "message": "Success"
+    },
+    {
+        "airline": "AFKLM",
+        "awb": "057-12345678",
+        "status": null,
+        "events_count": 0,
+        "duration": "9.63s",
+        "success": true,
+        "message": "Successfully loaded tracking data."
+    },
+    {
+        "airline": "Ethiopian",
+        "awb": "071-41973620",
+        "status": "In Transit",
+        "events_count": 0,
+        "duration": "22.40s",
+        "success": true,
+        "message": "ok"
+    }
+]

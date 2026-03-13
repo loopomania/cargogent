@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AInsurance Design & Architecture</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; margin: 40px; line-height: 1.5; }
+    h1 { font-size: 24pt; margin-bottom: 12pt; }
+    h2 { font-size: 18pt; margin-top: 18pt; margin-bottom: 8pt; }
+    h3 { font-size: 14pt; margin-top: 14pt; margin-bottom: 6pt; }
+    table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+    th, td { border: 1px solid #333; padding: 6pt 8pt; text-align: left; }
+    th { background: #f0f0f0; font-weight: bold; }
+    ul { margin: 8pt 0; }
+    li { margin: 4pt 0; }
+    p { margin: 8pt 0; }
+    hr { margin: 18pt 0; border: none; border-top: 1px solid #ccc; }
+    pre { font-family: monospace; font-size: 10pt; background: #f5f5f5; padding: 12pt; overflow-x: auto; white-space: pre; }
+  </style>
+</head>
+<body>
+
+<h1>AInsurance Design & Architecture</h1>
+
+<h2>Environment Setup</h2>
+<table>
+  <tr><th>Environment</th><th>Deployment</th><th>Database</th></tr>
+  <tr><td><strong>Production</strong></td><td>Neon + Hetzner</td><td>Neon PostgreSQL</td></tr>
+  <tr><td><strong>Development</strong></td><td>Local Docker</td><td>Local PostgreSQL container</td></tr>
+</table>
+
+<h3>Environment Files</h3>
+<ul>
+  <li><strong>Production</strong>: .env — used when deploying to Neon and Hetzner</li>
+  <li><strong>Development</strong>: .env-dev — used for local Docker development</li>
+</ul>
+
+<hr>
+
+<h2>AInsurance Architecture Review</h2>
+
+<h3>1. High-Level Overview</h3>
+<pre>                    ┌─────────────────────────────────────────────────────────┐
+                    │                    Caddy (Reverse Proxy)                 │
+                    │              Port 80/443, SSL, Rate limiting             │
+                    └─────────────────────────┬───────────────────────────────┘
+                                              │
+        ┌─────────────────────────────────────┼─────────────────────────────────────┐
+        │                                     │                                     │
+        ▼                                     ▼                                     ▼
+┌───────────────┐                   ┌───────────────┐                   ┌───────────────┐
+│   Frontend    │                   │   Backend     │                   │     n8n       │
+│  Nginx:8080   │                   │   Node:3000   │                   │   Node:5678   │
+│  (SPA static) │                   │   (Express)   │                   │  (Workflows)  │
+└───────┬───────┘                   └───────┬───────┘                   └───────┬───────┘
+        │                                  │                                     │
+        │                                  │                                     │
+        └──────────────────────────────────┼─────────────────────────────────────┘
+                                           │
+                                           ▼
+                    ┌─────────────────────────────────────────────────────────┐
+                    │                    PostgreSQL (Neon / db)                 │
+                    └─────────────────────────────────────────────────────────┘</pre>
+
+<h3>2. Component Roles</h3>
+
+<h4>Caddy</h4>
+<ul>
+  <li><strong>Role</strong>: Reverse proxy, SSL termination, routing.</li>
+  <li><strong>Tech</strong>: Caddy v2.</li>
+  <li><strong>Config</strong>: Caddyfile (prod) / Caddyfile.local (dev).</li>
+  <li><strong>Routing</strong>: aigentinsure.com/api/* → backend:3000; aigentinsure.com/* → frontend:8080; n8n.aigentinsure.com → n8n:5678 (IP-restricted in prod)</li>
+  <li><strong>Security</strong>: SSL, IP-based access control for n8n.</li>
+</ul>
+
+<h4>Frontend</h4>
+<ul>
+  <li><strong>Role</strong>: SPA UI.</li>
+  <li><strong>Tech</strong>: React 19, Vite 7, Tailwind CSS, React Router.</li>
+  <li><strong>Runtime</strong>: Nginx Alpine on port 8080.</li>
+  <li><strong>Build</strong>: Multi-stage Docker build (Node build → Nginx serve).</li>
+  <li><strong>Security</strong>: Non-root user (uid 101).</li>
+</ul>
+
+<h4>Backend</h4>
+<ul>
+  <li><strong>Role</strong>: REST API, auth, business logic, DB access.</li>
+  <li><strong>Tech</strong>: Node.js 20, Express 4.</li>
+  <li><strong>Runtime</strong>: Node Alpine, port 3000.</li>
+  <li><strong>Features</strong>: JWT auth, OTP, bcrypt, CORS, rate limiting, Excel upload, data.gov.il sync.</li>
+  <li><strong>Security</strong>: Read-only FS, no-new-privileges, non-root user.</li>
+</ul>
+
+<h4>n8n</h4>
+<ul>
+  <li><strong>Role</strong>: Workflow automation (OTP emails, sync triggers).</li>
+  <li><strong>Tech</strong>: n8n (Node.js).</li>
+  <li><strong>Runtime</strong>: n8nio/n8n image, port 5678.</li>
+  <li><strong>Storage</strong>: Neon PostgreSQL (prod) or SQLite (dev).</li>
+  <li><strong>Workflows</strong>: OTP email, Programs and Plans sync.</li>
+</ul>
+
+<h4>Database</h4>
+<ul>
+  <li><strong>Role</strong>: Persistent storage.</li>
+  <li><strong>Tech</strong>: PostgreSQL 15.</li>
+  <li><strong>Deployment</strong>: Neon (prod) or local Postgres container (dev).</li>
+  <li><strong>Schema</strong>: users, clients, providers, program_performances, n8n schema.</li>
+</ul>
+
+<h3>3. Implementation Languages & Runtime</h3>
+<table>
+  <tr><th>Layer</th><th>Language</th><th>Runtime</th><th>Build / Serve</th></tr>
+  <tr><td>Frontend</td><td>JavaScript (React)</td><td>Nginx (static)</td><td>Vite build</td></tr>
+  <tr><td>Backend</td><td>JavaScript (Node)</td><td>Node.js 20</td><td>node server.js</td></tr>
+  <tr><td>n8n</td><td>JavaScript (n8n)</td><td>Node.js</td><td>n8n image</td></tr>
+  <tr><td>Caddy</td><td>Config</td><td>Caddy v2</td><td>Caddyfile</td></tr>
+  <tr><td>Database</td><td>SQL</td><td>PostgreSQL 15</td><td>init.sql</td></tr>
+</table>
+
+<h3>4. Data Flow</h3>
+<ul>
+  <li><strong>Auth</strong>: Frontend → Backend → DB (users, OTP). Backend → n8n webhook for OTP emails.</li>
+  <li><strong>API</strong>: Frontend → Caddy → Backend → DB.</li>
+  <li><strong>Sync</strong>: n8n or Settings UI → Backend → data.gov.il → DB.</li>
+  <li><strong>Static</strong>: Caddy → Frontend (Nginx) → static files.</li>
+</ul>
+
+<h3>5. Strengths</h3>
+<ul>
+  <li>Separation of concerns: Frontend, API, automation, DB.</li>
+  <li>Security: Non-root, read-only FS, CORS, rate limiting, IP restrictions.</li>
+  <li>Deployment: Docker Compose, dev/prod compose files.</li>
+  <li>DB choice: Managed Neon for prod.</li>
+  <li>Flexibility: n8n for workflows without code changes.</li>
+</ul>
+
+<h3>6. Considerations</h3>
+<ul>
+  <li><strong>Caddyfile webhook path</strong>: ARCHITECTURE.md mentions http://n8n:5678/webhook/otpme; the actual OTP webhook is register-otp.</li>
+  <li><strong>CORS</strong>: Backend allows https://aigentinsure.com and http://localhost:5173; prod domain is aigentinsure.com.</li>
+  <li><strong>n8n DB</strong>: Prod uses Neon; dev uses SQLite for n8n to avoid PostgreSQL SSL issues.</li>
+  <li><strong>Frontend nginx</strong>: /api proxy in nginx.conf is not used when Caddy routes /api/* directly to the backend.</li>
+</ul>
+
+<h3>7. Summary Table</h3>
+<table>
+  <tr><th>Component</th><th>Technology</th><th>Port</th><th>Purpose</th></tr>
+  <tr><td>Caddy</td><td>Caddy v2</td><td>80, 443</td><td>Reverse proxy, SSL, routing</td></tr>
+  <tr><td>Frontend</td><td>React + Vite + Nginx</td><td>8080</td><td>SPA UI</td></tr>
+  <tr><td>Backend</td><td>Node.js + Express</td><td>3000</td><td>REST API</td></tr>
+  <tr><td>n8n</td><td>n8n (Node.js)</td><td>5678</td><td>Workflows</td></tr>
+  <tr><td>Database</td><td>PostgreSQL</td><td>5432</td><td>Persistence</td></tr>
+</table>
+
+</body>
+</html>
