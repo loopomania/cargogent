@@ -23,6 +23,12 @@ This lets you add new airlines without changing core API contracts.
 2. **Router Layer (`router.py`)**
    - Maps airline key -> tracker class (e.g., `elal`, `lh`).
    - Handles airline code normalization.
+   - **Selective Proxying**: Dynamically decides whether to route requests through the residential proxy (IPRoyal) or direct connection based on the airline's security profile.
+
+2.1 **Proxy Layer (Residential Proxies)**
+   - **Service**: IPRoyal.
+   - **Logic**: Used for "Hard" airlines (El Al, Delta, PAL) to bypass data center IP blocks.
+   - **Performance**: Selective proxying ensures fast direct connections for non-blocked airlines.
 
 3. **Airline Adapter Layer (`airlines/*.py`)**
    - `airlines/elal.py`: El Al flow using `undetected-chromedriver` targeting the legacy `elalextra.net/info/awb.asp` page for stability and session consistency.
@@ -100,13 +106,28 @@ docker build -t cargogent .
 docker run -d -p 8000:8000 --name cargogent_tracker cargogent
 ```
 
-### Quick Tests
+### Quick Tests (Local)
 ```bash
 curl -s "http://localhost:8000/health"
 curl -s "http://localhost:8000/track/elal/63883363"
-curl -s "http://localhost:8000/track/lufthansa/02021483976"
-curl -s "http://localhost:8000/track/delta/00610949890"
 ```
+
+### Remote (Hetzner)
+- **Base URL**: `http://168.119.228.149:8000`
+- **Deployment**: Managed via `scripts/deploy.sh`.
+- **Environment**: Requires `.env` with `PROXY_URL` and Server credentials.
+
+## Automated Deployment
+
+To deploy local changes to the Hetzner server:
+```bash
+./scripts/deploy.sh
+```
+This script automates:
+1. SSH key authorization.
+2. File synchronization via `rsync`.
+3. Secret management (`.env` syncing).
+4. Docker build/restart with `--env-file`.
 
 ## Extension Pattern
 

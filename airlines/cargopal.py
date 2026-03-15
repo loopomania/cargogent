@@ -36,7 +36,7 @@ class CargoPalTracker(AirlineTracker):
         }
 
         try:
-            async with requests.AsyncSession() as session:
+            async with requests.AsyncSession(proxy=self.proxy) as session:
                 request = await session.get(source_url, headers=headers, verify=False)
                 if request.status_code != 200:
                     message = f"Failed to fetch data: HTTP {request.status_code}"
