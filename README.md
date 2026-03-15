@@ -35,3 +35,20 @@ This repository is version-controlled with Git. Remote:
 ```bash
 git remote -v   # origin → https://github.com/loopomania/cargogent.git
 ```
+
+
+
+
+the followig is abit differet 
+once a cargo , aeb , lands  in israel its transfered to a local distributer
+before shippig it to the customer
+swissport israel and maman are  terminal services and ground handling logistics
+to query the status of a AWB you need AWB ad house bill
+when a cargo is shipped out of israel they also first handled in wissport israel or maman
+before loaded to ann air line
+This is https://www.swissport.co.il/heb/Main/
+An  Airline works with one of the two and the same one all the time
+to map do the following 
+in the attached excel you have thew fields master and house ref
+Query swissport and then Maman to map
+its my guess
