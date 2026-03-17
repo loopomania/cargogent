@@ -76,3 +76,18 @@ EOF
 
 echo "🏁 Deployment to ${SERVER_IP} finished!"
 echo "📍 Test endpoint: http://${SERVER_IP}:${PORT}/health"
+
+# 4. Run post-deploy tests (accessibility + AWBTrackers benchmark) from local machine
+DEPLOYED_URL="http://${SERVER_IP}:${PORT}"
+echo ""
+echo "🧪 Running post-deploy tests against $DEPLOYED_URL..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -x "$REPO_ROOT/scripts/post-deploy-test.sh" ]; then
+  AWBTRACKERS_BASE_URL="$DEPLOYED_URL" "$REPO_ROOT/scripts/post-deploy-test.sh" || {
+    echo "⚠️  Post-deploy tests failed; deployment succeeded but verify manually."
+    exit 1
+  }
+else
+  echo "⚠️  post-deploy-test.sh not found or not executable; skipping."
+fi

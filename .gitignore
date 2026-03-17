@@ -26,6 +26,9 @@ AWBTrackers/Tracking-Api-Key.json
 *.swp
 *.swo
 
+# Node
+node_modules/
+
 # Temporary / build
 *.log
 dist/
