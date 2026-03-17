@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 import time
+import re
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -82,10 +83,29 @@ class ChallengeTracker(AirlineTracker):
             if events:
                 status = events[0].status
             
-            # Extract Origin/Destination from the first event if possible
-            # Usually 'FROM' and 'TO' columns in the table
-            origin = events[-1].location if events else None # First event in time is usually at the bottom
-            dest = events[0].location if events else None
+            # Extract Origin/Destination
+            # Origin is the start of the first segment, Destination is the end of the last segment
+            if events:
+                # events[0] is most recent, events[-1] is oldest
+                # My new JS sets location to 'To' city.
+                # So events[-1].location is the destination of the first segment.
+                # We also want the origin of the first segment.
+                # I'll update the JS to return more info or handle it here.
+                dest = events[0].location
+                # For origin, we might need to parse it from remarks if we don't return it explicitly
+                # Or just use the summary information from the table if available.
+                origin = None
+                if events[-1].remarks and "Segment: " in events[-1].remarks:
+                    # Segment: BLL to LGG. ...
+                    m = re.search(r"Segment: (.*?) to ", events[-1].remarks)
+                    if m:
+                        origin = m.group(1).strip()
+                
+                if not origin:
+                    origin = events[-1].location # Fallback
+            else:
+                origin = None
+                dest = None
 
             return TrackingResponse(
                 awb=awb,
@@ -115,43 +135,57 @@ class ChallengeTracker(AirlineTracker):
         # I'll use a script to extract the columns.
         extraction_script = """
         const results = [];
-        // Look for the tracking results container
-        // Based on research, it has headers like FROM, TO, SERVICE, BY, ETD/ATD, ETA/ATA, PCS, WEIGHT
-        
-        // Find all rows in the results table/list
-        // The subagent reported it's structured below the form.
-        // Let's look for elements that look like tracking rows.
-        
-        const rows = Array.from(document.querySelectorAll('.row')).filter(r => {
-            return r.innerText.includes('FROM') === false && r.querySelector('.tracking-details-button') !== null;
-        });
+        // Tracking results are in tables with class 'tracking'
+        const tables = document.querySelectorAll('table.tracking');
+        tables.forEach(table => {
+            const rows = table.querySelectorAll('tr');
+            if (rows.length < 2) return;
+            
+            // Header is row 0, data is row 1
+            const dataRow = rows[1];
+            const cols = dataRow.querySelectorAll('td');
+            if (cols.length < 8) return;
 
-        rows.forEach(row => {
-            const cols = row.querySelectorAll('div');
-            if (cols.length >= 8) {
-                // Approximate mapping based on subagent report:
-                // FROM, TO, SERVICE, BY, ETD/ATD, ETA/ATA, PCS, WEIGHT
-                const fromLoc = cols[0] ? cols[0].innerText.trim() : "";
-                const toLoc = cols[1] ? cols[1].innerText.trim() : "";
-                const flt = cols[3] ? cols[3].innerText.trim() : "";
-                const depTime = cols[4] ? cols[4].innerText.trim() : "";
-                const arrTime = cols[5] ? cols[5].innerText.trim() : "";
-                const pcs = cols[6] ? cols[6].innerText.trim() : "";
-                const wgt = cols[7] ? cols[7].innerText.trim() : "";
-                
-                // We'll create one event for Arrival usually, or Departure.
-                // Or map them to the schema.
-                results.push({
-                    location: toLoc || fromLoc,
-                    status: "ARR",
-                    date: arrTime || depTime,
-                    pieces: pcs,
-                    weight: wgt,
-                    remarks: `From ${fromLoc} to ${toLoc}`,
-                    flight: flt
-                });
+            const fromLoc = cols[0].innerText.trim();
+            const toLoc = cols[1].innerText.trim();
+            const serviceType = cols[2].classList.contains('rfs') ? 'RFS' : (cols[2].classList.contains('flight') ? 'FLIGHT' : '');
+            const flightNum = cols[3].innerText.trim();
+            const depTime = cols[4].innerText.trim();
+            const arrTime = cols[5].innerText.trim();
+            const pcs = cols[6].innerText.trim();
+            const wgt = cols[7].innerText.trim();
+
+            // Status is represented by icons in the following div.tracking-details
+            let status = "In Transit";
+            let statusCode = "DEP";
+            let nextNode = table.nextElementSibling;
+            while (nextNode && !nextNode.classList.contains('tracking-details')) {
+                nextNode = nextNode.nextElementSibling;
             }
+            if (nextNode && nextNode.classList.contains('tracking-details')) {
+                const activeIcon = nextNode.querySelector('li[class*="_on"]');
+                if (activeIcon) {
+                    if (activeIcon.classList.contains('icon1_on')) { status = "Booked"; statusCode = "BKD"; }
+                    else if (activeIcon.classList.contains('icon2_on')) { status = "Received"; statusCode = "RCS"; }
+                    else if (activeIcon.classList.contains('icon3_on')) { status = "Departed"; statusCode = "DEP"; }
+                    else if (activeIcon.classList.contains('icon4_on')) { status = "Arrived"; statusCode = "ARR"; }
+                    else if (activeIcon.classList.contains('icon5_on')) { status = "Delivered"; statusCode = "DLV"; }
+                }
+            }
+
+            results.push({
+                location: toLoc || fromLoc,
+                status: status,
+                statusCode: statusCode,
+                date: arrTime || depTime,
+                pieces: pcs,
+                weight: wgt,
+                remarks: `Segment: ${fromLoc} to ${toLoc}. Service: ${serviceType}. Departure: ${depTime}`,
+                flight: flightNum
+            });
         });
+        // Reverse to have latest event first
+        results.reverse();
         return results;
         """
         
@@ -161,7 +195,8 @@ class ChallengeTracker(AirlineTracker):
             for ev in raw_events:
                 results.append(TrackingEvent(
                     location=ev.get("location"),
-                    status_code=ev.get("status"), # Generic
+                    status=ev.get("status"),
+                    status_code=ev.get("statusCode"),
                     date=ev.get("date"),
                     pieces=ev.get("pieces"),
                     weight=ev.get("weight"),
