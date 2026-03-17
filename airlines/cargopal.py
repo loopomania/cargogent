@@ -129,8 +129,30 @@ class CargoPalTracker(AirlineTracker):
 
         status, flight_guess = None, None
         if events:
-            # Sort events if they have dates? Since we aren't parsing dates uniformly yet, 
-            # let's rely on the order provided by the API (usually chronological).
+            # Sort events chronologically. 
+            # CargoPal dates are often in ISO-like format from the API (createdon) 
+            # or custom strings. We'll try to parse them for sorting.
+            def parse_date(evt):
+                if not evt.date:
+                    return datetime.min
+                # API dates from Table3/Table1 are usually "2026-03-16T..." 
+                # or "16-Mar-2026 15:15:00" etc.
+                try:
+                    # Try ISO format first
+                    return datetime.fromisoformat(evt.date.replace("Z", "+00:00"))
+                except:
+                    try:
+                        # Try common PAL format "16-Mar-2026 15:15:00"
+                        return datetime.strptime(evt.date, "%d-%b-%Y %H:%M:%S")
+                    except:
+                        try:
+                            # Try "16 Mar 2026 15:15"
+                            return datetime.strptime(evt.date, "%d %b %Y %H:%M")
+                        except:
+                            return datetime.min
+
+            events.sort(key=parse_date)
+
             status = events[-1].status_code
             flight_guess = next((e.flight for e in reversed(events) if e.flight), None)
 

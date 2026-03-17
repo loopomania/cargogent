@@ -4,7 +4,9 @@ import asyncio
 import json
 import re
 import os
+import sys
 from typing import List
+from datetime import datetime
 
 from playwright.async_api import async_playwright, Response
 
@@ -26,9 +28,12 @@ class ElAlTracker(AirlineTracker):
         origin = None
         destination = None
         trace = []
+        ajax_data = []
 
-        # CRITICAL: We use headed mode on Xvfb (:99) to bypass Reblaze/Radware
-        os.environ["DISPLAY"] = ":99"
+        # Only use Xvfb on Linux
+        if sys.platform == "linux":
+            os.environ["DISPLAY"] = ":99"
+            trace.append("linux_detected_setting_display")
 
         proxy_config = None
         if self.proxy:
@@ -40,155 +45,228 @@ class ElAlTracker(AirlineTracker):
                     "username": user,
                     "password": password,
                 }
-                trace.append("using_playwright_proxy")
 
+        # Strategy 0: Legacy URL (fast and simple, often more stable)
         try:
             async with async_playwright() as p:
-                # Launch in HEADED mode
                 browser = await p.chromium.launch(
-                    headless=False,
+                    headless=True, 
                     proxy=proxy_config,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+                    args=["--no-sandbox", "--disable-dev-shm-usage"]
                 )
-
+                
+                # Use a specific Mobile User-Agent
+                mobile_ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
                 context = await browser.new_context(
-                    user_agent=(
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/124.0.0.0 Safari/537.36"
-                    ),
+                    viewport={'width': 390, 'height': 844},
+                    user_agent=mobile_ua,
+                    is_mobile=True,
+                    has_touch=True
                 )
-
-                # Manual Stealth
-                await context.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    window.navigator.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
-                    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-                """)
+                
+                # Basic stealth
+                await context.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
                 
                 page = await context.new_page()
-                trace.append("browser_started_headed_stealth")
+                legacy_url = f"https://www.elalextra.net/info/awb.asp?aid={prefix}&awb={serial}&Lang=Eng"
+                trace.append(f"strategy_0_navigating_legacy_mobile")
+                
+                # Introduce a small delay to simulate human interaction if needed, though direct nav usually fine
+                await page.goto(legacy_url, timeout=30000, wait_until="domcontentloaded")
+                await asyncio.sleep(2) # Give it a moment to render any JS challenges
+                
+                legacy_text = await page.evaluate("document.body.innerText")
+                await browser.close()
+                
+                if legacy_text:
+                    trace.append(f"legacy_text_len:{len(legacy_text)}")
+                    events = self._parse_legacy_text(legacy_text)
+                    if events:
+                        trace.append(f"independent_legacy_success:{len(events)}")
+                        return self._finalize_response(awb_fmt, events, trace)
+                    else:
+                        trace.append("legacy_parse_yielded_no_events")
+                        # Debug info
+                        with open("/tmp/elal_legacy.txt", "w") as f:
+                            f.write(legacy_text)
+                else:
+                    trace.append("legacy_text_empty")
+        except Exception as le:
+            trace.append(f"indep_legacy_err:{str(le)[:40]}")
 
-                # Interception
-                ajax_data: list = []
 
-                async def handle_response(response: Response):
-                    if "getStations" in response.url and response.status == 200:
-                        try:
-                            body = await response.json()
-                            if isinstance(body, list):
-                                ajax_data.extend(body)
-                                trace.append(f"intercepted_ajax:{len(body)}_items")
-                        except:
-                            pass
-
-                page.on("response", handle_response)
-
-                trace.append("navigating_main_page")
-                await page.goto(self.main_url, timeout=60000, wait_until="domcontentloaded")
-
-                # Wait for Reblaze challenge to clear in headed mode
-                await asyncio.sleep(15)
-
-                body_html = await page.content()
-                if "onetrust-accept-btn-handler" in body_html:
+        # Strategy Loop: Try main site configurations
+        success = False
+        for attempt in range(3):
+            browser = None
+            try:
+                async with async_playwright() as p:
+                    # Strategy: Headless is often more stable in problematic environments
+                    is_mac = sys.platform == "darwin"
+                    browser = await p.chromium.launch(
+                        headless=is_mac, 
+                        proxy=proxy_config,
+                        args=["--no-sandbox", "--disable-dev-shm-usage"]
+                    )
+                    trace.append(f"attempt_{attempt}_launched_headless_{is_mac}")
+                    
+                    context = await browser.new_context(
+                        viewport={'width': 1280, 'height': 720},
+                        user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                    )
+                    
+                    if attempt < 2:
+                        await context.add_init_script("""
+                            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                            window.navigator.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
+                        """)
+                    
+                    page = await context.new_page()
+                    
+                    # Intercept AJAX
+                    async def handle_response(response):
+                        if "getStations" in response.url and response.status == 200:
+                            try:
+                                data = await response.json()
+                                if isinstance(data, list):
+                                    ajax_data.extend(data)
+                                    trace.append(f"intercepted:{len(data)}")
+                            except: pass
+                    
+                    page.on("response", handle_response)
+                    
+                    # Navigate
                     try:
-                        await page.click("#onetrust-accept-btn-handler", timeout=5000)
-                        trace.append("cookies_accepted")
+                        await page.goto(self.main_url, wait_until="networkidle", timeout=60000)
+                        trace.append("navigated_main")
+                    except Exception as ne:
+                        trace.append(f"nav_err:{str(ne)[:30]}")
+                        # Fallback to simple load
+                        try: await page.goto(self.main_url, wait_until="domcontentloaded", timeout=30000)
+                        except: pass
+                    
+                    # Cookie acceptance
+                    try:
+                        accept_btn = await page.query_selector("#onetrust-accept-btn-handler")
+                        if accept_btn:
+                            await accept_btn.click()
+                            await asyncio.sleep(2)
                     except: pass
 
-                if is_bot_blocked_html(body_html) or "access denied" in body_html.lower() or "challenge" in body_html.lower():
-                    if "rbzns" in body_html or "winsocks" in body_html:
-                        trace.append("reblaze_challenge_detected")
-                        await asyncio.sleep(15)
-                        body_html = await page.content()
-
-                if is_bot_blocked_html(body_html) or "access denied" in body_html.lower():
-                    blocked = True
-                    trace.append("main_page_blocked")
-                else:
-                    trace.append("main_page_loaded")
-                    # Form interaction
+                    # Form Interaction
                     try:
-                        # Find prefix/serial (Try multiple selectors, some sites use iframes but diagnostic v4 says it's main page)
-                        prefix_input = await page.query_selector("input.txtTrackPrefix, #txtAwbPrefix, input[name*='refix']")
+                        # Wait a bit for iframes to populate
+                        await asyncio.sleep(5)
+                        
+                        tracking_frame = None
+                        for frame in page.frames:
+                            if "iframeTracking" in (frame.name or "") or "AIR2.aspx" in frame.url:
+                                tracking_frame = frame
+                                break
+                        
+                        target = tracking_frame if tracking_frame else page
+                        
+                        # Specific selectors found: AWBID, AWBNumber, ImageButton1
+                        prefix_input = await target.wait_for_selector("#AWBID, input.txtTrackPrefix, #txtAwbPrefix", timeout=20000)
                         if prefix_input:
                             await prefix_input.fill(prefix)
-                            trace.append("filled_prefix")
-                        
-                        serial_input = await page.query_selector("input.txttrackAWBNum, #txtAwbNum, input[name*='erial']")
-                        if serial_input:
-                            await serial_input.fill(serial)
-                            trace.append("filled_serial")
+                            serial_input = await target.wait_for_selector("#AWBNumber, input.txttrackAWBNum, #txtAwbNum", timeout=10000)
+                            if serial_input:
+                                await serial_input.fill(serial)
+                                btn = await target.query_selector("#ImageButton1, button.btnOnlineTracking, #btnTrack")
+                                if btn:
+                                    try:
+                                        await btn.click()
+                                        trace.append("track_clicked_specific")
+                                    except: pass
+                                    
+                                    # Wait for AJAX or success indicator
+                                    for _ in range(10):
+                                        if ajax_data: 
+                                            success = True
+                                            break
+                                        await asyncio.sleep(1)
+                                    
+                                    if not ajax_data:
+                                        try:
+                                            manual_data = await target.evaluate(f"async () => {{ try {{ const r = await fetch('AIR2.aspx/getStations?awbTrackNum={serial}&airlineId={prefix}'); return await r.json(); }} catch(e) {{ return null; }} }}")
+                                            if manual_data and isinstance(manual_data, list):
+                                                ajax_data.extend(manual_data)
+                                                success = True
+                                                trace.append("manual_fetch_in_frame_success")
+                                        except: pass
+                    except Exception as fe:
+                        trace.append(f"form_err:{str(fe)[:30]}")
 
-                        if prefix_input and serial_input:
-                            btn = await page.query_selector("button.btnOnlineTracking, #btnTrack, button:has-text('GO')")
-                            if btn:
-                                await btn.click()
-                                trace.append("clicked_track_button")
-                                await asyncio.sleep(10)
-                    except Exception as e:
-                        trace.append(f"form_interaction_err:{str(e)[:40]}")
-
-                    # Manual fetch if still no data (headed cookies should be valid)
-                    if not ajax_data:
-                        trace.append("manual_ajax_fallback")
+                    # Strategy 2: Legacy fallback if AJAX failed
+                    if not success and not ajax_data:
+                        trace.append("try_legacy")
+                        legacy_url = f"https://www.elalextra.net/info/awb.asp?aid={prefix}&awb={serial}&Lang=Eng"
                         try:
-                            result = await page.evaluate(f"""
-                                async () => {{
-                                    try {{
-                                        const r = await fetch(
-                                            '/ElalCargo/ajax/getStations?awbTrackNum={serial}&airlineId={prefix}',
-                                            {{ headers: {{ 'X-Requested-With': 'XMLHttpRequest' }}, credentials: 'include' }}
-                                        );
-                                        const text = await r.text();
-                                        return {{status: r.status, body: text}};
-                                    }} catch(e) {{ return {{error: e.message}}; }}
-                                }}
-                            """)
-                            if result and not result.get("error"):
-                                body_text = result.get("body", "").strip()
-                                if body_text.startswith("["):
-                                    parsed = json.loads(body_text)
-                                    ajax_data.extend(parsed)
-                                    trace.append(f"manual_ajax_success:{len(parsed)}")
-                                else:
-                                    trace.append(f"manual_ajax_not_json_len:{len(body_text)}")
-                        except:
-                            pass
+                            await page.goto(legacy_url, timeout=30000, wait_until="domcontentloaded")
+                            await asyncio.sleep(3)
+                            legacy_text = await page.evaluate("document.body.innerText")
+                            if legacy_text:
+                                events = self._parse_legacy_text(legacy_text)
+                                if events: 
+                                    success = True
+                                    trace.append("legacy_success")
+                        except Exception as le:
+                            trace.append(f"legacy_err:{str(le)[:30]}")
 
-                if ajax_data:
-                    events = self._parse_ajax_data(ajax_data)
-                    trace.append(f"strategy_1_events:{len(events)}")
+                    if success or ajax_data:
+                        break # Out of try block
+                    
+            except Exception as e:
+                trace.append(f"attempt_{attempt}_fail:{str(e)[:40]}")
+            finally:
+                if browser:
+                    try: await browser.close()
+                    except: pass
+            
+            if success or ajax_data:
+                break
+            await asyncio.sleep(2)
 
-                # Legacy fallback
-                if not events:
-                    trace.append("strategy_2_legacy")
-                    legacy_url = f"https://www.elalextra.net/info/awb.asp?aid={prefix}&awb={serial}&Lang=Eng"
-                    try:
-                        await page.goto(legacy_url, timeout=30000)
-                        await asyncio.sleep(5)
-                        legacy_text = await page.evaluate("document.body.innerText")
-                        if "Access Denied" not in legacy_text and "Edgesuite" not in legacy_text:
-                            events = self._parse_legacy_text(legacy_text)
-                            if events: trace.append(f"legacy_events:{len(events)}")
-                    except:
-                        pass
+        if ajax_data:
+            events = self._parse_ajax_data(ajax_data)
+            trace.append("ajax_events_parsed")
 
-                await browser.close()
+        return self._finalize_response(awb_fmt, events, trace, message, blocked)
 
-        except Exception as exc:
-            message = f"El Al tracking failed: {exc}"
-            blocked = True
-            trace.append(f"exception:{str(exc)[:80]}")
-
+    def _finalize_response(self, awb_fmt, events, trace, message="Success", blocked=False):
         status, flight = None, None
+        origin = None
+        destination = None
+        
         if events:
-            status = events[-1].status_code
+            # Sort chronologically Oldest to Latest
+            def parse_dt(e):
+                try:
+                    # Format "17 Mar 26 15:15" or similar
+                    return datetime.strptime(e.date, "%d %b %y %H:%M")
+                except:
+                    return datetime.min
+
+            events.sort(key=parse_dt)
+            
+            # Map Origin/Destination correctly
+            dep_events = [e for e in events if e.status_code == "DEP"]
+            arr_events = [e for e in events if e.status_code == "ARR"]
+            
+            if dep_events:
+                origin = dep_events[0].location
+            else:
+                origin = next((e.location for e in events if e.location), None)
+            
+            if arr_events:
+                destination = arr_events[-1].location
+            else:
+                destination = next((e.location for e in reversed(events) if e.location), None)
+
+            # Final status/flight
+            status = events[-1].status if events else "UNKN"
             flight = next((e.flight for e in reversed(events) if e.flight), None)
-            if not origin:
-                origin = events[0].location
-                destination = events[-1].location
 
         return TrackingResponse(
             airline=self.name, awb=awb_fmt, origin=origin, destination=destination,
@@ -199,24 +277,111 @@ class ElAlTracker(AirlineTracker):
     def _parse_ajax_data(self, data: list) -> List[TrackingEvent]:
         events: List[TrackingEvent] = []
         if not data or not isinstance(data, list): return events
+        
         def s(val): return str(val).strip() if val is not None else None
+        
+        # El Al AJAX Status Mapper
+        # B = Booked, R = Received from Shipper, E = Expected / Exited / Departed?, A = Arrived?
+        # Based on user feedback, codes are mixed. Let's try to map logically.
+        def map_code(raw_type):
+            if not raw_type: return "UNKN"
+            t = raw_type.upper()
+            if t == "B": return "BKD"
+            if t == "R": return "RCS"
+            if t == "E": return "DEP" # Exited / Departed
+            if t == "A": return "ARR" # Arrived
+            return t if len(t) == 3 else "UNKN"
+
         for item in data:
+            raw_date = s(item.get('PointDateStr','')) # e.g. "17-Mar-26"
+            raw_time = s(item.get('DepTime',''))      # e.g. "15:15"
+            
+            # Standardize date to "DD MMM YY HH:mm" for internal sorting
+            clean_date = None
+            if raw_date and raw_time:
+                try:
+                    dt = datetime.strptime(f"{raw_date} {raw_time}", "%d-%b-%y %H:%M")
+                    clean_date = dt.strftime("%d %b %y %H:%M")
+                except:
+                    clean_date = f"{raw_date} {raw_time}"
+
             events.append(TrackingEvent(
-                status_code=s(item.get("TYPE")),
+                status_code=map_code(s(item.get("TYPE"))),
+                status=s(item.get("DetailedStatus")),
                 location=s(item.get("Origin") or item.get("Dest")),
-                date=f"{s(item.get('PointDateStr',''))} {s(item.get('DepTime',''))}".strip(),
+                date=clean_date,
                 flight=s(item.get("Flight")),
-                pieces=s(item.get("PCS")), weight=s(item.get("Weight")),
+                pieces=s(item.get("PCS")), 
+                weight=s(item.get("Weight")),
                 remarks=s(item.get("DetailedStatus")),
             ))
         return events
 
     def _parse_legacy_text(self, text: str) -> List[TrackingEvent]:
         events: List[TrackingEvent] = []
-        pattern = r"([A-Z]{3})\s+([A-Z]{3})\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2})\s+(\d{2}:\d{2})\s+(\d+)\s+([\d.]+)\s*([A-Z]{3})"
-        for m in re.finditer(pattern, text):
-            g = m.groups()
-            events.append(TrackingEvent(
-                status_code=g[6], location=g[0], date=f"{g[2]} {g[3]}", pieces=g[4], weight=g[5],
-            ))
+        
+        # New pattern for standard event rows:
+        # FOH     TLV     23 Feb 26  22:55        3       11.0    
+        # RCF     JFK     25 Feb 26  07:15        23      569.0   LY 001
+        # NFD     JFK     25 Feb 26  08:09        23      569.0                   DSV AIR SEA INC
+        event_pattern = r"^([A-Z]{3})\s+([A-Z]{3})\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2})\s+(\d{2}:\d{2})\s+(\d+)\s+([\d.]+)(.*)$"
+        
+        for line in text.split('\n'):
+            line = line.strip().replace('\xa0', ' ')
+            m = re.match(event_pattern, line)
+            if m:
+                g = m.groups()
+                status_code = g[0]
+                location = g[1]
+                date = f"{g[2]} {g[3]}"
+                pieces = g[4]
+                weight = g[5]
+                trailing = g[6].strip()
+                
+                flight = None
+                remarks = None
+                
+                if trailing:
+                    if re.match(r"^([A-Z]{2,3})\s*(\d{3,4})$", trailing):
+                        flight = trailing
+                    else:
+                        remarks = trailing
+                        
+                events.append(TrackingEvent(
+                    status_code=status_code,
+                    location=location,
+                    date=date,
+                    pieces=pieces,
+                    weight=weight,
+                    status=f"Status {status_code}",
+                    flight=flight,
+                    remarks=remarks
+                ))
+        
+        # Pattern 2: Multi-pipe/tab/space format (older style)
+        if not events:
+            pattern2 = r"(LY\s+\d+)\s*[|\t ]+\s*[^|\t\n]+[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*(\d+)\s*[|\t ]+\s*([\d.]+)"
+            for m in re.finditer(pattern2, text):
+                g = m.groups()
+                events.append(TrackingEvent(
+                    flight=g[0],
+                    date=g[2].strip(), 
+                    location=g[5].strip(), 
+                    status_code="DEP" if g[1] == "E" else g[1],
+                    pieces=g[7].strip(),
+                    weight=g[8].strip(),
+                    status=f"Departed {g[0]} from {g[5]}",
+                    remarks=f"Flight {g[0]} to {g[6]}"
+                ))
+                events.append(TrackingEvent(
+                    flight=g[0],
+                    date=g[4].strip(),
+                    location=g[6].strip(),
+                    status_code="ARR" if g[3] == "A" else g[3],
+                    pieces=g[7].strip(),
+                    weight=g[8].strip(),
+                    status=f"Arrived {g[0]} at {g[6]}",
+                    remarks=f"Flight {g[0]} from {g[5]}"
+                ))
+                
         return events

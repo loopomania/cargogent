@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 import time
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
@@ -7,6 +8,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from typing import List, Optional
+from datetime import datetime
 
 from .base import AirlineTracker
 from .common import normalize_awb
@@ -20,8 +22,6 @@ class EthiopianTracker(AirlineTracker):
 
     async def track(self, awb: str) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="071")
-        # Ethiopian seems to want the full AWB or just the serial. 
-        # Based on research, the input ID is AirwayBilNum.
         full_awb = f"{prefix}{serial}"
         trace = []
         
@@ -67,7 +67,6 @@ class EthiopianTracker(AirlineTracker):
                 trace.append("results_detected")
             except:
                 trace.append("results_timeout")
-                driver.save_screenshot("ethiopian_timeout.png")
 
             # Scrape basic info
             status = "In Transit"
@@ -75,24 +74,41 @@ class EthiopianTracker(AirlineTracker):
             dest = None
             
             try:
-                # Find labels then their values
-                headers = driver.find_elements(By.CSS_SELECTOR, ".et-track-header-item")
-                for item in headers:
-                    text = item.text.strip()
-                    if "Origin" in text:
-                        origin = item.find_element(By.XPATH, "./following-sibling::div").text.strip()
-                    elif "Destination" in text:
-                        dest = item.find_element(By.XPATH, "./following-sibling::div").text.strip()
+                # Find labels then their values in the whole page
+                # The labels are often in divs or spans
+                all_divs = driver.find_elements(By.TAG_NAME, "div")
+                for i, div in enumerate(all_divs):
+                    text = div.text.strip()
+                    if text == "Origin" and i + 1 < len(all_divs):
+                        origin = all_divs[i+1].text.strip()
+                    elif text == "Destination" and i + 1 < len(all_divs):
+                        dest = all_divs[i+1].text.strip()
+                
+                # If still not found, try a different selector
+                if not origin or not dest:
+                    headers = driver.find_elements(By.CSS_SELECTOR, ".et-track-header-item")
+                    for item in headers:
+                        text = item.text.strip()
+                        if "Origin" in text:
+                            origin = item.find_element(By.XPATH, "./following-sibling::div").text.strip()
+                        elif "Destination" in text:
+                            dest = item.find_element(By.XPATH, "./following-sibling::div").text.strip()
             except:
                 pass
 
             # Scrape events
             events = self._scrape_events(driver)
             if events:
-                status = events[0].status
+                status = events[-1].status if events else "UNKN"
+                # Fallback for origin/dest if not found in header
+                # We want the FIRST non-None location for origin, LAST for dest
+                if not origin:
+                    origin = next((e.location for e in events if e.location), None)
+                if not dest:
+                    dest = next((e.location for e in reversed(events) if e.location), None)
 
             return TrackingResponse(
-                awb=awb,
+                awb=f"{prefix}-{serial}",
                 airline="Ethiopian Airlines",
                 origin=origin,
                 destination=dest,
@@ -115,89 +131,36 @@ class EthiopianTracker(AirlineTracker):
                 driver.quit()
 
     def _scrape_events(self, driver) -> List[TrackingEvent]:
-        extraction_script = """
-        const results = [];
-        const historyRows = document.querySelectorAll('.et-track-history-item');
-        
-        historyRows.forEach(row => {
-            const statusBox = row.querySelector('.et-track-history-status');
-            const status = statusBox ? statusBox.innerText.trim() : "";
-            
-            const detailBox = row.querySelector('.et-track-history-detail');
-            const remarks = detailBox ? detailBox.innerText.trim() : "";
-            
-            const timeBox = row.querySelector('.et-track-history-time');
-            const time = timeBox ? timeBox.innerText.trim() : "";
-            
-            if (status || time) {
-                results.push({
-                    status: status,
-                    remarks: remarks,
-                    time: time,
-                    location: "" // Location often embedded in remarks
-                });
-            }
-        });
-        return results;
-        """
-        # Wait, let me double check the class names from the screenshot.
-        # Actually I can use a more generic text-based extraction if classes are tricky.
-        # From screenshot, it looks like:
-        # Each event has a circle, then Status, then details (pieces, weight, flight), then Date/Time on the far right.
-        
-        # I'll use the script from the research or a revised one.
-        # Let's try to extract from the list structure.
-        
+        # Text-based extraction from results
         extraction_script = """
         const events = [];
-        // The container seems to be a list of events.
-        // Each entry has a label (Status), a description (pieces, etc.), and a timestamp.
-        
-        const historyItems = Array.from(document.querySelectorAll('div')).filter(el => {
-            return el.innerText && el.innerText.includes('Shipment History');
-        });
-        
-        if (historyItems.length > 0) {
-            const container = historyItems[0].parentElement;
-            // Based on visual layout: Circle -> Status -> Details -> Timestamp
-            // Let's look for the rows.
-            const rows = container.querySelectorAll('.row, div[style*="border-bottom"]'); // Approximation
-            // Actually, let's use the innerText strategy if selectors are unknown.
-            
-            const allText = document.body.innerText;
-            const historyStart = allText.indexOf('Shipment History');
-            if (historyStart !== -1) {
-                const historyText = allText.substring(historyStart);
-                const lines = historyText.split('\\n').map(l => l.trim()).filter(l => l);
-                // First valid line is "Shipment History"
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i];
-                    // Potential status line. Let's look for the timestamp pattern.
-                    // Timestamp: "26-Jan-26 10:57:00"
-                    const timeMatch = line.match(/\\d{2}-[A-Z][a-z]{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}/);
-                    if (timeMatch) {
-                        const time = timeMatch[0];
-                        // The status might be a few lines back.
-                        // For example:
-                        // Delivered
-                        // 3/3 Pcs | ...
-                        // 26-Jan-26 10:57:00
-                        let status = lines[i-2] || "";
-                        let remarks = lines[i-1] || "";
-                        
-                        // If status is too long or looks like remarks, adjust.
-                        if (status.includes('|')) {
-                             status = lines[i-3] || "Status";
-                             remarks = lines[i-2] + " | " + lines[i-1];
-                        }
-
-                        events.push({
-                            time: time,
-                            status: status,
-                            remarks: remarks,
-                            location: ""
-                        });
+        const allText = document.body.innerText;
+        const historyStart = allText.indexOf('Shipment History');
+        if (historyStart !== -1) {
+            const historyText = allText.substring(historyStart);
+            const lines = historyText.split('\\n').map(l => l.trim()).filter(l => l);
+            // Walk through lines looking for timestamp pattern: 26-Jan-26 10:57:00
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const timeMatch = line.match(/^(\\d{2}-[A-Z][a-z]{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})$/);
+                if (timeMatch) {
+                    const time = timeMatch[1];
+                    // Status is usually 2 lines back, remarks 1 line back
+                    // But if it is stacked differently, we backtrack until we find lines that aren't timestamps or headers
+                    let status = lines[i-2] || "";
+                    let remarks = lines[i-1] || "";
+                    
+                    // If we find pieces pattern in "status", it means we offset by 1
+                    if (status.includes('/') || status.includes('|') || status.includes('Pcs')) {
+                        status = lines[i-3] || "Status";
+                        remarks = lines[i-2] + " | " + lines[i-1];
                     }
+
+                    events.push({
+                        date: time,
+                        status: status,
+                        remarks: remarks
+                    });
                 }
             }
         }
@@ -207,13 +170,86 @@ class EthiopianTracker(AirlineTracker):
         try:
             raw_events = driver.execute_script(extraction_script)
             results = []
+            
+            # Helper for mapping status codes
+            def get_status_code(status_text: str) -> str:
+                s = status_text.lower()
+                if "delivered" in s: return "DLV"
+                if "departed" in s or "flight" in s: return "DEP"
+                if "arrived" in s: return "ARR"
+                if "received" in s or "rcs" in s or "accepted" in s: return "RCS"
+                if "booked" in s: return "BKD"
+                if "manifest" in s: return "MAN"
+                if "ready" in s or "pickup" in s: return "NFD"
+                return "UNKN"
+
             for ev in raw_events:
+                remarks = ev.get("remarks", "")
+                pieces = None
+                weight = None
+                flight = None
+                location = None
+                
+                # Parse pieces: e.g., "20/20 Pcs"
+                pc_match = re.search(r"(\d+)/\d+\s+Pcs", remarks, re.IGNORECASE)
+                if pc_match:
+                    pieces = pc_match.group(1)
+                
+                # Parse weight: e.g., "208.0 Kg"
+                wt_match = re.search(r"([\d.]+)\s*Kg", remarks, re.IGNORECASE)
+                if wt_match:
+                    weight = wt_match.group(1) + " KG"
+                
+                # Parse flight: e.g., "on ET629"
+                fl_match = re.search(r"on\s+(ET\d{3,4})", remarks, re.IGNORECASE)
+                if fl_match:
+                    flight = fl_match.group(1).upper()
+                
+                # Parse location: "from CGK to ADD" or "at ADD"
+                # If "Departed", we want the "from" station.
+                # If "Arrived", we want the "to" or "at" station.
+                s_lower = ev.get("status", "").lower()
+                from_match = re.search(r"from\s+([A-Z]{3})", remarks, re.IGNORECASE)
+                to_match = re.search(r"to\s+([A-Z]{3})", remarks, re.IGNORECASE)
+                at_match = re.search(r"at\s+([A-Z]{3})", remarks, re.IGNORECASE)
+
+                if "departed" in s_lower and from_match:
+                    location = from_match.group(1).upper()
+                elif ("arrived" in s_lower or "delivered" in s_lower) and (to_match or at_match):
+                    location = (to_match or at_match).group(1).upper()
+                elif from_match: # Fallback
+                    location = from_match.group(1).upper()
+                elif at_match:
+                    location = at_match.group(1).upper()
+                elif to_match:
+                    location = to_match.group(1).upper()
+                else:
+                    # Last resort: find any 3-letter code
+                    loc_pattern = re.findall(r"\b([A-Z]{3})\b", remarks)
+                    if loc_pattern:
+                        location = loc_pattern[-1]
+
                 results.append(TrackingEvent(
-                    time=ev.get("time"),
+                    status_code=get_status_code(ev.get("status", "")),
                     status=ev.get("status"),
-                    remarks=ev.get("remarks"),
-                    location=ev.get("location")
+                    location=location,
+                    date=ev.get("date"),
+                    pieces=pieces,
+                    weight=weight,
+                    remarks=remarks,
+                    flight=flight
                 ))
+            
+            # Sort events (Ethiopian sometimes shows them reversed)
+            # Format: "26-Jan-26 10:57:00"
+            def parse_date(d_str):
+                try:
+                    return datetime.strptime(d_str, "%d-%b-%y %H:%M:%S")
+                except:
+                    return datetime.min
+
+            results.sort(key=lambda x: parse_date(x.date))
+            
             return results
         except Exception as e:
             logger.error(f"Ethiopian scraping error: {e}")

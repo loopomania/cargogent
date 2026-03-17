@@ -67,7 +67,24 @@ class LufthansaTracker(AirlineTracker):
             driver.get(source_url)
             
             # Wait for content to load
-            time.sleep(15) 
+            time.sleep(5)
+            
+            # Handle cookie consent
+            try:
+                accept_btn = driver.find_element(By.ID, "uc-btn-accept-banner")
+                if accept_btn.is_displayed():
+                    accept_btn.click()
+                    time.sleep(2)
+            except:
+                try:
+                    # Alternative selector if ID is different
+                    accept_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Accept all')]")
+                    accept_btn.click()
+                    time.sleep(2)
+                except:
+                    pass
+
+            time.sleep(10) # Wait for page to finish loading data after consent
             
             # Extract text from the whole page including Shadow DOM to catch React-rendered details
             page_text = driver.execute_script("""
@@ -96,6 +113,11 @@ class LufthansaTracker(AirlineTracker):
                 message = "Cloudflare Turnstile JS challenge blocking access."
             else:
                 message = "Successfully loaded tracking data."
+                driver.save_screenshot("lufthansa_debug.png")
+                with open("lufthansa_debug.html", "w") as f:
+                    f.write(html)
+                with open("lufthansa_debug_text.txt", "w") as f:
+                    f.write(page_text)
         except Exception as exc:
             message = f"Undetected-chromedriver fetch failed: {exc}"
             blocked = True
@@ -112,13 +134,27 @@ class LufthansaTracker(AirlineTracker):
         
         # If no events found via standard tables, use the text-based extraction
         if not events and not blocked:
-            # Look for Milestone plan or Status history sections
-            # Format: STATUS DATE / TIME PIECES LOCATION
-            # Example: BKD 04 JAN / 21:43 1 pcs TLV
-            pattern = r"(BKD|RCS|DEP|ARR|RCF|NFD|DLV|MAN|DIS)\s+(\d{2}\s+[A-Z]{3})\s*/\s*(\d{2}:\d{2})\s+(\d+)\s+pcs\s+([A-Z]{3})"
+            # Improved regex to handle various Lufthansa date/time formats
+            # Looking for patterns like: BKD 26 FEB / 17:23 1 pcs TLV
+            pattern = r"(BKD|RCS|DEP|ARR|RCF|NFD|DLV|MAN|DIS)\s+(\d{2}\s+[A-Z]{3})\s*(?:/)?\s*(\d{2}:\d{2})\s*(\d+)?\s*(?:pcs)?\s*([A-Z]{3})"
             matches = re.finditer(pattern, page_text)
             for m in matches:
-                status_code, date_part, time_part, pieces, location = m.groups()
+                groups = m.groups()
+                status_code = groups[0]
+                date_part = groups[1]
+                time_part = groups[2]
+                pieces = groups[3] or "1"
+                location = groups[4]
+                
+                events.append(
+                    TrackingEvent(
+                        status_code=status_code,
+                        location=location,
+                        date=f"{date_part} {time_part}",
+                        pieces=pieces,
+                        remarks="Extracted from milestone text",
+                    )
+                )
                 events.append(
                     TrackingEvent(
                         status_code=status_code,

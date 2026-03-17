@@ -8,6 +8,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from typing import List, Optional
+from datetime import datetime
 
 from .base import AirlineTracker
 from .common import (
@@ -94,7 +95,6 @@ class CathayTracker(AirlineTracker):
                 trace.append("results_rendered")
             except:
                 trace.append("results_timeout")
-                driver.save_screenshot("cathay_final_error.png")
 
             # Expand shipment history
             try:
@@ -124,7 +124,7 @@ class CathayTracker(AirlineTracker):
                 status = status_el.text.strip()
             except:
                 if events:
-                    status = events[0].status
+                    status = events[-1].status if events else "UNKN"
 
             try:
                 od_el = driver.find_element(By.CSS_SELECTOR, ".-overall-od")
@@ -134,12 +134,16 @@ class CathayTracker(AirlineTracker):
             except:
                 pass
 
+            # Finalize TrackingResponse
+            flight = next((e.flight for e in reversed(events) if e.flight), None)
+
             return TrackingResponse(
-                awb=awb,
+                awb=f"{prefix}-{serial}",
                 airline="Cathay Cargo",
                 origin=origin,
                 destination=dest,
                 status=status,
+                flight=flight,
                 events=events,
                 raw_meta={"trace": trace, "events_count": len(events)}
             )
@@ -158,7 +162,7 @@ class CathayTracker(AirlineTracker):
                 driver.quit()
 
     def _scrape_events(self, driver) -> List[TrackingEvent]:
-        # Verified text-based scraper
+        # Extraction script returns a list of dictionaries
         extraction_script = """
         const events = [];
         const text = document.body.innerText;
@@ -167,32 +171,33 @@ class CathayTracker(AirlineTracker):
         let currentDate = "";
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            // Date header
+            // Date header: e.g., "16 Jan 2026"
             if (line.match(/^\\d{1,2} [A-Z][a-z]{2} \\d{4}$/)) {
                 currentDate = line;
                 continue;
             }
-            // Event row (Time + Loc)
+            // Event row (Time + Loc): e.g., "05:13 HKG"
             const timeMatch = line.match(/^(\\d{2}:\\d{2})(\\s+[A-Z]{3})?$/);
             if (timeMatch) {
-                const time = timeMatch[1];
+                const timeStr = timeMatch[1];
                 let location = timeMatch[2]?.trim() || "";
                 let currentIdx = i;
                 if (!location && lines[i+1] && lines[i+1].match(/^[A-Z]{3}$/)) {
-                    location = lines[i+1];
+                    location = lines[i+1].trim();
                     currentIdx = i + 1;
                 }
-                const status = lines[currentIdx + 1] || "";
+                const rawStatus = lines[currentIdx + 1] || "";
                 let remarks = "";
                 let j = currentIdx + 2;
+                // Accumulate remarks until next time or date header
                 while (j < lines.length && !lines[j].match(/^\\d{2}:\\d{2}/) && !lines[j].match(/^\\d{1,2} [A-Z][a-z]{2} \\d{4}$/)) {
                     remarks += (remarks ? " | " : "") + lines[j];
                     j++;
                 }
                 events.push({
-                    time: (currentDate ? currentDate + " " : "") + time,
+                    date: (currentDate ? currentDate + " " : "") + timeStr,
                     location: location,
-                    status: status,
+                    status: rawStatus,
                     remarks: remarks
                 });
                 i = j - 1;
@@ -203,17 +208,67 @@ class CathayTracker(AirlineTracker):
         try:
             raw_events = driver.execute_script(extraction_script)
             results = []
+            
+            # Helper for mapping status codes
+            def get_status_code(status_text: str) -> str:
+                s = status_text.lower()
+                if "arrived" in s: return "ARR"
+                if "departed" in s or "flight" in s: return "DEP"
+                if "delivered" in s: return "DLV"
+                if "received" in s or "rct" in s or "rcs" in s: return "RCS"
+                if "manifest" in s or "man" in s: return "MAN"
+                if "booked" in s or "bkd" in s: return "BKD"
+                if "ready" in s or "nfd" in s: return "NFD"
+                return "UNKN"
+
             for ev in raw_events:
+                remarks = ev.get("remarks", "")
+                pieces = None
+                weight = None
+                flight = None
+                
+                # Parse pieces: e.g., "1pc(s)"
+                pc_match = re.search(r"(\d+)\s*pc\(s\)", remarks, re.IGNORECASE)
+                if pc_match:
+                    pieces = pc_match.group(1)
+                
+                # Parse weight: e.g., "344kg"
+                wt_match = re.search(r"(\d+)\s*kg", remarks, re.IGNORECASE)
+                if wt_match:
+                    weight = wt_match.group(1) + " KG"
+                
+                # Parse flight: e.g., "CX759", "K4701D"
+                fl_match = re.search(r"\b([A-Z0-9]{2}\d{3,4}[A-Z]?)\b", remarks)
+                if fl_match:
+                    flight = fl_match.group(1)
+                
+                # Cleanup remarks: remove the parts we extracted if they are at the start/end
+                clean_remarks = remarks
+                # If remarks starts with a code like ARR | or RCT |
+                clean_remarks = re.sub(r"^[A-Z]{3}\s*\|\s*", "", clean_remarks)
+                
                 results.append(TrackingEvent(
-                    time=ev.get("time"),
-                    location=ev.get("location"),
+                    status_code=get_status_code(ev.get("status", "")),
                     status=ev.get("status"),
-                    remarks=ev.get("remarks")
+                    location=ev.get("location"),
+                    date=ev.get("date"),
+                    pieces=pieces,
+                    weight=weight,
+                    remarks=clean_remarks,
+                    flight=flight
                 ))
+            
+            # Sort events (Cathay usually shows newest first in UI, we want oldest first for consistency)
+            def parse_date(d_str):
+                try:
+                    # Format: "16 Jan 2026 05:13"
+                    return datetime.strptime(d_str, "%d %b %Y %H:%M")
+                except:
+                    return datetime.min
+
+            results.sort(key=lambda x: parse_date(x.date))
+            
             return results
         except Exception as e:
             logger.error(f"Cathay scraping error: {e}")
             return []
-
-    def _scrape_fallback(self, driver) -> List[TrackingEvent]:
-        return []

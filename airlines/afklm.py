@@ -9,18 +9,19 @@ from __future__ import annotations
 
 import re
 import time
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 from .base import AirlineTracker
 from .common import (
     is_bot_blocked_html,
     normalize_awb,
-    summarize_from_events,
 )
 from models import TrackingEvent, TrackingResponse
 
@@ -29,70 +30,106 @@ class AFKLMTracker(AirlineTracker):
     name = "afklm"
     base_url = "https://www.afklcargo.com/mycargo/shipment/detail/"
 
-    def _extract_events_from_text(self, page_text: str) -> List[TrackingEvent]:
-        """Extract events from page text using AF-KLM status patterns."""
+    def _parse_html(self, html: str) -> dict:
+        soup = BeautifulSoup(html, "html.parser")
         events: List[TrackingEvent] = []
+        pieces = None
+        weight = None
+        remarks = None
         
-        # AF-KLM format: 04 FEB 01:06 - 2 pieces delivered at TLV
-        # Pattern: (DD MMM HH:mm) - (.*)
-        lines = page_text.split("\n")
-        for line in lines:
-            line = line.strip()
-            # Match 04 FEB 01:06 - ...
-            m = re.search(r"(\d{2}\s+[A-Z]{3}\s+\d{2}:\d{2})\s*-\s*(.*)", line, re.IGNORECASE)
-            if m:
-                date_str = m.group(1).strip()
-                description = m.group(2).strip()
+        # 1. Parse Shipment Info (pieces, weight, remarks)
+        shipment_info = soup.find("afkl-shipment-info")
+        if shipment_info:
+            lis = shipment_info.find_all("li")
+            for li in lis:
+                text = li.get_text(strip=True)
+                # Look for weight and pieces
+                if re.search(r'\b(?:pcs|pieces)\b', text, re.I) and re.search(r'\b(?:kg|lbs)\b', text, re.I):
+                    pcs_match = re.search(r'(\d+)\s*(?:pcs|pieces)', text, re.I)
+                    wt_match = re.search(r'([\d,\.]+)\s*(?:kg|lbs)', text, re.I)
+                    if pcs_match: 
+                        pieces = pcs_match.group(1)
+                    if wt_match: 
+                        weight = wt_match.group(0)
+                # Look for description remarks
+                elif "Manifest" in text or "Consolidation" in text or "Lithium" in text or len(text) > 30:
+                    # Very primitive heuristic since remarks are usually the longest text
+                    if not remarks:
+                        remarks = text
+        
+        # 2. Extract Event history (station view)
+        station_views = soup.find_all("div", class_=lambda c: c and "station-view" in c)
+        for sv in station_views:
+            rows = sv.find_all("div", class_=lambda c: c and "py-3" in c)
+            for row in rows:
+                station_tag = row.find(class_="stationName")
+                if not station_tag: 
+                    continue
+                loc = station_tag.get_text(strip=True).upper()
                 
-                # Extract status code
-                status_code = "UNKN"
-                desc_low = description.lower()
-                if any(k in desc_low for k in ["delivered", "dlv"]):
-                    status_code = "DLV"
-                elif any(k in desc_low for k in ["departed", "dep", "left", "flight"]):
-                    status_code = "DEP"
-                elif any(k in desc_low for k in ["arrived", "arr", "reached", "arrival"]):
-                    status_code = "ARR"
-                elif any(k in desc_low for k in ["received", "rcs", "accepted", "check", "warehouse"]):
-                    status_code = "RCS"
-                elif any(k in desc_low for k in ["booked", "bkd", "confirmed"]):
-                    status_code = "BKD"
-                elif any(k in desc_low for k in ["available", "nfd", "pick-up", "notified", "pickup"]):
-                    status_code = "NFD"
+                ul = row.find("ul", class_="description")
+                if not ul: 
+                    continue
                 
-                # Extract location (usually 3 uppercase letters)
-                # Blacklist common 3-letter words and months that aren't airports
-                BLACKLIST = {
-                    "OUR", "THE", "VIA", "FOR", "AND", "ANY", "NOT", "PCS", "LBS", "KGS", "OUT", "GEN", "YES", "NON",
-                    "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
-                }
-                location = None
-                
-                # Priority 1: 3-letter uppercase preceded by prepositions
-                loc_match = re.search(r"\b(at|from|to|in|of|reached|for)\s+([A-Z]{3})\b", description, re.IGNORECASE)
-                if loc_match:
-                    found = loc_match.group(2).upper()
-                    if found not in BLACKLIST:
-                        location = found
-                
-                # Priority 2: Any 3-letter uppercase in description that is NOT blacklisted
-                if not location:
-                    all_locs = re.findall(r"\b([A-Z]{3})\b", description)
-                    for l in all_locs:
-                        if l.upper() not in BLACKLIST:
-                            location = l.upper()
-                            break
+                lis = ul.find_all("li")
+                for li in lis:
+                    spans = li.find_all("span")
+                    texts = [s.get_text(strip=True) for s in spans if s.get_text(strip=True)]
+                    if len(texts) >= 3:
+                        status_raw = texts[0]
+                        pcs_text = texts[1]
+                        
+                        # Date and flight extraction handling "Estimated:" splits
+                        date_text = ""
+                        flight = None
+                        ev_pcs = None
+                        
+                        m_pcs = re.search(r'(\d+)', pcs_text)
+                        if m_pcs:
+                            ev_pcs = str(m_pcs.group(1))
 
-                events.append(
-                    TrackingEvent(
-                        status_code=status_code,
-                        location=location,
-                        date=date_str,
-                        description=description[:200]
-                    )
-                )
+                        # Find the actual date string (DD MMM HH:MM)
+                        date_str_match = next((t for t in texts[2:] if re.match(r'\d{2}\s+[A-Z]{3}\s+\d{2}:\d{2}', t)), None)
+                        if date_str_match:
+                            date_text = date_str_match
+
+                        # Find the flight string (e.g. "(AF0693)")
+                        flight_match = next((t for t in texts[2:] if "(" in t and ")" in t), None)
+                        if flight_match:
+                            flight = flight_match.strip("()")
+                        
+                        # Map Status Code
+                        status_code = "UNKN"
+                        desc_low = status_raw.lower()
+                        if "deliver" in desc_low or "dlv" in desc_low:
+                            status_code = "DLV"
+                        elif "depart" in desc_low or "dep" in desc_low:
+                            status_code = "DEP"
+                        elif "arrive" in desc_low or "arr" in desc_low:
+                            status_code = "ARR"
+                        elif "accept" in desc_low or "rcs" in desc_low or "receiv" in desc_low:
+                            status_code = "RCS"
+                        elif "book" in desc_low or "bkd" in desc_low or "confirm" in desc_low:
+                            status_code = "BKD"
+                        elif "notif" in desc_low or "nfd" in desc_low or "pick" in desc_low:
+                            status_code = "NFD"
+
+                        events.append(TrackingEvent(
+                            status_code=status_code,
+                            location=loc,
+                            date=date_text,
+                            pieces=ev_pcs,
+                            flight=flight,
+                            remarks=status_raw
+                        ))
         
-        return events
+        return {
+            "pieces": pieces,
+            "weight": weight,
+            "remarks": remarks,
+            "events": events
+        }
+
 
     async def track(self, awb: str) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="074")
@@ -100,7 +137,6 @@ class AFKLMTracker(AirlineTracker):
         message = "Success"
         blocked = False
         html = ""
-        page_text = ""
         source_url = f"{self.base_url}{awb_fmt}"
         trace = []
 
@@ -129,39 +165,7 @@ class AFKLMTracker(AirlineTracker):
             # Additional wait for actual content
             time.sleep(5)
 
-            # Extract text carefully preserving structure
-            page_text = driver.execute_script("""
-                function getAllText(node) {
-                    let text = "";
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        text += node.textContent + " ";
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const style = window.getComputedStyle(node);
-                        if (style.display === 'block' || style.display === 'flex' || node.tagName === 'LI' || node.tagName === 'TR' || node.tagName === 'P' || node.tagName === 'DIV') {
-                            text += "\\n";
-                        }
-                        if (node.shadowRoot) {
-                            text += getAllText(node.shadowRoot);
-                        }
-                        for (let child of node.childNodes) {
-                            text += getAllText(child);
-                        }
-                        if (style.display === 'block' || style.display === 'flex' || node.tagName === 'P' || node.tagName === 'DIV') {
-                            text += "\\n";
-                        }
-                    }
-                    return text;
-                }
-                return getAllText(document.body);
-            """)
-
             html = driver.page_source
-
-            # Save debug files
-            try:
-                with open("/tmp/afklm_last_html.html", "w") as f: f.write(html)
-                with open("/tmp/afklm_last_text.txt", "w") as f: f.write(page_text)
-            except: pass
 
             if is_bot_blocked_html(html):
                 blocked = True
@@ -179,15 +183,21 @@ class AFKLMTracker(AirlineTracker):
                 except Exception:
                     pass
 
-        events = self._extract_events_from_text(page_text)
+        # Parse logic
+        parsed_data = self._parse_html(html)
+        events = parsed_data.get("events", [])
+        weight = parsed_data.get("weight")
+        remarks = parsed_data.get("remarks")
+        pieces = parsed_data.get("pieces")
         
         # Sort events by date (Format: 04 FEB 01:06)
         if events:
-            from datetime import datetime
             now = datetime.now()
             current_year = now.year
             
             def parse_afkl_date(d_str):
+                if not d_str:
+                    return datetime.min
                 try:
                     # Try with current year
                     dt = datetime.strptime(f"{d_str} {current_year}", "%d %b %H:%M %Y")
@@ -200,26 +210,20 @@ class AFKLMTracker(AirlineTracker):
 
             events.sort(key=lambda x: parse_afkl_date(x.date))
         
-        # Better summarization
+        # Determine origin/destination based on sorted events
         origin, destination, status, flight = None, None, None, None
         
-        # Try finding Origin/Destination from the header area first (e.g. " BOS   TLV ")
-        header_match = re.search(r"\b([A-Z]{3})\s+([A-Z]{3})\b", page_text)
-        if header_match:
-            origin = header_match.group(1).upper()
-            destination = header_match.group(2).upper()
-
         if events:
-            # Origin fallback if not in header
-            if not origin:
-                origin = next((e.location for e in events if e.location and len(e.location) == 3), events[0].location)
-            # Destination fallback if not in header
-            if not destination or destination == origin:
-                destination = next((e.location for e in reversed(events) if e.location and len(e.location) == 3 and e.location != origin), None)
+            # First location
+            origin = events[0].location
+            # Last location that is different from origin, or last location
+            dest_candidates = [e.location for e in reversed(events) if e.location and e.location != origin]
+            destination = dest_candidates[0] if dest_candidates else origin
             
             status = events[-1].status_code
             flight = next((e.flight for e in reversed(events) if e.flight), None)
 
+        # Update TrackingResponse initialization to include the new fields
         return TrackingResponse(
             airline=self.name,
             awb=awb_fmt,
@@ -232,8 +236,10 @@ class AFKLMTracker(AirlineTracker):
             blocked=blocked,
             raw_meta={
                 "source_url": source_url,
-                "text_length": len(page_text),
                 "event_count": len(events),
-                "trace": trace
+                "trace": trace,
+                "pieces": pieces,
+                "weight": weight,
+                "remarks": remarks
             },
         )

@@ -83,3 +83,33 @@ def get_proxy_extension(proxy_url, folder_path="/tmp/proxy_auth_extension"):
         f.write(background_js)
     
     return folder_path
+
+def get_iproyal_proxy(base_proxy_url: str) -> str:
+    """
+    Transform a base IPRoyal proxy URL into a US-targeted, session-rotated one.
+    Example Input: http://user:pass@geo.iproyal.com:12321
+    Example Output: http://user-country-us-session-abc12345:pass@geo.iproyal.com:12321
+    """
+    import re
+    import random
+    import string
+
+    if not base_proxy_url or "iproyal" not in base_proxy_url.lower():
+        return base_proxy_url
+
+    # Match http://user:pass@host:port
+    match = re.search(r'(https?://)([^:@]+):([^@]*)@(.+)', base_proxy_url)
+    if not match:
+        return base_proxy_url
+
+    protocol, user, password, rest = match.groups()
+    
+    # Generate random 8-char session
+    session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    
+    # Ensure US targeting and session rotation
+    # If user already contains session or country, we might need to be careful, 
+    # but for standard geo.iproyal.com we usually append.
+    new_user = f"{user}-country-us-session-{session_id}"
+    
+    return f"{protocol}{new_user}:{password}@{rest}"
