@@ -92,24 +92,27 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
     import time
     
     t0 = time.time()
-    try:
-        res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=55.0)
-    except asyncio.TimeoutError:
+    res = None
+    last_error_msg = ""
+    for attempt in range(2):
+        try:
+            res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=40.0)
+            if res.status != "Error" or res.events:
+                break
+            else:
+                last_error_msg = res.message
+        except asyncio.TimeoutError:
+            last_error_msg = f"Primary airline tracker timed out (attempt {attempt+1})"
+        except Exception as e:
+            last_error_msg = f"Primary tracker failed (attempt {attempt+1}): {str(e)[:40]}"
+            
+    if not res or (res.status == "Error" and not getattr(res, "events", [])):
         from models import TrackingResponse
         res = TrackingResponse(
             airline=airline.title(),
             awb=awb,
             status="Error",
-            message="Primary airline tracker timed out after 55s",
-            events=[]
-        )
-    except Exception as e:
-        from models import TrackingResponse
-        res = TrackingResponse(
-            airline=airline.title(),
-            awb=awb,
-            status="Error",
-            message=f"Primary tracker failed: {str(e)[:40]}",
+            message=last_error_msg or "Unknown error",
             events=[]
         )
     
