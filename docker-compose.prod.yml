@@ -1,0 +1,89 @@
+# Production stack: Hetzner + Neon (no local Postgres).
+# Run: docker compose -f docker-compose.prod.yml up -d --build
+# Requires .env with DATABASE_URL (Neon), ADMIN_EMAIL, ADMIN_PASSWORD_HASH, etc.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+      n8n:
+        condition: service_started
+      awbtrackers:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    # nginx serves static on 8080
+
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      AWBTRACKERS_URL: http://awbtrackers:8000
+      DATABASE_URL: postgresql://cargogent:dev@postgres:5432/cargogent
+    depends_on:
+      postgres:
+        condition: service_healthy
+      awbtrackers:
+        condition: service_started
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  awbtrackers:
+    build:
+      context: ./AWBTrackers
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - PROXY_URL=${PROXY_URL:-}
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_BACKEND_URL: ${N8N_BACKEND_URL:-}
+    depends_on:
+      - backend
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cargogent
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: cargogent
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cargogent"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  postgres_data_prod:

@@ -71,6 +71,17 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
     COMPOSE_CMD="docker-compose"
   fi
   $COMPOSE_CMD -f docker-compose.prod.yml up -d --build
+  
+  echo "Running database migrations..."
+  sleep 5
+  docker cp backend/migrations/001_tenants.sql cargogent-postgres-1:/tmp/001.sql || true
+  docker cp backend/migrations/002_users.sql cargogent-postgres-1:/tmp/002.sql || true
+  docker exec cargogent-postgres-1 psql -U cargogent -d cargogent -f /tmp/001.sql || true
+  docker exec cargogent-postgres-1 psql -U cargogent -d cargogent -f /tmp/002.sql || true
+  
+  # Update admin password explicitly in case the migration created it with the old default
+  docker exec cargogent-postgres-1 psql -U cargogent -d cargogent -c "UPDATE users SET password_hash = '\$2b\$10\$cFwIUBPGFAPjTlMN02W.cOpvdm6.Rij/mKFCLNGwKmjv7mvWZ/NvW' WHERE username = 'alon@cargogent.com';" || true
+
 REMOTE
 
 echo "Done. App: http://${SERVER_IP}/"
