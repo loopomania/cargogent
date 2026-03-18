@@ -10,17 +10,27 @@ import { ping as dbPing } from "./services/db.js";
 const app = express();
 app.set("trust proxy", 1);
 
-// CORS: In prod restrict to the APP_URL origin; in dev allow all for local tooling
-const allowedOrigin = process.env.APP_URL ?? (isDev ? "*" : "");
+// CORS: allow origins listed in ALLOWED_ORIGINS (comma-separated) or APP_URL, wildcard in dev.
+const buildAllowedOrigins = (): Set<string> | null => {
+  if (isDev) return null; // null = allow all
+  const raw = process.env.ALLOWED_ORIGINS || process.env.APP_URL || "";
+  const origins = raw.split(",").map((o) => o.trim()).filter(Boolean);
+  return origins.length > 0 ? new Set(origins) : null;
+};
+const allowedOrigins = buildAllowedOrigins();
+
 app.use(
   cors({
-    origin: isDev ? "*" : (origin, callback) => {
-      if (!origin || origin === allowedOrigin) {
-        callback(null, true);
-      } else {
-        callback(new Error("CORS: origin not allowed"));
-      }
-    },
+    origin: allowedOrigins === null
+      ? "*"
+      : (origin, callback) => {
+          // allow server-to-server (no origin header) and listed origins
+          if (!origin || allowedOrigins.has(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error("CORS: origin not allowed"));
+          }
+        },
     methods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
