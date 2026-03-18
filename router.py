@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker
+from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker, MamanTracker, SwissportTracker
 from models import TrackingResponse
 
 
@@ -38,6 +38,8 @@ TRACKERS = {
     "et": EthiopianTracker(),
     "challenge": ChallengeTracker(),
     "ch": ChallengeTracker(),
+    "maman": MamanTracker(),
+    "swissport": SwissportTracker(),
 }
 
 # AWB prefix (first 3 digits) -> airline key for router detection
@@ -71,7 +73,7 @@ def get_airline_from_awb(awb: str) -> str:
     return "elal"
 
 
-async def route_track(airline: str, awb: str) -> TrackingResponse:
+async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> TrackingResponse:
     key = normalize_airline(airline)
     tracker = TRACKERS.get(key)
     if not tracker:
@@ -83,10 +85,39 @@ async def route_track(airline: str, awb: str) -> TrackingResponse:
             message=f"unsupported_airline:{key}",
             raw_meta={"supported": sorted(TRACKERS.keys())},
         )
-    return await tracker.track(awb)
+    
+    # 1. Track from airline
+    res = await tracker.track(awb, hawb=hawb)
+    res.hawb = hawb
+    
+    # 2. If HAWB is provided, also track from Ground Services
+    if hawb:
+        # Track from Maman
+        try:
+            maman = TRACKERS["maman"]
+            import asyncio
+            maman_res = await asyncio.wait_for(maman.track(awb, hawb=hawb), timeout=45.0)
+            if maman_res.events:
+                res.events.extend(maman_res.events)
+                res.message += " | maman_synced"
+        except Exception as e:
+            res.message += f" | maman_error:{str(e)[:20]}"
+
+        # Track from Swissport
+        try:
+            swissport = TRACKERS["swissport"]
+            import asyncio
+            swissport_res = await asyncio.wait_for(swissport.track(awb, hawb=hawb, origin=res.origin), timeout=35.0)
+            if swissport_res.events:
+                res.events.extend(swissport_res.events)
+                res.message += " | swissport_synced"
+        except Exception as e:
+            res.message += f" | swissport_error:{str(e)[:20]}"
+
+    return res
 
 
-async def route_track_by_awb(awb: str) -> TrackingResponse:
+async def route_track_by_awb(awb: str, hawb: Optional[str] = None) -> TrackingResponse:
     """Route tracking by AWB only; airline is detected from AWB prefix."""
     airline = get_airline_from_awb(awb)
-    return await route_track(airline, awb)
+    return await route_track(airline, awb, hawb=hawb)
