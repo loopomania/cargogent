@@ -1,0 +1,99 @@
+# CargoGent local dev stack
+# Run: docker compose up --build
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+      - n8n
+      - awbtrackers
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE: /api
+    ports:
+      - "8080:8080"
+
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://cargogent:dev@postgres:5432/cargogent
+      AWBTRACKERS_URL: http://awbtrackers:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      awbtrackers:
+        condition: service_started
+
+  awbtrackers:
+    build:
+      context: ./AWBTrackers
+      dockerfile: Dockerfile
+    environment:
+      - PROXY_URL=${PROXY_URL:-}
+    env_file:
+      - .env
+    # No ports exposed to host by default; access via Caddy. For direct benchmark: uncomment.
+    # ports:
+    #   - "8000:8000"
+
+  # Backend (Node) - add when backend/ is implemented
+  # backend:
+  #   build: ./backend
+  #   environment:
+  #     - NODE_ENV=development
+  #     - DATABASE_URL=postgresql://cargogent:dev@postgres:5432/cargogent
+  #     - AWBTRACKERS_URL=http://awbtrackers:8000
+  #   depends_on:
+  #     - postgres
+  #     - awbtrackers
+
+  # Frontend - add when frontend/ is implemented
+  # frontend:
+  #   build: ./frontend
+  #   environment:
+  #     - VITE_API_BASE=/api
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_BACKEND_URL: http://localhost/n8n
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cargogent
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: cargogent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cargogent"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
@@ -9,6 +9,14 @@ export default function Login() {
   const [error, setError] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("timeout") === "1") {
+      setError("Your session has expired. Please log in again.");
+      window.history.replaceState({}, document.title, "/login");
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

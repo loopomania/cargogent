@@ -33,10 +33,7 @@ services:
     environment:
       NODE_ENV: production
       AWBTRACKERS_URL: http://awbtrackers:8000
-      DATABASE_URL: postgresql://cargogent:dev@postgres:5432/cargogent
     depends_on:
-      postgres:
-        condition: service_healthy
       awbtrackers:
         condition: service_started
     deploy:
@@ -61,6 +58,7 @@ services:
       N8N_HOST: 0.0.0.0
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
+      N8N_PATH: /n8n/
       N8N_BACKEND_URL: ${N8N_BACKEND_URL:-}
     depends_on:
       - backend
@@ -68,22 +66,3 @@ services:
       restart_policy:
         condition: on-failure
 
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: cargogent
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: cargogent
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cargogent"]
-      interval: 3s
-      timeout: 5s
-      retries: 5
-    deploy:
-      restart_policy:
-        condition: on-failure
-
-volumes:
-  postgres_data_prod:
