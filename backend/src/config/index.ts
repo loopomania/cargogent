@@ -31,6 +31,9 @@ export const config = {
   smtpUser: env.SMTP_USER || "",
   smtpPass: env.SMTP_PASS || "",
   smtpFrom: env.SMTP_FROM || '"CargoGent" <noreply@cargogent.com>',
+
+  /** n8n webhook URL for user invitation and password-reset emails. Falls back to SMTP if unset. */
+  n8nInviteWebhookUrl: env.N8N_INVITE_WEBHOOK_URL || "",
 } as const;
 
 export const isDev = config.nodeEnv === "development";

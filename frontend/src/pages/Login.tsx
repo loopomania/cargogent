@@ -108,6 +108,14 @@ export default function Login() {
         >
           Sign in
         </button>
+        <div style={{ textAlign: "center", marginTop: "1rem" }}>
+          <a
+            href="/forgot-password"
+            style={{ fontSize: "0.8rem", color: "var(--text-muted)", textDecoration: "none" }}
+          >
+            Forgot password?
+          </a>
+        </div>
       </form>
     </div>
   );

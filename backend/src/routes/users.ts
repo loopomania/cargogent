@@ -16,15 +16,43 @@ const router = Router();
 // Only Admins can manage users
 router.use(authOptional, requireAdmin);
 
+/** Helper: fire n8n webhook or fall back to SMTP */
+async function sendUserEmail(
+  email: string,
+  name: string,
+  inviteUrl: string,
+  flowType: "invite" | "reset"
+) {
+  if (config.n8nInviteWebhookUrl) {
+    const res = await fetch(config.n8nInviteWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name, inviteUrl, flow_type: flowType }),
+    });
+    if (!res.ok) throw new Error(`n8n webhook failed: ${res.status}`);
+  } else {
+    // SMTP fallback for local dev
+    const subject =
+      flowType === "invite"
+        ? "Welcome to CargoGent – Set Up Your Account"
+        : "CargoGent – Password Reset";
+    const greeting = name ? `Hi ${name},` : "Hi,";
+    const body =
+      flowType === "invite"
+        ? `<p>${greeting}</p><p>You've been invited to CargoGent. Click below to set your password (link valid 24 hours):</p><p><a href="${inviteUrl}">${inviteUrl}</a></p>`
+        : `<p>${greeting}</p><p>Click below to reset your CargoGent password (link valid 24 hours):</p><p><a href="${inviteUrl}">${inviteUrl}</a></p><p>If you did not request this, ignore this email.</p>`;
+    await sendMail(email, subject, body);
+  }
+}
+
 /** GET /api/users — List all users */
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const users = await listUsers();
-    // Mask access key hash to only show availability
-    const maskedUsers = users.map(u => ({
+    const maskedUsers = users.map((u) => ({
       ...u,
       has_access_key: !!u.access_key_hash,
-      access_key_hash: undefined // Remove hash from response
+      access_key_hash: undefined,
     }));
     res.json(maskedUsers);
   } catch (err) {
@@ -33,39 +61,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-/** POST /api/users — Create a user and email magic link */
+/** POST /api/users — Create a user and send invite via n8n / SMTP */
 router.post("/", async (req, res) => {
-  const { username } = req.body;
+  const { username, name } = req.body as { username?: string; name?: string };
   if (!username) {
     res.status(400).json({ error: "Username (email) is required" });
     return;
   }
 
   try {
-    const user = await createUser(username);
-    
-    // Generate magic link token valid for 1 hour
+    const user = await createUser(username, name ?? "");
+
+    // 24-hour invite token
     const token = jwt.sign(
-      { sub: user.id, username: user.username, action: "setup" },
+      { sub: user.id, email: user.username, name: user.name ?? "", flow_type: "invite" },
       config.jwtSecret,
-      { expiresIn: "1h" }
-    );
-    
-    // Note: Assuming frontend domain is the same or passed via env in a real scenario
-    // For now returning the link, in reality we just email it
-    const magicLink = `http://${req.headers.host}/setup-password?token=${token}`;
-    
-    await sendMail(
-      user.username,
-      "Welcome to CargoGent - Setup your password",
-      `<p>You have been invited to CargoGent. Please set up your password and access key by clicking the link below (valid for 1 hour):</p>
-       <a href="${magicLink}">${magicLink}</a>`
+      { expiresIn: "24h" }
     );
 
-    res.status(201).json({ message: "User created and email sent", user: { id: user.id, username: user.username } });
+    const inviteUrl = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host}/setup-password?token=${token}`;
+    await sendUserEmail(user.username, user.name ?? "", inviteUrl, "invite");
+
+    res.status(201).json({ message: "User created and invite sent", user: { id: user.id, username: user.username, name: user.name } });
   } catch (err: any) {
     console.error(err);
-    if (err.code === '23505') {
+    if (err.code === "23505") {
       res.status(409).json({ error: "Username already exists" });
     } else {
       res.status(500).json({ error: "Failed to create user" });
@@ -73,10 +93,9 @@ router.post("/", async (req, res) => {
   }
 });
 
-/** POST /api/users/:id/reset — Trigger password reset */
+/** POST /api/users/:id/reset — Trigger password reset email */
 router.post("/:id/reset", async (req, res) => {
   const { id } = req.params;
-  
   try {
     const user = await getUserById(id);
     if (!user) {
@@ -85,21 +104,13 @@ router.post("/:id/reset", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { sub: user.id, username: user.username, action: "reset" },
+      { sub: user.id, email: user.username, name: user.name ?? "", flow_type: "reset" },
       config.jwtSecret,
-      { expiresIn: "1h" }
+      { expiresIn: "24h" }
     );
-    
-    const magicLink = `http://${req.headers.host}/setup-password?token=${token}`;
-    
-    await sendMail(
-      user.username,
-      "CargoGent Password Reset",
-      `<p>You requested a password reset. Click the link below to change your password (valid for 1 hour):</p>
-       <a href="${magicLink}">${magicLink}</a>
-       <p>If you did not request this, please ignore this email.</p>`
-    );
-    
+    const inviteUrl = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host}/setup-password?token=${token}`;
+    await sendUserEmail(user.username, user.name ?? "", inviteUrl, "reset");
+
     res.json({ message: "Reset email sent" });
   } catch (err) {
     console.error(err);
@@ -110,7 +121,6 @@ router.post("/:id/reset", async (req, res) => {
 /** POST /api/users/:id/key — Generate new 16-char access key */
 router.post("/:id/key", async (req, res) => {
   const { id } = req.params;
-  
   try {
     const user = await getUserById(id);
     if (!user) {
@@ -119,15 +129,11 @@ router.post("/:id/key", async (req, res) => {
     }
 
     const plainTextKey = await generateAccessKey(id);
-    
     await sendMail(
       user.username,
-      "CargoGent - New API Access Key",
-      `<p>Your new API Access Key has been generated.</p>
-       <p><strong>${plainTextKey}</strong></p>
-       <p>Please keep this key secure. It will not be shown again.</p>`
+      "CargoGent – New API Access Key",
+      `<p>Your new API Access Key has been generated.</p><p><strong>${plainTextKey}</strong></p><p>Please keep this key secure. It will not be shown again.</p>`
     );
-    
     res.json({ message: "Access key generated and emailed to user" });
   } catch (err) {
     console.error(err);

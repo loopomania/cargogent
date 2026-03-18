@@ -87,6 +87,7 @@ export async function trackByAirline(airline: string, awb: string, hawb?: string
 export interface User {
   id: string;
   username: string;
+  name?: string;
   role: string;
   has_access_key: boolean;
   created_at: string;
@@ -98,11 +99,11 @@ export async function listUsers(): Promise<User[]> {
   return res.json();
 }
 
-export async function createUser(username: string): Promise<User> {
+export async function createUser(username: string, name: string): Promise<User> {
   const res = await fetch(`${API_BASE}/users`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, name }),
   });
   await handleResponse(res);
   const data = await res.json();
@@ -124,13 +125,33 @@ export async function generateUserKey(id: string): Promise<void> {
   await handleResponse(res);
 }
 
-export async function setupPassword(token: string, newPassword: string): Promise<void> {
+export async function setupPassword(token: string, newPassword: string): Promise<{ flow_type: string | null }> {
   const res = await fetch(`${API_BASE}/auth/setup-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, newPassword }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err: any = new Error(body.error || `HTTP ${res.status}`);
+    err.expired = !!body.expired;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
   await handleResponse(res);
+}
+
+export async function verifyToken(token: string): Promise<{ valid: boolean; reason?: string; flow_type?: string | null }> {
+  const res = await fetch(`${API_BASE}/auth/verify-token?token=${encodeURIComponent(token)}`);
+  return res.json();
 }
 
 export interface QueryLog {

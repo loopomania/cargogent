@@ -5,6 +5,7 @@ import crypto from "crypto";
 export interface User {
   id: string;
   username: string;
+  name?: string;
   role: string;
   tenant_id?: string;
   access_key_hash?: string;
@@ -24,7 +25,7 @@ export async function listUsers(): Promise<User[]> {
   const pool = getPool();
   if (!pool) return [];
   const res = await pool.query(`
-    SELECT id, username, role, tenant_id, access_key_hash, created_at
+    SELECT id, username, name, role, tenant_id, access_key_hash, created_at
     FROM users
     ORDER BY created_at DESC
   `);
@@ -35,7 +36,7 @@ export async function getUserById(id: string): Promise<User | null> {
   const pool = getPool();
   if (!pool) return null;
   const res = await pool.query(
-    "SELECT id, username, role, tenant_id, access_key_hash, created_at FROM users WHERE id = $1",
+    "SELECT id, username, name, role, tenant_id, access_key_hash, created_at FROM users WHERE id = $1",
     [id]
   );
   return res.rows[0] || null;
@@ -45,13 +46,13 @@ export async function getUserByUsername(username: string): Promise<User & { pass
   const pool = getPool();
   if (!pool) return null;
   const res = await pool.query(
-    "SELECT id, username, password_hash, role, tenant_id, access_key_hash, created_at FROM users WHERE username = $1",
+    "SELECT id, username, name, password_hash, role, tenant_id, access_key_hash, created_at FROM users WHERE username = $1",
     [username]
   );
   return res.rows[0] || null;
 }
 
-export async function createUser(username: string, tenantId: string = '00000000-0000-0000-0000-000000000000'): Promise<User> {
+export async function createUser(username: string, name: string = "", tenantId: string = '00000000-0000-0000-0000-000000000000'): Promise<User> {
   const pool = getPool();
   if (!pool) throw new Error("Database not connected");
   
@@ -59,10 +60,10 @@ export async function createUser(username: string, tenantId: string = '00000000-
   const placeholderHash = await bcrypt.hash(crypto.randomUUID(), 10);
   
   const res = await pool.query(
-    `INSERT INTO users (username, password_hash, role, tenant_id)
-     VALUES ($1, $2, 'user', $3)
-     RETURNING id, username, role, tenant_id, access_key_hash, created_at`,
-    [username, placeholderHash, tenantId]
+    `INSERT INTO users (username, name, password_hash, role, tenant_id)
+     VALUES ($1, $2, $3, 'user', $4)
+     RETURNING id, username, name, role, tenant_id, access_key_hash, created_at`,
+    [username, name || null, placeholderHash, tenantId]
   );
   return res.rows[0];
 }

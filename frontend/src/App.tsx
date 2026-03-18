@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import InviteExpired from "./pages/InviteExpired";
 import AdminDashboard from "./pages/AdminDashboard";
 import Users from "./pages/Users";
 import Logs from "./pages/Logs";
@@ -52,6 +54,8 @@ export default function App() {
       />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/setup-password" element={<SetupPassword />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/invite-expired" element={<InviteExpired />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

@@ -74,11 +74,17 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
   
   echo "Running database migrations..."
   sleep 5
-  docker run --rm -v /app/cargogent/backend/migrations:/migrations --env-file /app/cargogent/.env postgres:16-alpine sh -c '
-    psql "$DATABASE_URL" -f /migrations/001_tenants.sql &&
-    psql "$DATABASE_URL" -f /migrations/002_users.sql &&
-    psql "$DATABASE_URL" -f /migrations/003_query_logs.sql
-  ' || true
+  DB_URL=$(grep '^DATABASE_URL=' /app/cargogent/.env 2>/dev/null | cut -d'=' -f2-)
+  if [ -n "$DB_URL" ]; then
+    docker run --rm \
+      -v /app/cargogent/backend/migrations:/migrations \
+      -e "DATABASE_URL=$DB_URL" \
+      postgres:16-alpine sh -c \
+      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql' \
+      && echo "Migrations applied." || echo "Warning: Some migrations may have failed (idempotent — check logs)."
+  else
+    echo "Warning: DATABASE_URL not found in .env — skipping migrations."
+  fi
 
 REMOTE
 

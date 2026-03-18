@@ -1,18 +1,35 @@
 # CargoGent reverse proxy
-# Use http://localhost (not https). From another device on the same network use http://<this-machine-ip>
+
+(security_headers) {
+	header {
+		# Prevent clickjacking
+		X-Frame-Options "DENY"
+		# Prevent MIME sniffing
+		X-Content-Type-Options "nosniff"
+		# Enforce HTTPS for one year (preload-ready)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Restrict referrer
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Minimal permissions policy
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Content-Security-Policy — allow same-origin + CDN fonts
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+		# Remove server fingerprinting
+		-Server
+	}
+}
 
 (routes) {
-	# AWBTrackers (tracking API)
-	handle /track/* {
-		reverse_proxy awbtrackers:8000
-	}
-	handle /health {
-		reverse_proxy awbtrackers:8000
-	}
+	import security_headers
 
-	# Backend API
+	# Backend API — all tracking goes through here (auth enforced by backend)
 	handle /api/* {
 		reverse_proxy backend:3000
+	}
+
+	# AWBTrackers health check only — no direct track/* exposure
+	handle /health {
+		reverse_proxy awbtrackers:8000
 	}
 
 	# n8n
@@ -29,14 +46,13 @@
 	}
 }
 
-# Automatically serve HTTPS dynamically for localhost
+# Serve HTTPS for localhost in dev (internal CA)
 localhost {
-	# Use Caddy's internal CA to issue a locally-trusted cert for development
 	tls internal
 	import routes
 }
 
-# Fallback for network IP access via HTTP
+# Production: HTTP on :80 — Caddy auto-upgrades to HTTPS when a domain is used
 :80 {
 	import routes
 }
