@@ -82,7 +82,12 @@ The existing **deploy script** (`scripts/deploy.sh`) deploys AWBTrackers to Hetz
 
 ## Israel ground handling (Swissport / Maman)
 
-Once cargo lands in Israel it is transferred to a local distributor before delivery. Swissport Israel and Maman are terminal/ground handling providers. To query AWB status you may need AWB and house bill. For outbound cargo they are handled by Swissport Israel or Maman before being loaded onto the airline. An airline typically works with one of the two. In the Excel you have **Master** and **House Ref**; query Swissport and Maman to map. See: https://www.swissport.co.il/heb/Main/
+Once cargo lands in Israel it is transferred to a local distributor before delivery. Swissport Israel and Maman are terminal/ground handling providers. To query AWB status you may need AWB and house bill. For outbound cargo they are handled by Swissport Israel or Maman before being loaded onto the airline. An airline typically works with one of the two. In the Excel you have **Master** and **House Ref**.
+
+**Tracking Optimizations Engine:**
+1. **LRU Caching Priority**: The tracking engine dynamically memorizes the most recently successful ground handler mapped to an airline's prefix. When tracking a HAWB, the engine queries the preferred service first.
+2. **Conditional Excursion**: If an import shipment destined for Tel Aviv lacks an official arrival stamp (e.g., `RCF`, `DLV`), the engine bypasses Maman and Swissport executions entirely to eliminate redundant waits.
+3. **Telemetry & Hard Bounds**: Native airline queries are wrapped in 55s latency limits, while Maman and Swissport are capped at 30s and 20s respectively. Tracking telemetry (execution duration per layer) is recorded and bubbled up to the UI.
 
 ## Version control
 
