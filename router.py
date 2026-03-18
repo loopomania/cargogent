@@ -87,7 +87,19 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
         )
     
     # 1. Track from airline
-    res = await tracker.track(awb, hawb=hawb)
+    import asyncio
+    try:
+        res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=55.0)
+    except Exception as e:
+        from airlines.models import TrackingResponse
+        res = TrackingResponse(
+            airline=airline.title(),
+            awb=awb,
+            status="Error",
+            message=f"Primary tracker failed: {str(e)[:40]}",
+            events=[]
+        )
+    
     res.hawb = hawb
     
     # 2. If HAWB is provided, also track from Ground Services
@@ -95,8 +107,7 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
         # Track from Maman
         try:
             maman = TRACKERS["maman"]
-            import asyncio
-            maman_res = await asyncio.wait_for(maman.track(awb, hawb=hawb), timeout=45.0)
+            maman_res = await asyncio.wait_for(maman.track(awb, hawb=hawb), timeout=30.0)
             if maman_res.events:
                 res.events.extend(maman_res.events)
                 res.message += " | maman_synced"
@@ -106,8 +117,7 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
         # Track from Swissport
         try:
             swissport = TRACKERS["swissport"]
-            import asyncio
-            swissport_res = await asyncio.wait_for(swissport.track(awb, hawb=hawb, origin=res.origin), timeout=35.0)
+            swissport_res = await asyncio.wait_for(swissport.track(awb, hawb=hawb, origin=res.origin), timeout=20.0)
             if swissport_res.events:
                 res.events.extend(swissport_res.events)
                 res.message += " | swissport_synced"
