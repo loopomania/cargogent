@@ -59,6 +59,8 @@ AWB_PREFIX_TO_AIRLINE: dict[str, str] = {
 }
 
 
+GROUND_SERVICE_MEMORY: dict[str, str] = {}
+
 def normalize_airline(code: str) -> str:
     return code.strip().lower()
 
@@ -86,12 +88,23 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
             raw_meta={"supported": sorted(TRACKERS.keys())},
         )
     
-    # 1. Track from airline
     import asyncio
+    import time
+    
+    t0 = time.time()
     try:
         res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=55.0)
+    except asyncio.TimeoutError:
+        from models import TrackingResponse
+        res = TrackingResponse(
+            airline=airline.title(),
+            awb=awb,
+            status="Error",
+            message="Primary airline tracker timed out after 55s",
+            events=[]
+        )
     except Exception as e:
-        from airlines.models import TrackingResponse
+        from models import TrackingResponse
         res = TrackingResponse(
             airline=airline.title(),
             awb=awb,
@@ -100,29 +113,63 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
             events=[]
         )
     
+    t1 = time.time()
+    airline_duration = round(t1 - t0, 1)
+    
     res.hawb = hawb
+    if "durations" not in res.raw_meta:
+        res.raw_meta["durations"] = {}
+    res.raw_meta["durations"]["airline"] = airline_duration
+    
+    ground_duration = 0.0
     
     # 2. If HAWB is provided, also track from Ground Services
     if hawb:
-        # Track from Maman
-        try:
-            maman = TRACKERS["maman"]
-            maman_res = await asyncio.wait_for(maman.track(awb, hawb=hawb), timeout=30.0)
-            if maman_res.events:
-                res.events.extend(maman_res.events)
-                res.message += " | maman_synced"
-        except Exception as e:
-            res.message += f" | maman_error:{str(e)[:20]}"
+        # Check if it's an import to Israel that hasn't landed yet
+        is_import_to_tlv = res.destination == "TLV" or any(e.location == "TLV" for e in res.events)
+        has_landed = any(
+            e.location in ["TLV", "Israel"] or
+            e.status_code in ["RCF", "NFD", "DLV", "AWD"]
+            for e in res.events
+        )
+        
+        skip_ground = res.destination == "TLV" and not has_landed
 
-        # Track from Swissport
-        try:
-            swissport = TRACKERS["swissport"]
-            swissport_res = await asyncio.wait_for(swissport.track(awb, hawb=hawb, origin=res.origin), timeout=20.0)
-            if swissport_res.events:
-                res.events.extend(swissport_res.events)
-                res.message += " | swissport_synced"
-        except Exception as e:
-            res.message += f" | swissport_error:{str(e)[:20]}"
+        if skip_ground:
+            res.message += " | ground_skipped:not_arrived"
+        else:
+            t_g0 = time.time()
+            ground_services = ["maman", "swissport"]
+            
+            # Reorder ground services based on recent LRU preference for this airline
+            pref = GROUND_SERVICE_MEMORY.get(key)
+            if pref and pref in ground_services:
+                ground_services.remove(pref)
+                ground_services.insert(0, pref)
+                
+            for g_name in ground_services:
+                timeout_val = 30.0 if g_name == "maman" else 20.0
+                try:
+                    g_tracker = TRACKERS[g_name]
+                    if g_name == "swissport":
+                        g_res = await asyncio.wait_for(g_tracker.track(awb, hawb=hawb, origin=res.origin), timeout=timeout_val)
+                    else:
+                        g_res = await asyncio.wait_for(g_tracker.track(awb, hawb=hawb), timeout=timeout_val)
+                        
+                    if g_res.events:
+                        res.events.extend(g_res.events)
+                        res.message += f" | {g_name}_synced"
+                        GROUND_SERVICE_MEMORY[key] = g_name  # Update cache
+                        break # Found events, skip the other
+                except asyncio.TimeoutError:
+                    res.message += f" | {g_name}_timed_out"
+                except Exception as e:
+                    res.message += f" | {g_name}_error:{str(e)[:20]}"
+
+            t_g1 = time.time()
+            ground_duration = round(t_g1 - t_g0, 1)
+
+    res.raw_meta["durations"]["ground"] = ground_duration
 
     return res
 
