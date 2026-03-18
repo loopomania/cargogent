@@ -70,13 +70,13 @@ router.post("/login", loginLimiter, async (req, res) => {
 
   const userRecord = await getUserByUsername(raw);
   if (!userRecord) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid username or password" });
     return;
   }
 
   const match = await bcrypt.compare(pwd, userRecord.password_hash);
   if (!match) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid username or password" });
     return;
   }
 

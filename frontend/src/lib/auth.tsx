@@ -40,9 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Login failed");
+      if (!res.ok) throw new Error(data.error || "Invalid username or password");
       const u = data.user as User;
-      if (!u?.email || !u?.role) throw new Error("Invalid response");
+      if (!u?.email || !u?.role) throw new Error("Invalid username or password");
       setUser(u);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
       if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
