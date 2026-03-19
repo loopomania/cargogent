@@ -29,6 +29,23 @@ const forgotLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// HIGH-03: Rate-limit the setup-password endpoint.
+const setupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many attempts, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many requests" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Helper: fire n8n webhook or fall back to SMTP */
 async function sendUserEmail(
   email: string,
@@ -56,6 +73,19 @@ async function sendUserEmail(
     await sendMail(email, subject, body);
   }
 }
+
+/** Cookie options — HttpOnly so JS cannot read it (HIGH-04). */
+const COOKIE_NAME = "cargogent_session";
+// secure:true only when the site is actually served over HTTPS.
+// Keying off APP_URL (not NODE_ENV) because prod may run on HTTP behind a future reverse proxy.
+const isHttps = config.appUrl.startsWith("https://");
+const cookieOpts = {
+  httpOnly: true,
+  secure: isHttps,
+  sameSite: "strict" as const,
+  maxAge: 30 * 60 * 1000, // 30 minutes, matching JWT expiry
+  path: "/",
+};
 
 /** POST /api/auth/login */
 router.post("/login", loginLimiter, async (req, res) => {
@@ -88,24 +118,25 @@ router.post("/login", loginLimiter, async (req, res) => {
     tenant_id: userRecord.tenant_id,
   };
 
-  let token: string | undefined;
   if (config.jwtSecret) {
-    token = jwt.sign(
+    const token = jwt.sign(
       { sub: user.id, email: user.email, name: user.name, role: user.role, tenant_id: user.tenant_id },
       config.jwtSecret,
       { expiresIn: "30m" }
     );
+    // HIGH-04: set HttpOnly cookie — browser clients use this automatically.
+    res.cookie(COOKIE_NAME, token, cookieOpts);
+    // Still return the token in the body for API clients / backward-compat.
+    res.json({ user, token });
+  } else {
+    res.json({ user });
   }
-
-  res.json({ user, token });
 });
 
-const verifyTokenLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: "Too many requests" },
-  standardHeaders: true,
-  legacyHeaders: false,
+/** POST /api/auth/logout — clears the session cookie (HIGH-04). */
+router.post("/logout", (_req, res) => {
+  res.clearCookie(COOKIE_NAME, { path: "/" });
+  res.json({ message: "Logged out" });
 });
 
 /** GET /api/auth/verify-token?token=... — Check a setup/invite/reset token without side-effects.
@@ -147,9 +178,8 @@ router.post("/forgot-password", forgotLimiter, async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // Build URL — use APP_URL env var if available
-    const baseUrl = process.env.APP_URL ?? "http://localhost";
-    const inviteUrl = `${baseUrl}/setup-password?token=${token}`;
+    // HIGH-02: Use APP_URL env var — never derive from request Host header.
+    const inviteUrl = `${config.appUrl}/setup-password?token=${token}`;
     await sendUserEmail(userRecord.username, userRecord.name ?? "", inviteUrl, "reset");
   } catch (err) {
     console.error("forgot-password error:", err);
@@ -157,7 +187,8 @@ router.post("/forgot-password", forgotLimiter, async (req, res) => {
 });
 
 /** POST /api/auth/setup-password — Set password from invite or reset token */
-router.post("/setup-password", async (req, res) => {
+// HIGH-03: rate-limited via setupLimiter.
+router.post("/setup-password", setupLimiter, async (req, res) => {
   const { token, newPassword } = req.body as {
     token?: string;
     newPassword?: string;

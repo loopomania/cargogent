@@ -6,7 +6,7 @@ const router = Router();
 
 /** GET /api/logs?page=1&limit=1000 — paginated query log viewer, admin only. */
 router.get("/", authOptional, requireAdmin, async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit as string) || 1000, 1000);
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 1000);
   const page = Math.max(parseInt(req.query.page as string) || 1, 1);
   const offset = (page - 1) * limit;
 

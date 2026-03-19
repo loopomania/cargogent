@@ -1,17 +1,19 @@
 const API_BASE = "/api";
 
+// HIGH-04: No longer reads a JWT from localStorage.
+// The browser automatically sends the HttpOnly `cargogent_session` cookie
+// on every request because we include credentials: "include".
 function authHeaders(): HeadersInit {
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("cargogent_token") : null;
-  const h: HeadersInit = { Accept: "application/json" };
-  if (token) (h as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-  return h;
+  return { Accept: "application/json" };
 }
+
+// Common fetch options — credentials: "include" tells the browser to send cookies.
+const withCreds: RequestInit = { credentials: "include" };
 
 async function handleResponse(res: Response): Promise<Response> {
   if (res.status === 401) {
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem("cargogent_user");
-      localStorage.removeItem("cargogent_token");
     }
     if (typeof window !== "undefined") {
       window.location.href = "/login?timeout=1";
@@ -63,8 +65,9 @@ export interface TrackingResponse {
 export async function trackByAwb(awb: string, hawb?: string): Promise<TrackingResponse> {
   const url = new URL(`${window.location.origin}${API_BASE}/track/${encodeURIComponent(awb)}`);
   if (hawb) url.searchParams.append("hawb", hawb);
-  
+
   const res = await fetch(url.toString(), {
+    ...withCreds,
     headers: authHeaders(),
   });
   await handleResponse(res);
@@ -75,8 +78,9 @@ export async function trackByAwb(awb: string, hawb?: string): Promise<TrackingRe
 export async function trackByAirline(airline: string, awb: string, hawb?: string): Promise<TrackingResponse> {
   const url = new URL(`${window.location.origin}${API_BASE}/track/${encodeURIComponent(airline)}/${encodeURIComponent(awb)}`);
   if (hawb) url.searchParams.append("hawb", hawb);
-  
+
   const res = await fetch(url.toString(), {
+    ...withCreds,
     headers: authHeaders(),
   });
   await handleResponse(res);
@@ -94,7 +98,7 @@ export interface User {
 }
 
 export async function listUsers(): Promise<User[]> {
-  const res = await fetch(`${API_BASE}/users`, { headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/users`, { ...withCreds, headers: authHeaders() });
   await handleResponse(res);
   return res.json();
 }
@@ -102,6 +106,7 @@ export async function listUsers(): Promise<User[]> {
 export async function createUser(username: string, name: string): Promise<User> {
   const res = await fetch(`${API_BASE}/users`, {
     method: "POST",
+    ...withCreds,
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ username, name }),
   });
@@ -111,23 +116,24 @@ export async function createUser(username: string, name: string): Promise<User> 
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE", headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE", ...withCreds, headers: authHeaders() });
   await handleResponse(res);
 }
 
 export async function resetUserPassword(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/users/${id}/reset`, { method: "POST", headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/users/${id}/reset`, { method: "POST", ...withCreds, headers: authHeaders() });
   await handleResponse(res);
 }
 
 export async function generateUserKey(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/users/${id}/key`, { method: "POST", headers: authHeaders() });
+  const res = await fetch(`${API_BASE}/users/${id}/key`, { method: "POST", ...withCreds, headers: authHeaders() });
   await handleResponse(res);
 }
 
 export async function setupPassword(token: string, newPassword: string): Promise<{ flow_type: string | null }> {
   const res = await fetch(`${API_BASE}/auth/setup-password`, {
     method: "POST",
+    ...withCreds,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, newPassword }),
   });
@@ -143,6 +149,7 @@ export async function setupPassword(token: string, newPassword: string): Promise
 export async function forgotPassword(email: string): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/forgot-password`, {
     method: "POST",
+    ...withCreds,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
   });
@@ -150,7 +157,7 @@ export async function forgotPassword(email: string): Promise<void> {
 }
 
 export async function verifyToken(token: string): Promise<{ valid: boolean; reason?: string; flow_type?: string | null }> {
-  const res = await fetch(`${API_BASE}/auth/verify-token?token=${encodeURIComponent(token)}`);
+  const res = await fetch(`${API_BASE}/auth/verify-token?token=${encodeURIComponent(token)}`, withCreds);
   return res.json();
 }
 
@@ -172,9 +179,10 @@ export interface QueryLogsResponse {
   limit: number;
 }
 
-export async function fetchLogs(page = 1, limit = 1000): Promise<QueryLogsResponse> {
+// MED-03: Default limit lowered to 50 to prevent large data dumps on every page load.
+export async function fetchLogs(page = 1, limit = 50): Promise<QueryLogsResponse> {
   const url = `${API_BASE}/logs?page=${page}&limit=${limit}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, { ...withCreds, headers: authHeaders() });
   await handleResponse(res);
   return res.json();
 }

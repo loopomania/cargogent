@@ -71,10 +71,10 @@ export async function createUser(username: string, name: string = "", tenantId: 
 export async function deleteUser(id: string): Promise<void> {
   const pool = getPool();
   if (!pool) throw new Error("Database not connected");
-  // Don't allow deleting the superadmin as a safeguard
-  const res = await pool.query("DELETE FROM users WHERE id = $1 AND username != 'alon@cargogent.com'", [id]);
+  // HIGH-05: protected flag set via migration — not a hardcoded email.
+  const res = await pool.query("DELETE FROM users WHERE id = $1 AND is_protected = false", [id]);
   if (res.rowCount === 0) {
-    throw new Error("User not found or cannot delete super admin");
+    throw new Error("User not found or cannot delete a protected account");
   }
 }
 

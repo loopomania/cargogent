@@ -75,13 +75,23 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
   echo "Running database migrations..."
   sleep 5
   DB_URL=$(grep '^DATABASE_URL=' /app/cargogent/.env 2>/dev/null | cut -d'=' -f2-)
+  ADMIN_EMAIL=$(grep '^ADMIN_EMAIL=' /app/cargogent/.env 2>/dev/null | cut -d'=' -f2-)
+  ADMIN_HASH=$(grep '^ADMIN_PASSWORD_HASH=' /app/cargogent/.env 2>/dev/null | sed "s/^ADMIN_PASSWORD_HASH=//;s/^'//;s/'$//")
   if [ -n "$DB_URL" ]; then
     docker run --rm \
       -v /app/cargogent/backend/migrations:/migrations \
       -e "DATABASE_URL=$DB_URL" \
       postgres:16-alpine sh -c \
-      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql' \
+      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql && psql "$DATABASE_URL" -f /migrations/005_add_is_protected.sql' \
       && echo "Migrations applied." || echo "Warning: Some migrations may have failed (idempotent — check logs)."
+
+    # Sync admin credentials from .env into DB on every deploy (migration uses ON CONFLICT DO NOTHING)
+    if [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_HASH" ]; then
+      echo "Syncing admin credentials from .env into DB..."
+      docker run --rm postgres:16-alpine psql "$DB_URL" -c \
+        "UPDATE users SET password_hash = '${ADMIN_HASH}' WHERE username = '${ADMIN_EMAIL}';" \
+        && echo "Admin credentials synced." || echo "Warning: Admin credential sync failed."
+    fi
   else
     echo "Warning: DATABASE_URL not found in .env — skipping migrations."
   fi

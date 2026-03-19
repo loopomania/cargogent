@@ -79,7 +79,7 @@ router.post("/", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    const inviteUrl = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host}/setup-password?token=${token}`;
+    const inviteUrl = `${config.appUrl}/setup-password?token=${token}`;
     await sendUserEmail(user.username, user.name ?? "", inviteUrl, "invite");
 
     res.status(201).json({ message: "User created and invite sent", user: { id: user.id, username: user.username, name: user.name } });
@@ -108,7 +108,7 @@ router.post("/:id/reset", async (req, res) => {
       config.jwtSecret,
       { expiresIn: "24h" }
     );
-    const inviteUrl = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host}/setup-password?token=${token}`;
+    const inviteUrl = `${config.appUrl}/setup-password?token=${token}`;
     await sendUserEmail(user.username, user.name ?? "", inviteUrl, "reset");
 
     res.json({ message: "Reset email sent" });

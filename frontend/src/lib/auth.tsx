@@ -12,13 +12,14 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// HIGH-04: Only the user object (no JWT token) lives in localStorage.
+// The JWT is stored exclusively in an HttpOnly cookie set by the server.
 const STORAGE_KEY = "cargogent_user";
-const TOKEN_KEY = "cargogent_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include", // ensures the HttpOnly cookie is received and stored
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
       });
@@ -44,19 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const u = data.user as User;
       if (!u?.email || !u?.role) throw new Error("Invalid username or password");
       setUser(u);
+      // Only the non-sensitive user profile is stored locally.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
-      else localStorage.removeItem(TOKEN_KEY);
       return u;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // HIGH-04: Ask the server to clear the HttpOnly session cookie.
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TOKEN_KEY);
   }, []);
 
   return (

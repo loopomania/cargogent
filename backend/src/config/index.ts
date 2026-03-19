@@ -34,6 +34,15 @@ export const config = {
 
   /** n8n webhook URL for user invitation and password-reset emails. Falls back to SMTP if unset. */
   n8nInviteWebhookUrl: env.N8N_INVITE_WEBHOOK_URL || "",
+
+  /** HIGH-01: Comma-separated list of allowed CORS origins. Defaults to localhost for dev. */
+  allowedOrigins: (env.ALLOWED_ORIGINS ?? "http://localhost")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+
+  /** HIGH-02: Canonical app URL used in email links. Never derived from request Host header. */
+  appUrl: (env.APP_URL ?? "http://localhost").replace(/\/$/, ""),
 } as const;
 
 export const isDev = config.nodeEnv === "development";

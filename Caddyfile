@@ -32,8 +32,11 @@
 		reverse_proxy awbtrackers:8000
 	}
 
-	# n8n
+	# n8n — MED-01: protected by basicauth; credentials injected from env vars.
 	handle /n8n/* {
+		basicauth {
+			{env.N8N_ADMIN_USER} {env.N8N_ADMIN_HASH}
+		}
 		reverse_proxy n8n:5678
 	}
 
