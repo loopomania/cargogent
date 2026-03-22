@@ -86,6 +86,46 @@ export async function updateUserPassword(id: string, newPasswordPlain: string): 
   await pool.query("UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2", [hash, id]);
 }
 
+export interface UserNotificationSettings {
+  incremental_email_interval_hours: number;
+  full_report_times_per_day: number;
+}
+
+export async function getNotificationSettings(userId: string): Promise<UserNotificationSettings | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const res = await pool.query<{
+    incremental_email_interval_hours: number;
+    full_report_times_per_day: number;
+  }>(
+    `SELECT incremental_email_interval_hours, full_report_times_per_day
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    incremental_email_interval_hours: row.incremental_email_interval_hours,
+    full_report_times_per_day: row.full_report_times_per_day,
+  };
+}
+
+export async function updateNotificationSettings(
+  userId: string,
+  settings: UserNotificationSettings
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) throw new Error("Database not connected");
+  await pool.query(
+    `UPDATE users SET
+       incremental_email_interval_hours = $1,
+       full_report_times_per_day = $2,
+       updated_at = now()
+     WHERE id = $3`,
+    [settings.incremental_email_interval_hours, settings.full_report_times_per_day, userId]
+  );
+}
+
 export async function generateAccessKey(id: string): Promise<string> {
   const pool = getPool();
   if (!pool) throw new Error("Database not connected");

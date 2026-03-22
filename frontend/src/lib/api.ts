@@ -186,3 +186,42 @@ export async function fetchLogs(page = 1, limit = 50): Promise<QueryLogsResponse
   await handleResponse(res);
   return res.json();
 }
+
+/** Customer console — /api/me */
+export interface MeNotificationSettings {
+  incremental_email_interval_hours: number;
+  full_report_times_per_day: number;
+}
+
+export async function fetchMeSettings(): Promise<MeNotificationSettings> {
+  const res = await fetch(`${API_BASE}/me/settings`, { ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+  return res.json();
+}
+
+export async function patchMeSettings(body: MeNotificationSettings): Promise<MeNotificationSettings> {
+  const res = await fetch(`${API_BASE}/me/settings`, {
+    method: "PATCH",
+    ...withCreds,
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  await handleResponse(res);
+  return res.json();
+}
+
+export interface AttentionAwb {
+  awb_id: string;
+  mawb: string;
+  hawb: string | null;
+  latest_status: string | null;
+  updated_at: string;
+  reasons: ("stale_24h" | "special_treatment")[];
+}
+
+export async function fetchAttentionAwbs(): Promise<AttentionAwb[]> {
+  const res = await fetch(`${API_BASE}/me/awbs/attention`, { ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+  const data = await res.json();
+  return data.awbs ?? [];
+}

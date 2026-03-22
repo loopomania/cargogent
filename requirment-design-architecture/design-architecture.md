@@ -40,7 +40,7 @@ CargoGent tracks **AWBs (Air Waybills)** for multiple tenants. Workflows run on 
 
 - **Role**: Orchestrates all scheduled workflows (email retrieval, AWB status check, notifications, UiPath queue, error queue → Slack).
 - **Tech**: n8n (Node.js).
-- **Workflows**: See [System-requirmets.md](System-requirmets.md) (Workflows 1–5).
+- **Workflows & DB**: See [System-requirmets.md](../System-requirmets.md) and [product.requirements.md](../product.requirements.md).
 
 ### AWBTrackers (tracking service)
 
@@ -73,7 +73,7 @@ So: **one call to AWBTrackers per status check** → **one new history row** + *
 ### Database (multi-tenant)
 
 - **Role**: Persistent storage; all AWB data scoped by `tenant_id`.
-- **Tables**: Tenant, **AWB Latest Status**, **AWB Status History**, **AWBs In Transit** (see [System-requirmets.md](System-requirmets.md)).
+- **Tables**: See [System-requirmets.md](../System-requirmets.md) (full target schema: notifications, alerts queue, lease fields, etc.).
 
 ## 4. Data flow (tracking)
 

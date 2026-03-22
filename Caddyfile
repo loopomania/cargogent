@@ -13,7 +13,7 @@
 		# Minimal permissions policy
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		# Content-Security-Policy — allow same-origin + CDN fonts
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' wss: ws:; frame-ancestors 'none';"
 		# Remove server fingerprinting
 		-Server
 	}

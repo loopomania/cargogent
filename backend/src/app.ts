@@ -5,7 +5,9 @@ import trackRoutes from "./routes/track.js";
 import authRoutes from "./routes/auth.js";
 import usersRoutes from "./routes/users.js";
 import logsRoutes from "./routes/logs.js";
-import { config, isDev } from "./config/index.js";
+import meRoutes from "./routes/me.js";
+import alertsRoutes from "./routes/alerts.js";
+import { config } from "./config/index.js";
 import { ping as dbPing } from "./services/db.js";
 
 const app = express();
@@ -17,7 +19,7 @@ app.use(
   cors({
     origin: config.allowedOrigins,
     credentials: true,
-    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -44,5 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/track", trackRoutes);
 app.use("/api/logs", logsRoutes);
+app.use("/api/alerts", alertsRoutes);
+app.use("/api/me", meRoutes);
 
 export default app;

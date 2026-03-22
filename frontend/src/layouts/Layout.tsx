@@ -51,9 +51,14 @@ export default function Layout({
             </>
           )}
           {role === "customer" && (
-            <Link to="/customer" style={navItemStyle}>
-              My cargo
-            </Link>
+            <>
+              <Link to="/customer" style={navItemStyle}>
+                AWBs
+              </Link>
+              <Link to="/customer/settings" style={navItemStyle}>
+                Settings
+              </Link>
+            </>
           )}
         </nav>
         <div style={{ marginTop: "auto", padding: "1rem 1.25rem", borderTop: "1px solid var(--border)" }}>

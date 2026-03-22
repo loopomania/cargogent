@@ -29,7 +29,7 @@ services:
   backend:
     build: ./backend
     env_file:
-      - .env
+      - .env-prod
     environment:
       NODE_ENV: production
       AWBTRACKERS_URL: http://awbtrackers:8000
@@ -45,7 +45,7 @@ services:
       context: ./AWBTrackers
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - .env-prod
     environment:
       - PROXY_URL=${PROXY_URL:-}
     deploy:

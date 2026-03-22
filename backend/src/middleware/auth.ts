@@ -51,3 +51,35 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
   res.status(403).json({ error: "Admin required" });
 }
+
+/** Any authenticated user (admin or customer). */
+export function requireAuthenticated(req: Request, res: Response, next: NextFunction): void {
+  const user = (req as Request & { user?: { sub?: string } }).user;
+  if (!user?.sub) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+  next();
+}
+
+/**
+ * Freight-forwarder console: role `user` (DB default for invited users) or `customer`.
+ * Admins use /admin, not this API.
+ */
+export function requireCustomerRole(req: Request, res: Response, next: NextFunction): void {
+  const user = (req as Request & { user?: { sub?: string; role?: string } }).user;
+  if (!user?.sub) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+  const r = user.role ?? "";
+  if (r === "admin") {
+    res.status(403).json({ error: "Use the admin console for this account" });
+    return;
+  }
+  if (r !== "user" && r !== "customer") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  next();
+}

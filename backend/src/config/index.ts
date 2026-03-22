@@ -1,4 +1,25 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+
+// Determine which .env file to use based on the environment
+const isProdEnv = process.env.NODE_ENV === "production";
+const envFileName = isProdEnv ? ".env-prod" : ".env-dev";
+const envPath = path.resolve(process.cwd(), "..", envFileName);
+
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else {
+  // Fallback if running from the frontend directory or nested
+  const fallbackPath = path.resolve(process.cwd(), "../../", envFileName);
+  if (fs.existsSync(fallbackPath)) {
+    dotenv.config({ path: fallbackPath });
+  } else {
+    // Basic fallback, just in case
+    dotenv.config();
+  }
+}
+
 
 const env = process.env;
 

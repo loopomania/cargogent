@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-type Role = "admin" | "customer";
+/** API returns `user` for invited freight-forwarder accounts; we treat it like `customer` in routing. */
+type Role = "admin" | "customer" | "user";
 
 interface User {
   id: string;

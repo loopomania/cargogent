@@ -11,6 +11,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    env_file:
+      - .env-dev
     depends_on:
       - backend
       - frontend
@@ -27,7 +29,7 @@ services:
   backend:
     build: ./backend
     env_file:
-      - .env
+      - .env-dev
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://cargogent:dev@postgres:5432/cargogent
@@ -45,7 +47,7 @@ services:
     environment:
       - PROXY_URL=${PROXY_URL:-}
     env_file:
-      - .env
+      - .env-dev
     # No ports exposed to host by default; access via Caddy. For direct benchmark: uncomment.
     # ports:
     #   - "8000:8000"
@@ -69,11 +71,20 @@ services:
 
   n8n:
     image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
     environment:
       N8N_HOST: localhost
       N8N_PORT: 5678
       N8N_PROTOCOL: http
       N8N_BACKEND_URL: http://localhost/n8n
+      # Pre-configure owner account so credentials are always known in dev
+      N8N_OWNER_EMAIL: admin@cargogent.com
+      N8N_OWNER_PASSWORD: CargoGent1!
+      N8N_OWNER_FIRST_NAME: CargoGent
+      N8N_OWNER_LAST_NAME: Admin
+    volumes:
+      - n8n_data:/home/node/.n8n
     depends_on:
       - backend
 
@@ -93,5 +104,6 @@ services:
 
 volumes:
   postgres_data:
+  n8n_data:
   caddy_data:
   caddy_config:

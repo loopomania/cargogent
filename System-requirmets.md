@@ -1,146 +1,232 @@
-# System Requirements
+# CargoGent — System Requirements & Technical Design
 
-## 1. Main Purpose
+**Product requirements (PRD):** [product.requirements.md](product.requirements.md)  
+**Component architecture diagram:** [requirment-design-architecture/design-architecture.md](requirment-design-architecture/design-architecture.md)
 
-The system's main purpose is to **track AWBs (Air Waybills) across the sky around the world**.
+This document is the **single canonical technical specification** for workflows, scheduling, database design, and integration behavior. It supersedes conflicting fragments in older drafts.
 
-## 2. How It Works
+---
 
-The system achieves this by running a number of workflows **on a schedule**. All workflows are **implemented via n8n**.
+## 1. Main purpose
 
-## 3. Multi-Tenancy
+Track **AWBs (Air Waybills)** worldwide using scheduled workflows (e.g. **n8n**), **AWBTrackers**, email ingestion from **`info@cargogent.com`**, PostgreSQL storage, and notifications.
 
-The system is **multi-tenant**: two or more companies require AWB shipping tracking. The database must **differentiate between companies** and be **designed for multi-tenancy**. All data must be scoped by tenant.
+---
 
-## 4. Error Handling (All Workflows)
+## 2. Multi-tenancy & email routing
 
-All workflows must be able to **handle errors at every step**. When an error occurs, the system must:
-- Send an **email** to the proper email address
-- Send a **Slack** message to the proper Slack channel (via the Error Queue — see Workflow 5)
+- **Mailbox:** Inbound email is delivered to **`info@cargogent.com`** (single inbox; e.g. Gmail IMAP).
+- **Tenant resolution:** Identify tenant from the **sender email domain** (e.g. `user@seedomain.com` → domain `seedomain.com`). Domain uniqueness is a **product constraint** for routing.
+- **Users:** Multiple users per tenant; users with the **same domain** **share the same AWBs** (visibility rule).
+- **Data isolation:** All AWB-related rows include **`tenant_id`** as the first logical scope column.
 
-## 5. Workflows
+---
 
-### Workflow 1: Email Retrieval
+## 3. Scheduling (authoritative)
 
-- **Email source**: Gmail via IMAP. **All tenants send emails to the same Gmail mailbox**. Tenants are differentiated by **sender** (email sender address).
-- **Schedule**: Runs every minute or so
-- **Process**:
-  1. Retrieves email from Gmail (IMAP)
-  2. If there is new email to the system, reads it
-  3. Extracts attachment(s) from the email — **there may be one or more attachments**
-  4. Each attachment contains:
-     - **AWBs** (and additional data on those AWBs)
-     - AWBs may be referred to as **"master"** in the Excel file
-     - **Note**: Attachments may contain **both new AWBs and existing AWBs** (already in the system)
-     - **Note**: The Excel may contain fields that are **not directly relevant to AWB status** (e.g., consignor, consignee, INCO terms). The system stores all fields from the original Excel.
-  5. After parsing the Excel, AWBs are written to **AWB Latest Status** and **AWBs In Transit** (see Database section) — new AWBs are inserted; existing AWBs are updated. Column names are normalized (Excels may use similar but different names).
-- **Error handling** (examples):
-  - **A. Attachment missing** — If the expected attachment is not present → send email + Slack to the proper email and Slack channel
-  - **B. Excel unknown format** — If the Excel has an unknown format of fields → send email + Slack to the proper email and Slack channel
-- **Excel format**: See [Excel-format.md](Excel-format.md) for the expected format specification.
+| Mechanism | Interval / rule |
+|-----------|------------------|
+| **AWB status check scheduler** | **Every 30 minutes** |
+| **Next check when shipment is on ground** | **Now + 2 hours** |
+| **Next check when shipment is in air** | **Scheduled landing (ETA) + 1 hour**; if ETA is unknown → **Now + 2 hours** (same cadence as ground default bucket) |
+| **Email notification job** | **Every 60 minutes** (or aligned to user schedules for digest Excel) |
+| **Email retrieval (IMAP)** | Frequent enough to meet product latency (e.g. **every 1–5 minutes**); exact n8n cron is implementation detail |
+| **24h stale MAWB warning** | Evaluated **inside the same scheduled AWB status check run** (i.e. every **30 minutes** together with due checks) |
+| **Parallel tracker calls** | **Up to 20** concurrent AWB queries |
 
-### Workflow 2: AWB Status Check
+---
 
-- **Schedule**: Runs every minute
-- **Next query time**: Stored in the **AWBs In Transit** table (`next_status_check_at`). When an AWB **first enters the system**, the **time of arrival** is set as the time for the next check. Thereafter, the next query time **depends on the AWB status**:
-  - **On ground** (waiting to be shipped): Check **every hour**
-  - **In the air**: Check **only once** — when it lands
-  - **Summary**: When shipment is in the air → check once (when it lands). When on ground → check every hour.
-- **Process**:
-  1. Goes over the AWBs
-  2. For each AWB, checks the **AWBs In Transit** table for when the next query is due
-  3. Queries different tracking websites for new updates that may be available
-  4. Stores tracking result in **AWB Status History**; updates **AWB Latest Status** with latest status; updates **AWBs In Transit** with next query time (based on new status); removes from AWBs In Transit when delivered
-  5. For AWBs with **multiple parts** (pieces): records `pieces_total` and `pieces_departed`; flags discrepancies (e.g., site shows 3 of 5 departed, Excel expects 5)
-- **Tracking methods** (varies by AWB / carrier):
-  - **API** — Some AWBs are checked via API
-  - **Puppeteer** — Others via Puppeteer web search / web query
-  - **UiPath** — Others via UiPath automation via API; **UiPath requests go into a queue** (see Workflow 4 and UiPath Queue below)
-- **Error handling**: Must handle errors at every step → send email + Slack to the proper channels
+## 4. Workflows
 
-### Workflow 3: Email Notification
+### 4.1 Workflow 1 — Incoming email (Excel)
 
-- **Schedule**: Runs on a schedule (e.g., every minute)
-- **Update definition**: **Every change in status** counts as an update worth notification.
-- **Recipient mapping**: Each **tenant** has its **credentials** and **notification email address** (stored in the tenant table). Each AWB is associated with tenant_id when entering the system.
-- **Sending**: All notification emails are sent from **one Gmail account** (SMTP) to the different tenant's notification email addresses.
-- **Update email format**: The update email must contain an **Excel attachment** with the **same fields** as the original incoming Excel (including fields not directly relevant to AWB status, e.g., consignor, consignee, INCO terms). The attachment includes the **updated status** for the relevant AWBs. The tenant receives a familiar layout with status changes reflected.
-- **Process**:
-  1. Goes over emails that need to be sent (triggered by status changes in tracking history)
-  2. For each update, looks up the tenant (by tenant_id), builds an Excel with the same structure as the original (all fields) plus updated status, and sends it from the shared Gmail SMTP account to that tenant's notification address
-- **Error handling**: Must handle errors at every step → send email + Slack to the proper channels
+**Trigger:** New mail at **`info@cargogent.com`** with Excel attachment(s).
 
-### Workflow 4: UiPath Workflow
+**Process:**
 
-- **Role**: Accesses UiPath via API
-- **Process**:
-  1. Retrieves requests from the **UiPath queue** (local n8n internal queue)
-  2. Executes each request via UiPath API
-- **Context**: UiPath API has a limit on concurrent requests. All UiPath requests from Workflow 2 go into this queue; Workflow 4 processes them one at a time (or within the concurrency limit) by pulling from the queue.
+1. Resolve **`tenant_id`** from **sender domain** (and thus which users may see the data).
+2. Parse Excel; **normalize** column names per [Excel-format.md](requirment-design-architecture/Excel-format.md).
+3. **HAWB is required** on every logical shipment row (never null in the model).
+4. **New HAWBs:** Insert **one** row into **`awb_latest_status`** with **`PRIMARY KEY (tenant_id, hawb)`**; insert **one row per Excel line** into **`hawb_mawb_lines`** (same `tenant_id`, `hawb`, each distinct `mawb` from the file). Enqueue **`awbs_in_transit`** for **`(tenant_id, hawb)`** with **`next_status_check_at = NOW()`**.
+5. **Existing HAWBs:** Reconcile **`hawb_mawb_lines`** with the Excel (add/update/remove lines by **`(tenant_id, hawb, mawb)`**). Merge non–MAWB/HAWB columns into **`awb_latest_status`** per product rules (e.g. last row in file wins, or explicit column semantics). On **any mismatch** with persisted business fields:
+   - Enqueue **Slack alert** for **CargoGent ops** (`Alerts_Queue`).
+   - Set **`next_status_check_at = NOW()`** for the affected AWB(s) to force immediate tracking refresh.
+6. **Batch timestamp:** All rows from the **same ingest batch** share the **same batch update timestamp** (stored per row or on a batch header table — implementation choice; see §6).
+7. **Original file:** Retain reference or blob for audit if required by compliance (optional table in §6).
 
-### Workflow 5: Error Handling (Slack)
+**Errors:** Missing attachment / unknown format → email + Slack per error-handling policy.
 
-- **Role**: Centralized error notification to Slack
-- **Trigger**: Listens to an **error queue**
-- **Process**: Whenever the queue receives a message, sends that message to a **predefined Slack channel**
+---
 
-### UiPath Queue
+### 4.2 Workflow 2 — AWB status check (tracking)
 
-- **Type**: Local n8n internal queue
-- **Purpose**: UiPath API cannot handle more than a limited number of concurrent requests. All UiPath requests from **Workflow 2** (AWB Status Check) go into this queue. **Workflow 4** retrieves from the queue and executes via UiPath API.
+**Trigger:** Scheduler **every 30 minutes**.
 
-### Error Queue
+**Process:**
 
-- **Type**: Queue for error messages (local n8n internal or external)
-- **Purpose**: Workflows push error messages to this queue. **Workflow 5** listens and forwards each message to the predefined Slack channel.
+1. Select from **`awbs_in_transit`** where **`next_status_check_at <= NOW()`** and row is **not** locked by another worker (`locked_until` expired or null).
+2. **Lease (not boolean only):** Before processing, set **`locked_until = NOW() + lease_ttl`** and **`worker_id`** (or equivalent) for crash recovery; clear lease after success or failure.
+3. Call **AWBTrackers** (or backend proxy) up to **20** parallel requests.
+4. On result (per **HAWB**; may run **AWBTrackers once per active `(tenant_id, hawb, mawb)` line** when multiple MAWBs exist):
+   - **Append** **`awb_status_history`** (never overwrite); include **`mawb`** (or equivalent) in **`status_details`** when the check was for a specific MAWB line.
+   - **Update** **`awb_latest_status`** (aggregate `latest_status`, `updated_at`, and mapped fields — e.g. worst/most recent across lines, per product rule).
+   - Recompute **`next_status_check_at`** for **`(tenant_id, hawb)`**: **+2h** if on ground; **ETA + 1h** if in air (use **most constraining** ETA across active MAWB lines if multiple).
+   - If **delivered / complete** per product rules for that HAWB → **remove** **`(tenant_id, hawb)`** from **`awbs_in_transit`** and optionally archive or clear **`hawb_mawb_lines`**.
+5. **24h stale rule:** In the same run, for open shipments, if **`updated_at` (or last meaningful track) < NOW() - 24h`** and not delivered → enqueue **`Alerts_Queue`** (Slack to ops).
 
-## 6. Database (Multi-Tenant)
+---
 
-- **Design**: Multi-tenant; all data scoped by tenant (company).
-- **Schema**: The **first column** of AWB-related tables is **tenant_id**, used to differentiate between companies.
-- **Tenant table** (separate): Each tenant has its **credentials** and **notification email address**. AWBs are associated with tenant_id when entering the system. Notification emails are sent from one shared Gmail SMTP account to each tenant's configured notification address.
-- **AWB–tenant relationship**: Each AWB is connected to **one and only one** tenant.
-- **AWB with multiple parts**: An AWB may have **a number of parts** in two ways: (1) **Physical pieces** — e.g., 5 boxes, only 3 departed; (2) **Master/House** — one Master AWB can include multiple House AWBs. The system must track piece counts (`pieces_total`, `pieces_departed`), flag splits/mismatches, and handle Master–House relationships.
-- **Excel column mapping**: Excel files from different sources (e.g., Unifreight, CargoWise) may have the **same columns but with similar names**. The system must normalize/map these column names to a consistent schema.
+### 4.3 Workflow 3 — Email notifications
 
-### Table Structure
+**Trigger:** **Every 60 minutes** (and/or user-specific windows for daily/twice-daily Excel).
 
-**Reference**: The `awbs/` folder contains `__DSV Tracing Specification_170126.docx` (describes the purpose for CargoGent) and Excel files with AWB status data.
+**Process:**
 
-#### 1. AWB Latest Status (main table)
+1. **Delta / “changes since last email”:** **Per user** — use `Pending_Notifications` + last-sent watermark per user.
+2. **Full Excel (daily / twice daily):** Generate **canonical layout** plus **extra status columns** (latest status, last update time, etc.).
+3. Send via shared SMTP (or n8n); mark notifications sent.
 
-| Column | Description |
-|--------|-------------|
-| `tenant_id` | FK to tenant; one AWB → one tenant only |
-| `awb_id` | Primary key; unique AWB identifier |
-| `awb_number` | Master AWB number (e.g., "114...") |
-| ... | **All fields from the original Excel** (origin, destination, consignor, consignee, INCO terms, **Packages**, **Total Packages**, **Inner**, **Outer**, etc.), including those not directly relevant to AWB status — required for round-trip Excel in update emails. An AWB may have **multiple parts** (pieces); store piece counts. |
-| `latest_status` | Current status (e.g., on ground, in air, delivered) |
-| `updated_at` | Timestamp of last status update |
+---
 
-Stores the **current state** of each AWB. Updated when a new tracking result is received.
+### 4.4 Workflow 4 — Slack alerts (ops)
 
-#### 2. AWB Status History
+**Trigger:** Inserts into **`Alerts_Queue`** (from Workflow 1–2) or internal API.
 
-| Column | Description |
-|--------|-------------|
-| `tenant_id` | FK to tenant |
-| `awb_id` | FK to AWB |
-| `history_id` | Primary key; unique per record |
-| `status` | Status at this point in time |
-| `status_details` | ETD, ATD, ETA, ATA, pieces (total, departed), etc. — see [awb-status_details.md](awb-status_details.md). An AWB may have multiple parts; track `pieces_total` and `pieces_departed` to detect splits. |
-| `checked_at` | Timestamp when this status was retrieved |
+**Process:** Post to **one** Slack channel for **CargoGent ops** only; mark `sent_to_slack`.
 
-**Full history** of tracking results. Each status check appends a new record. Never overwritten.
+---
 
-#### 3. AWBs In Transit (needs status update)
+### 4.5 Workflow 5 — Error queue (optional extension)
+
+Centralized errors from any workflow → Slack (same ops channel or dedicated error channel — **product default: ops channel** unless split later).
+
+---
+
+### 4.6 UiPath (if used)
+
+Long-running or rate-limited automations go through an internal queue; see legacy notes in repo. Does not change §3 scheduling rules.
+
+---
+
+## 5. MAWB / HAWB rules (technical)
+
+- **Strict shipment identity:** **`(tenant_id, hawb)`** — exactly **one** logical house shipment row in **`awb_latest_status`** per tenant + HAWB.
+- **HAWB:** Required (never null). **MAWB** is **not** part of the primary key of the shipment aggregate.
+- **Excel many-to-one MAWB → many HAWBs:** Example for one tenant: `(hawb1, mawb1)`, `(hawb2, mawb1)`, `(hawb3, mawb1)`, `(hawb4, mawb1)`, `(hawb4, mawb2)` → **four** parent rows (`hawb1`…`hawb4`) and **five** rows in **`hawb_mawb_lines`** (hawb4 appears twice with different MAWBs).
+- **MAWB may change** over time (rebooking): update or replace lines in **`hawb_mawb_lines`**; parent **`awb_latest_status`** remains keyed by **`(tenant_id, hawb)`**.
+- **Export lifecycle** details: [product.requirements.md](product.requirements.md) §9. **Import lifecycle:** **TBD**.
+
+---
+
+## 6. Database design (target schema)
+
+> **Note:** `backend/migrations/*.sql` is a **minimal/stub** subset. Implement new migrations to match this section.
+
+### 6.1 `tenants`
 
 | Column | Description |
 |--------|-------------|
-| `tenant_id` | FK to tenant |
-| `awb_id` | FK to AWB latest status |
-| `next_status_check_at` | **Date and time** when the next status should be checked |
+| `id` | UUID PK |
+| `name` | Company name |
+| `notification_email` | Default tenant contact for mail (if used) |
+| `allowed_sender_domains` | Text[] or child table: domains mapping to this tenant for `info@cargogent.com` routing |
 
-Contains only AWBs **still in transit** that require status updates. Workflow 2 queries this table to find which AWBs are due for a check. When an AWB is fully delivered (e.g., ATA in Israel), it is removed from this table.
+### 6.2 `users`
 
-- **Different tables**: When AWBs appear in other tables (e.g., for different workflows or purposes), each table **always stores AWBs with all their data** — including **tenant_id** and everything else. No fragmented references; full context in every table.
+| Column | Description |
+|--------|-------------|
+| `id` | UUID PK |
+| `tenant_id` | FK → tenants |
+| `username` / `email` | Login email; domain must match tenant routing rules |
+| `password_hash`, `role`, … | Auth |
+| `notification_setting` | Enum: e.g. `REALTIME`, `DAILY_EXCEL`, `TWICE_DAILY_EXCEL` |
+| `last_notification_sent_at` | Optional watermark for per-user delta emails |
+
+### 6.3 `awb_latest_status` (wide table — **one row per `(tenant_id, hawb)`**)
+
+| Column | Description |
+|--------|-------------|
+| **`tenant_id`** | UUID FK → tenants, **part of PK** |
+| **`hawb`** | TEXT NOT NULL, **part of PK** |
+| **PK** | **`PRIMARY KEY (tenant_id, hawb)`** — strict; no second row for the same house under the same tenant. |
+| **Wide columns** | All non-key Excel fields that describe the **shipment / house** (consignor, consignee, pieces, etc.) per product mapping. |
+| **`latest_status`** | Aggregate status for the HAWB (derived from tracker + business rules). |
+| **`updated_at`** | Last meaningful update to this aggregate row. |
+| **`batch_ingest_at`** | Optional; timestamp shared by all HAWBs touched in the same ingest batch. |
+
+**Note:** Do **not** duplicate the same `(tenant_id, hawb)` for a second MAWB. Multiple MAWBs for the same HAWB live only in **`hawb_mawb_lines`**.
+
+### 6.4 `hawb_mawb_lines` (Excel MAWB lines per HAWB)
+
+One row per **distinct `(tenant_id, hawb, mawb)`** present in the latest reconciled Excel for that house.
+
+| Column | Description |
+|--------|-------------|
+| **`tenant_id`, `hawb`** | FK → `awb_latest_status(tenant_id, hawb)` ON DELETE CASCADE |
+| **`mawb`** | TEXT NOT NULL |
+| **PK** | **`PRIMARY KEY (tenant_id, hawb, mawb)`** |
+| Optional | Line-specific columns (weight, pieces on this MAWB line) if they differ per line in Excel |
+
+**Example (one tenant):** Lines `(hawb1,mawb1)`, `(hawb2,mawb1)`, `(hawb3,mawb1)`, `(hawb4,mawb1)`, `(hawb4,mawb2)` → **4** parents in `awb_latest_status`, **5** rows here.
+
+### 6.5 `awb_status_history`
+
+Append-only: `history_id`, **`tenant_id`**, **`hawb`**, optional **`mawb`** (which line was queried), `status`, `status_details` JSONB (see [awb-status_details.md](requirment-design-architecture/awb-status_details.md)), `checked_at`.
+
+**FK:** **`(tenant_id, hawb)`** → `awb_latest_status`.
+
+### 6.6 `awbs_in_transit`
+
+| Column | Description |
+|--------|-------------|
+| **`tenant_id`, `hawb`** | **`PRIMARY KEY (tenant_id, hawb)`** — one queue row per house shipment |
+| `next_status_check_at` | timestamptz |
+| `locked_until` | Lease expiry |
+| `worker_id` | Lease holder |
+
+**FK:** **`(tenant_id, hawb)`** → `awb_latest_status`.
+
+### 6.7 `pending_notifications`
+
+`notification_id`, `tenant_id`, `user_id`, **`hawb`**, `change_summary`, `created_at`, `sent` boolean.  
+**FK:** **`(tenant_id, hawb)`** → `awb_latest_status` (optional composite FK).
+
+### 6.8 `alerts_queue`
+
+`alert_id`, `tenant_id`, **`hawb`** (nullable if global), `alert_type`, `message`, `created_at`, `sent_to_slack` boolean.
+
+### 6.9 Optional: `email_ingest_batches`
+
+`batch_id`, `tenant_id`, `received_at`, `message_id`, `sender`, `attachment_storage_ref` — links rows ingested in one mail.
+
+---
+
+## 7. Warning rules (technical)
+
+| Rule | Implementation note |
+|------|---------------------|
+| Excel ↔ DB mismatch | `Alerts_Queue` + Slack ops + `next_status_check_at = NOW()` |
+| 24h no update on open MAWB | Checked **each tracking scheduler tick (30 min)** |
+| HAWB type / stage attention | **TBD** — column mapping pending |
+
+---
+
+## 8. Related files
+
+- [product.requirements.md](product.requirements.md)
+- [requirment-design-architecture/design-architecture.md](requirment-design-architecture/design-architecture.md)
+- [requirment-design-architecture/Excel-format.md](requirment-design-architecture/Excel-format.md)
+- [requirment-design-architecture/awb-status_details.md](requirment-design-architecture/awb-status_details.md)
+- `backend/migrations/` — current DB stubs; align with §6 over time.
+
+---
+
+## 9. Change log (this consolidation)
+
+- Polling: **on ground 2h**, **in air ETA+1h**, scheduler **30 min**, **20** concurrent trackers.
+- Inbound mail: **`info@cargogent.com`**, tenant by **sender domain**; users with same domain share AWBs.
+- Storage: **wide `awb_latest_status`** + child **`hawb_mawb_lines`**; batch rows share **same batch timestamp** where applicable.
+- Identity: **strict `PRIMARY KEY (tenant_id, hawb)`** on the house shipment; **multiple MAWB lines** per HAWB via **`hawb_mawb_lines` `PRIMARY KEY (tenant_id, hawb, mawb)`** (supports e.g. hawb4 + mawb1 and hawb4 + mawb2 in one Excel).
+- Queue locking: **lease** (`locked_until`, `worker_id`).
+- Slack: **single ops channel**; Excel/DB alerts **ops only**.
+- Full Excel export: **canonical + extra status columns**.

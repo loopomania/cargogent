@@ -1,0 +1,142 @@
+{
+  "name": "workflow-user-email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "user-email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-invite",
+              "leftValue": "={{ $json.body.flow_type }}",
+              "rightValue": "invite",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "branch-flow-type",
+      "name": "Branch on flow_type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "Welcome to CargoGent – Set Up Your Account",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#0f1117;color:#e2e8f0;border-radius:12px\">\n  <div style=\"text-align:center;margin-bottom:32px\">\n    <h1 style=\"font-size:28px;font-weight:700;color:#ffffff;margin:0\">CargoGent</h1>\n    <p style=\"color:#6b7280;font-size:13px;margin:4px 0 0\">Cargo Intelligence Platform</p>\n  </div>\n  <h2 style=\"font-size:20px;font-weight:600;color:#ffffff;margin:0 0 12px\">You've been invited 🎉</h2>\n  <p style=\"color:#cbd5e1;line-height:1.6;margin:0 0 8px\">Hi {{ $('Webhook').item.json.body.name || 'there' }},</p>\n  <p style=\"color:#cbd5e1;line-height:1.6;margin:0 0 24px\">An administrator has created a CargoGent account for you. Click the button below to set your password and get started. This link expires in <strong style=\"color:#fff\">24 hours</strong>.</p>\n  <div style=\"text-align:center;margin:32px 0\">\n    <a href=\"{{ $('Webhook').item.json.body.inviteUrl }}\" style=\"display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;letter-spacing:0.3px\">Set Your Password →</a>\n  </div>\n  <p style=\"color:#4b5563;font-size:12px;line-height:1.6;border-top:1px solid #1f2937;padding-top:16px;margin:0\">If you didn't expect this invitation, you can safely ignore this email. This link will expire after 24 hours.</p>\n</div>",
+        "options": {}
+      },
+      "id": "send-invite-email",
+      "name": "Send Invite Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [480, -120],
+      "credentials": {
+        "smtp": {
+          "id": "QF6LvYDoe1D3Q3ju",
+          "name": "CargoGent SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "CargoGent – Password Reset Request",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#0f1117;color:#e2e8f0;border-radius:12px\">\n  <div style=\"text-align:center;margin-bottom:32px\">\n    <h1 style=\"font-size:28px;font-weight:700;color:#ffffff;margin:0\">CargoGent</h1>\n    <p style=\"color:#6b7280;font-size:13px;margin:4px 0 0\">Cargo Intelligence Platform</p>\n  </div>\n  <h2 style=\"font-size:20px;font-weight:600;color:#ffffff;margin:0 0 12px\">Reset your password 🔐</h2>\n  <p style=\"color:#cbd5e1;line-height:1.6;margin:0 0 8px\">Hi {{ $('Webhook').item.json.body.name || 'there' }},</p>\n  <p style=\"color:#cbd5e1;line-height:1.6;margin:0 0 24px\">We received a request to reset your CargoGent password. Click the button below to choose a new password. This link expires in <strong style=\"color:#fff\">24 hours</strong>.</p>\n  <div style=\"text-align:center;margin:32px 0\">\n    <a href=\"{{ $('Webhook').item.json.body.inviteUrl }}\" style=\"display:inline-block;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;letter-spacing:0.3px\">Reset My Password →</a>\n  </div>\n  <p style=\"color:#4b5563;font-size:12px;line-height:1.6;border-top:1px solid #1f2937;padding-top:16px;margin:0\">If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>\n</div>",
+        "options": {}
+      },
+      "id": "send-reset-email",
+      "name": "Send Reset Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [480, 120],
+      "credentials": {
+        "smtp": {
+          "id": "QF6LvYDoe1D3Q3ju",
+          "name": "CargoGent SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {}
+      },
+      "id": "respond-ok-invite",
+      "name": "Respond OK (invite)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, -120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {}
+      },
+      "id": "respond-ok-reset",
+      "name": "Respond OK (reset)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 120]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Branch on flow_type", "type": "main", "index": 0 }]
+      ]
+    },
+    "Branch on flow_type": {
+      "main": [
+        [{ "node": "Send Invite Email", "type": "main", "index": 0 }],
+        [{ "node": "Send Reset Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Invite Email": {
+      "main": [
+        [{ "node": "Respond OK (invite)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Reset Email": {
+      "main": [
+        [{ "node": "Respond OK (reset)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

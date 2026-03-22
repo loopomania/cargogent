@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { trackByAirline, trackByAwb } from "../services/trackService.js";
-import { authOptional, requireAdmin } from "../middleware/auth.js";
+import { authOptional, requireAuthenticated } from "../middleware/auth.js";
 import { logQueryRequest } from "../services/db.js";
 
 const router = Router();
 
 /** GET /api/track/:airline/:awb — track by airline + AWB. Admin only. (Must be before /:awb.) */
-router.get("/:airline/:awb", authOptional, requireAdmin, async (req, res) => {
+router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res) => {
   const { airline, awb } = req.params;
   const { hawb } = req.query;
   if (!airline || !awb) {
@@ -43,7 +43,7 @@ router.get("/:airline/:awb", authOptional, requireAdmin, async (req, res) => {
 });
 
 /** GET /api/track/:awb — track by AWB only (airline from prefix). Admin only. */
-router.get("/:awb", authOptional, requireAdmin, async (req, res) => {
+router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
   const { awb } = req.params;
   const { hawb } = req.query;
   if (!awb) {

@@ -6,9 +6,14 @@ import InviteExpired from "./pages/InviteExpired";
 import AdminDashboard from "./pages/AdminDashboard";
 import Users from "./pages/Users";
 import Logs from "./pages/Logs";
-import CustomerDashboard from "./pages/CustomerDashboard";
+import CustomerAwbs from "./pages/CustomerAwbs";
+import CustomerSettings from "./pages/CustomerSettings";
 import SetupPassword from "./pages/SetupPassword";
 import Layout from "./layouts/Layout";
+
+function isCustomerRole(r: string) {
+  return r === "customer" || r === "user";
+}
 
 function ProtectedRoute({
   children,
@@ -20,7 +25,13 @@ function ProtectedRoute({
   const { user, loading } = useAuth();
   if (loading) return <div className="loading-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to={user.role === "admin" ? "/admin" : "/customer"} replace />;
+  if (role === "admin") {
+    if (user.role !== "admin") return <Navigate to={isCustomerRole(user.role) ? "/customer" : "/login"} replace />;
+  } else {
+    // Customer console: invited users have role `user` in DB
+    if (user.role === "admin") return <Navigate to="/admin" replace />;
+    if (!isCustomerRole(user.role)) return <Navigate to="/login" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -47,7 +58,10 @@ export default function App() {
         element={
           <ProtectedRoute role="customer">
             <Layout role="customer">
-              <CustomerDashboard />
+              <Routes>
+                <Route path="/" element={<CustomerAwbs />} />
+                <Route path="/settings" element={<CustomerSettings />} />
+              </Routes>
             </Layout>
           </ProtectedRoute>
         }

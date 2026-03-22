@@ -19,7 +19,7 @@ if ! ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVE
   echo "Cannot connect to ${SERVER_IP}. Trying ssh-copy-id..."
   PUB_KEY="$HOME/.ssh/id_ed25519.pub"
   if [ -f "$PUB_KEY" ]; then
-    SSH_PASS=$(grep "^rootPassword=" "$REPO_ROOT/.env" 2>/dev/null | cut -d'=' -f2-)
+    SSH_PASS=$(grep "^rootPassword=" "$REPO_ROOT/.env-prod" 2>/dev/null | cut -d'=' -f2-)
     if [ -n "$SSH_PASS" ] && command -v sshpass &>/dev/null; then
       sshpass -p "$SSH_PASS" ssh-copy-id -o StrictHostKeyChecking=no -i "$PUB_KEY" "${SERVER_USER}@${SERVER_IP}"
     fi
@@ -42,15 +42,14 @@ rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
   --exclude '*.pyc' \
   "$REPO_ROOT/" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/"
 
-# 3. Check for .env on server
-echo "Checking for .env on server..."
-ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "[ -f ${APP_DIR}/.env ]" || {
-  if [ -f "$REPO_ROOT/.env.prod.example" ]; then
-    echo "Warning: .env not found on server. Copying .env.prod.example to .env..."
-    rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$REPO_ROOT/.env.prod.example" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/.env"
-    echo "IMPORTANT: You must SSH into the server and edit ${APP_DIR}/.env with your DATABASE_URL, ADMIN_EMAIL, and ADMIN_PASSWORD_HASH before the app will work!"
+# 3. Check for .env-prod on server
+echo "Checking for .env-prod on server..."
+ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "[ -f ${APP_DIR}/.env-prod ]" || {
+  if [ -f "$REPO_ROOT/.env-prod" ]; then
+    echo "Warning: .env-prod not found on server. Copying local .env-prod to server..."
+    rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$REPO_ROOT/.env-prod" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/.env-prod"
   else
-    echo "Warning: .env not found on server and .env.prod.example missing locally."
+    echo "Warning: .env-prod not found on server and missing locally."
   fi
 }
 
@@ -74,15 +73,15 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
   
   echo "Running database migrations..."
   sleep 5
-  DB_URL=$(grep '^DATABASE_URL=' /app/cargogent/.env 2>/dev/null | cut -d'=' -f2-)
-  ADMIN_EMAIL=$(grep '^ADMIN_EMAIL=' /app/cargogent/.env 2>/dev/null | cut -d'=' -f2-)
-  ADMIN_HASH=$(grep '^ADMIN_PASSWORD_HASH=' /app/cargogent/.env 2>/dev/null | sed "s/^ADMIN_PASSWORD_HASH=//;s/^'//;s/'$//")
+  DB_URL=$(grep '^DATABASE_URL=' /app/cargogent/.env-prod 2>/dev/null | cut -d'=' -f2-)
+  ADMIN_EMAIL=$(grep '^ADMIN_EMAIL=' /app/cargogent/.env-prod 2>/dev/null | cut -d'=' -f2-)
+  ADMIN_HASH=$(grep '^ADMIN_PASSWORD_HASH=' /app/cargogent/.env-prod 2>/dev/null | sed "s/^ADMIN_PASSWORD_HASH=//;s/^'//;s/'$//")
   if [ -n "$DB_URL" ]; then
     docker run --rm \
       -v /app/cargogent/backend/migrations:/migrations \
       -e "DATABASE_URL=$DB_URL" \
       postgres:16-alpine sh -c \
-      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql && psql "$DATABASE_URL" -f /migrations/005_add_is_protected.sql' \
+      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql && psql "$DATABASE_URL" -f /migrations/005_add_is_protected.sql && psql "$DATABASE_URL" -f /migrations/006_hawb_mawb_lines.sql' \
       && echo "Migrations applied." || echo "Warning: Some migrations may have failed (idempotent — check logs)."
 
     # Sync admin credentials from .env into DB on every deploy (migration uses ON CONFLICT DO NOTHING)

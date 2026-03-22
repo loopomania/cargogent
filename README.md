@@ -19,7 +19,6 @@ CargoGent tracks **AWBs (Air Waybills)** across carriers and updates status for 
 
 ## Local development (full stack)
 
-1. Copy `.env.example` to `.env` (it includes the first admin: `alon@cargogent.com`; set optional `PROXY_URL` for AWBTrackers).
 2. Run with Docker Compose:
 
 ```bash
@@ -58,10 +57,11 @@ The existing **deploy script** (`scripts/deploy.sh`) deploys AWBTrackers to Hetz
 
 ## Documentation
 
-- **[System-requirmets.md](System-requirmets.md)** — System purpose, multi-tenancy, workflows, database design.
-- **[design-architecture.md](design-architecture.md)** — Architecture, Caddy, backend, frontend, n8n, AWBTrackers.
-- **[Excel-format.md](Excel-format.md)** — Expected format of Excel attachments (AWBs and column mapping).
-- **[awb-status_details.md](awb-status_details.md)** — Fields for status details (ETD, ATD, ETA, ATA, pieces, etc.).
+- **[product.requirements.md](product.requirements.md)** — Product requirements (PRD): tenancy, email routing, scheduling rules, notifications, Slack.
+- **[System-requirmets.md](System-requirmets.md)** — Technical design: workflows, database tables, queues, AWBTrackers integration.
+- **[requirment-design-architecture/design-architecture.md](requirment-design-architecture/design-architecture.md)** — Component diagram, Caddy, backend, frontend, n8n.
+- **[requirment-design-architecture/Excel-format.md](requirment-design-architecture/Excel-format.md)** — Excel column mapping.
+- **[requirment-design-architecture/awb-status_details.md](requirment-design-architecture/awb-status_details.md)** — `status_details` field semantics.
 
 ## AWBTrackers (tracking service)
 
@@ -72,7 +72,7 @@ The existing **deploy script** (`scripts/deploy.sh`) deploys AWBTrackers to Hetz
 ## Production (Hetzner + Neon)
 
 - **Stack**: `docker-compose.prod.yml` — Caddy, frontend (static build), backend, AWBTrackers, n8n. No local Postgres; backend uses **Neon** via `DATABASE_URL` (Postgres connection string from [Neon Console](https://console.neon.tech)).
-- **Env**: Copy [.env.prod.example](.env.prod.example) into `.env` and set `DATABASE_URL` (Neon connection string), `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, optional `PROXY_URL`.
+- **Env**: Copy [.env.prod.example](.env.prod.example) into `.env-prod` and set `DATABASE_URL` (Neon connection string), `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, optional `PROXY_URL`.
 - **Deploy**:
   ```bash
   ./scripts/deploy-prod.sh
