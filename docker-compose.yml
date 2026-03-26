@@ -44,8 +44,6 @@ services:
     build:
       context: ./AWBTrackers
       dockerfile: Dockerfile
-    environment:
-      - PROXY_URL=${PROXY_URL:-}
     env_file:
       - .env-dev
     # No ports exposed to host by default; access via Caddy. For direct benchmark: uncomment.
