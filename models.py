@@ -19,6 +19,7 @@ class TrackingEvent(BaseModel):
 class TrackingResponse(BaseModel):
     airline: str
     awb: str
+    hawb: Optional[str] = None
     origin: Optional[str] = None
     destination: Optional[str] = None
     status: Optional[str] = None

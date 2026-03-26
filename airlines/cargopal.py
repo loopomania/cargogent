@@ -6,6 +6,7 @@ from datetime import datetime
 from curl_cffi import requests
 
 from .base import AirlineTracker
+from .proxy_util import get_rotating_proxy
 from .common import (
     normalize_awb,
     summarize_from_events,
@@ -17,7 +18,7 @@ class CargoPalTracker(AirlineTracker):
     name = "cargopal"
     base_url = "https://cargo.pal.com.ph/Services/Shipment/AWBTrackingService.svc/GetAWBTrackingRecord"
 
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="079")
         awb_fmt = f"{prefix}-{serial}"
         message = "Success"
@@ -36,7 +37,10 @@ class CargoPalTracker(AirlineTracker):
         }
 
         try:
-            async with requests.AsyncSession(proxy=self.proxy) as session:
+            rotated_proxy = get_rotating_proxy(self.proxy) if self.proxy else None
+            proxies = {"http": rotated_proxy, "https": rotated_proxy} if rotated_proxy else None
+            
+            async with requests.AsyncSession(proxies=proxies) as session:
                 request = await session.get(source_url, headers=headers, verify=False)
                 if request.status_code != 200:
                     message = f"Failed to fetch data: HTTP {request.status_code}"

@@ -12,6 +12,7 @@ from playwright.async_api import async_playwright, Response
 
 from .base import AirlineTracker
 from .common import normalize_awb, is_bot_blocked_html
+from .proxy_util import get_rotating_proxy
 from models import TrackingResponse, TrackingEvent
 
 
@@ -19,7 +20,7 @@ class ElAlTracker(AirlineTracker):
     name = "elal"
     main_url = "https://www.elal.com/en/Cargo/Pages/Online-Tracking.aspx"
 
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="114")
         awb_fmt = f"{prefix}-{serial}"
         message = "Success"
@@ -36,22 +37,32 @@ class ElAlTracker(AirlineTracker):
             trace.append("linux_detected_setting_display")
 
         proxy_config = None
+        proxy_server_arg = None
         if self.proxy:
-            match = re.search(r'https?://(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)', self.proxy)
+            rotated_proxy = get_rotating_proxy(self.proxy)
+            match = re.search(r'https?://(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)', rotated_proxy)
             if match:
                 user, password, host, port = match.groups()
+                # Playwright requires proxy server WITHOUT credentials in URL
+                # Credentials go into the separate username/password fields
                 proxy_config = {
                     "server": f"http://{host}:{port}",
-                    "username": user,
-                    "password": password,
+                    "username": user or "",
+                    "password": password or "",
                 }
+                proxy_server_arg = f"http://{host}:{port}"
+
+        # NOTE: IPRoyal (geo.iproyal.com:12321) uses HTTPS CONNECT auth which Chromium
+        # does not support (ERR_PROXY_AUTH_UNSUPPORTED). Playwright proxy is disabled.
+        # El Al's legacy endpoint (elalextra.net) works without proxy.
+        playwright_proxy = None
 
         # Strategy 0: Legacy URL (fast and simple, often more stable)
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
-                    headless=True, 
-                    proxy=proxy_config,
+                    headless=True,
+                    proxy=playwright_proxy,
                     args=["--no-sandbox", "--disable-dev-shm-usage"]
                 )
                 
@@ -104,8 +115,8 @@ class ElAlTracker(AirlineTracker):
                     # Strategy: Headless is often more stable in problematic environments
                     is_mac = sys.platform == "darwin"
                     browser = await p.chromium.launch(
-                        headless=is_mac, 
-                        proxy=proxy_config,
+                        headless=is_mac,
+                        proxy=None,
                         args=["--no-sandbox", "--disable-dev-shm-usage"]
                     )
                     trace.append(f"attempt_{attempt}_launched_headless_{is_mac}")

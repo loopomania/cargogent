@@ -11,5 +11,5 @@ class AirlineTracker(ABC):
         self.proxy = proxy
 
     @abstractmethod
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb: Optional[str] = None, **kwargs) -> TrackingResponse:
         raise NotImplementedError

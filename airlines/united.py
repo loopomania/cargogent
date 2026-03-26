@@ -23,6 +23,7 @@ from .common import (
     is_bot_blocked_html,
     normalize_awb,
 )
+from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingEvent, TrackingResponse
 
 
@@ -106,7 +107,7 @@ class UnitedTracker(AirlineTracker):
         events.sort(key=get_zulu)
         return events
 
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="016")
         awb_fmt = f"{prefix}-{serial}"
         message = "Success"
@@ -120,9 +121,17 @@ class UnitedTracker(AirlineTracker):
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
 
+        if self.proxy:
+            rotated_proxy = get_rotating_proxy(self.proxy)
+            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
+            if ext_path:
+                options.add_argument(f"--load-extension={ext_path}")
+            else:
+                options.add_argument(f'--proxy-server={rotated_proxy}')
+
         driver = None
         try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True)
+            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
             driver.set_page_load_timeout(90)
 
             trace.append(f"navigating_to:{source_url}")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker, MamanTracker, SwissportTracker
+from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker
 from models import TrackingResponse
 
 
@@ -19,27 +19,25 @@ TRACKERS = {
     "elal": ElAlTracker(proxy=PROXY_URL),
     "el-al": ElAlTracker(proxy=PROXY_URL),
     "ly": ElAlTracker(proxy=PROXY_URL),
-    "lufthansa": LufthansaTracker(),
-    "lh": LufthansaTracker(),
+    "lufthansa": LufthansaTracker(proxy=PROXY_URL),
+    "lh": LufthansaTracker(proxy=PROXY_URL),
     "delta": DeltaTracker(proxy=PROXY_URL),
     "dl": DeltaTracker(proxy=PROXY_URL),
-    "afklm": AFKLMTracker(),
-    "af": AFKLMTracker(),
-    "kl": AFKLMTracker(),
-    "klm": AFKLMTracker(),
-    "united": UnitedTracker(),
-    "ua": UnitedTracker(),
+    "afklm": AFKLMTracker(proxy=PROXY_URL),
+    "af": AFKLMTracker(proxy=PROXY_URL),
+    "kl": AFKLMTracker(proxy=PROXY_URL),
+    "klm": AFKLMTracker(proxy=PROXY_URL),
+    "united": UnitedTracker(proxy=PROXY_URL),
+    "ua": UnitedTracker(proxy=PROXY_URL),
     "cargopal": CargoPalTracker(proxy=PROXY_URL),
     "pal": CargoPalTracker(proxy=PROXY_URL),
     "pr": CargoPalTracker(proxy=PROXY_URL),
-    "cathay": CathayTracker(),
-    "cx": CathayTracker(),
-    "ethiopian": EthiopianTracker(),
-    "et": EthiopianTracker(),
-    "challenge": ChallengeTracker(),
-    "ch": ChallengeTracker(),
-    "maman": MamanTracker(),
-    "swissport": SwissportTracker(),
+    "cathay": CathayTracker(proxy=PROXY_URL),
+    "cx": CathayTracker(proxy=PROXY_URL),
+    "ethiopian": EthiopianTracker(proxy=PROXY_URL),
+    "et": EthiopianTracker(proxy=PROXY_URL),
+    "challenge": ChallengeTracker(proxy=PROXY_URL),
+    "ch": ChallengeTracker(proxy=PROXY_URL),
 }
 
 # AWB prefix (first 3 digits) -> airline key for router detection
@@ -107,7 +105,6 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
             last_error_msg = f"Primary tracker failed (attempt {attempt+1}): {str(e)[:40]}"
             
     if not res or (res.status == "Error" and not getattr(res, "events", [])):
-        from models import TrackingResponse
         res = TrackingResponse(
             airline=airline.title(),
             awb=awb,
@@ -142,32 +139,8 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
             res.message += " | ground_skipped:not_arrived"
         else:
             t_g0 = time.time()
-            ground_services = ["maman", "swissport"]
-            
-            # Reorder ground services based on recent LRU preference for this airline
-            pref = GROUND_SERVICE_MEMORY.get(key)
-            if pref and pref in ground_services:
-                ground_services.remove(pref)
-                ground_services.insert(0, pref)
-                
-            for g_name in ground_services:
-                timeout_val = 30.0 if g_name == "maman" else 20.0
-                try:
-                    g_tracker = TRACKERS[g_name]
-                    if g_name == "swissport":
-                        g_res = await asyncio.wait_for(g_tracker.track(awb, hawb=hawb, origin=res.origin), timeout=timeout_val)
-                    else:
-                        g_res = await asyncio.wait_for(g_tracker.track(awb, hawb=hawb), timeout=timeout_val)
-                        
-                    if g_res.events:
-                        res.events.extend(g_res.events)
-                        res.message += f" | {g_name}_synced"
-                        GROUND_SERVICE_MEMORY[key] = g_name  # Update cache
-                        break # Found events, skip the other
-                except asyncio.TimeoutError:
-                    res.message += f" | {g_name}_timed_out"
-                except Exception as e:
-                    res.message += f" | {g_name}_error:{str(e)[:20]}"
+            ground_services = []
+            res.message += " | no_ground_handlers_configured"
 
             t_g1 = time.time()
             ground_duration = round(t_g1 - t_g0, 1)

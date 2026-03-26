@@ -84,9 +84,10 @@ def get_proxy_extension(proxy_url, folder_path="/tmp/proxy_auth_extension"):
     
     return folder_path
 
-def get_iproyal_proxy(base_proxy_url: str) -> str:
+def get_rotating_proxy(base_proxy_url: str) -> str:
     """
-    Transform a base IPRoyal proxy URL into a US-targeted, session-rotated one.
+    Transform a base proxy URL into a session-rotated one if it's a known service like IPRoyal.
+    Otherwise, returns the base proxy URL to support any premium generic proxy service (BrightData, ZenRows, etc).
     Example Input: http://user:pass@geo.iproyal.com:12321
     Example Output: http://user-country-us-session-abc12345:pass@geo.iproyal.com:12321
     """
@@ -94,22 +95,18 @@ def get_iproyal_proxy(base_proxy_url: str) -> str:
     import random
     import string
 
-    if not base_proxy_url or "iproyal" not in base_proxy_url.lower():
+    if not base_proxy_url:
         return base_proxy_url
 
-    # Match http://user:pass@host:port
-    match = re.search(r'(https?://)([^:@]+):([^@]*)@(.+)', base_proxy_url)
-    if not match:
-        return base_proxy_url
+    # Check if this is IPRoyal where we need manual session injection
+    if "iproyal" in base_proxy_url.lower():
+        match = re.search(r'(https?://)([^:@]+):([^@]*)@(.+)', base_proxy_url)
+        if match:
+            protocol, user, password, rest = match.groups()
+            session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+            new_user = f"{user}-country-us-session-{session_id}"
+            return f"{protocol}{new_user}:{password}@{rest}"
+            
+    # For BrightData, Oxylabs, ScraperAPI, ZenRows proxies, they usually auto-rotate or use built-in session formatting.
+    return base_proxy_url
 
-    protocol, user, password, rest = match.groups()
-    
-    # Generate random 8-char session
-    session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    
-    # Ensure US targeting and session rotation
-    # If user already contains session or country, we might need to be careful, 
-    # but for standard geo.iproyal.com we usually append.
-    new_user = f"{user}-country-us-session-{session_id}"
-    
-    return f"{protocol}{new_user}:{password}@{rest}"

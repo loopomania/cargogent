@@ -16,6 +16,7 @@ from .common import (
     parse_events_from_html_table,
     summarize_from_events,
 )
+from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingEvent, TrackingResponse
 import requests
 
@@ -44,7 +45,7 @@ class LufthansaTracker(AirlineTracker):
             )
         return events
 
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         awb_clean = awb.replace("-", "").replace(" ", "")
         message = "Success"
         blocked = False
@@ -60,9 +61,17 @@ class LufthansaTracker(AirlineTracker):
         options.add_argument("--disable-extensions")
         options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
         
+        if self.proxy:
+            rotated_proxy = get_rotating_proxy(self.proxy)
+            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
+            if ext_path:
+                options.add_argument(f"--load-extension={ext_path}")
+            else:
+                options.add_argument(f'--proxy-server={rotated_proxy}')
+        
         driver = None
         try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=False)
+            driver = uc.Chrome(options=options, headless=False, use_subprocess=False, version_main=146)
             driver.set_page_load_timeout(60)
             driver.get(source_url)
             

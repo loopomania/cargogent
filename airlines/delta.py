@@ -23,7 +23,7 @@ from playwright.async_api import async_playwright, Response
 
 from .base import AirlineTracker
 from .common import normalize_awb, is_bot_blocked_html
-from .proxy_util import get_iproyal_proxy
+from .proxy_util import get_rotating_proxy
 from models import TrackingEvent, TrackingResponse
 
 
@@ -31,7 +31,7 @@ class DeltaTracker(AirlineTracker):
     name = "delta"
     base_url = "https://www.deltacargo.com/Cargo/trackShipment"
 
-    async def track(self, awb: str) -> TrackingResponse:
+    async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="006")
         awb_fmt = f"{prefix}-{serial}"
         awb_clean = f"{prefix}{serial}"
@@ -48,8 +48,8 @@ class DeltaTracker(AirlineTracker):
 
         proxy_config = None
         if self.proxy:
-            # Specialized IPRoyal proxy for Delta to bypass Akamai
-            specialized_proxy = get_iproyal_proxy(self.proxy)
+            # Request rotated IP for the scraping request
+            specialized_proxy = get_rotating_proxy(self.proxy)
             
             m = re.search(r'https?://(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)', specialized_proxy)
             if m:
