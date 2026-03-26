@@ -133,6 +133,10 @@ class AFKLMTracker(AirlineTracker):
 
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
+        """Offload sync UC/Selenium work to the shared browser executor."""
+        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
+
+    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="074")
         awb_fmt = f"{prefix}-{serial}"
         message = "Success"

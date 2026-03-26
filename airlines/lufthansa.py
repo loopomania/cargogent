@@ -46,6 +46,10 @@ class LufthansaTracker(AirlineTracker):
         return events
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
+        """Offload sync UC/Selenium work to the shared browser executor."""
+        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
+
+    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         awb_clean = awb.replace("-", "").replace(" ", "")
         message = "Success"
         blocked = False
@@ -58,7 +62,6 @@ class LufthansaTracker(AirlineTracker):
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--disable-infobars")
         options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-extensions")
         options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
         
         if self.proxy:

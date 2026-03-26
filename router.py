@@ -15,29 +15,26 @@ PROXY_URL = os.environ.get("PROXY_URL")
 # Selective Proxying: Only use residential proxy for "Hard" airlines
 PROXY_REQUIRED = {"elal", "el-al", "ly", "delta", "dl", "cargopal", "pal", "pr"}
 
+_elal      = ElAlTracker(proxy=PROXY_URL)
+_lufthansa = LufthansaTracker(proxy=PROXY_URL)
+_delta     = DeltaTracker(proxy=PROXY_URL)
+_afklm     = AFKLMTracker(proxy=PROXY_URL)
+_united    = UnitedTracker(proxy=PROXY_URL)
+_cargopal  = CargoPalTracker(proxy=PROXY_URL)
+_cathay    = CathayTracker(proxy=PROXY_URL)
+_ethiopian = EthiopianTracker(proxy=PROXY_URL)
+_challenge = ChallengeTracker(proxy=PROXY_URL)
+
 TRACKERS = {
-    "elal": ElAlTracker(proxy=PROXY_URL),
-    "el-al": ElAlTracker(proxy=PROXY_URL),
-    "ly": ElAlTracker(proxy=PROXY_URL),
-    "lufthansa": LufthansaTracker(proxy=PROXY_URL),
-    "lh": LufthansaTracker(proxy=PROXY_URL),
-    "delta": DeltaTracker(proxy=PROXY_URL),
-    "dl": DeltaTracker(proxy=PROXY_URL),
-    "afklm": AFKLMTracker(proxy=PROXY_URL),
-    "af": AFKLMTracker(proxy=PROXY_URL),
-    "kl": AFKLMTracker(proxy=PROXY_URL),
-    "klm": AFKLMTracker(proxy=PROXY_URL),
-    "united": UnitedTracker(proxy=PROXY_URL),
-    "ua": UnitedTracker(proxy=PROXY_URL),
-    "cargopal": CargoPalTracker(proxy=PROXY_URL),
-    "pal": CargoPalTracker(proxy=PROXY_URL),
-    "pr": CargoPalTracker(proxy=PROXY_URL),
-    "cathay": CathayTracker(proxy=PROXY_URL),
-    "cx": CathayTracker(proxy=PROXY_URL),
-    "ethiopian": EthiopianTracker(proxy=PROXY_URL),
-    "et": EthiopianTracker(proxy=PROXY_URL),
-    "challenge": ChallengeTracker(proxy=PROXY_URL),
-    "ch": ChallengeTracker(proxy=PROXY_URL),
+    "elal": _elal, "el-al": _elal, "ly": _elal,
+    "lufthansa": _lufthansa, "lh": _lufthansa,
+    "delta": _delta, "dl": _delta,
+    "afklm": _afklm, "af": _afklm, "kl": _afklm, "klm": _afklm,
+    "united": _united, "ua": _united,
+    "cargopal": _cargopal, "pal": _cargopal, "pr": _cargopal,
+    "cathay": _cathay, "cx": _cathay,
+    "ethiopian": _ethiopian, "et": _ethiopian,
+    "challenge": _challenge, "ch": _challenge,
 }
 
 # AWB prefix (first 3 digits) -> airline key for router detection

@@ -22,6 +22,10 @@ class EthiopianTracker(AirlineTracker):
     base_url = "https://cargo.ethiopianairlines.com/my-cargo/track-your-shipment"
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
+        """Offload sync UC/Selenium work to the shared browser executor."""
+        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
+
+    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="071")
         full_awb = f"{prefix}{serial}"
         trace = []
@@ -30,7 +34,6 @@ class EthiopianTracker(AirlineTracker):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
         options.add_argument("--disable-gpu")
         
         if self.proxy:
