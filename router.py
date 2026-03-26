@@ -69,6 +69,35 @@ def get_airline_from_awb(awb: str) -> str:
             return AWB_PREFIX_TO_AIRLINE[prefix]
     return "elal"
 
+import time
+
+_AIRLINE_CIRCUIT_BREAKER: dict[str, dict] = {}
+MAX_FAILURES = 3
+COOLDOWN_SECONDS = 300  # 5 minutes
+
+def is_airline_blocked(airline: str) -> bool:
+    breaker = _AIRLINE_CIRCUIT_BREAKER.get(airline)
+    if not breaker:
+        return False
+    if breaker["fails"] >= MAX_FAILURES:
+        if time.time() < breaker["blocked_until"]:
+            return True
+        else:
+            # Cooldown expired, half-open state (test one request)
+            breaker["fails"] = MAX_FAILURES - 1 
+            return False
+    return False
+
+def record_airline_success(airline: str):
+    if airline in _AIRLINE_CIRCUIT_BREAKER:
+        _AIRLINE_CIRCUIT_BREAKER[airline] = {"fails": 0, "blocked_until": 0}
+
+def record_airline_failure(airline: str):
+    breaker = _AIRLINE_CIRCUIT_BREAKER.setdefault(airline, {"fails": 0, "blocked_until": 0})
+    breaker["fails"] += 1
+    if breaker["fails"] >= MAX_FAILURES:
+        breaker["blocked_until"] = time.time() + COOLDOWN_SECONDS
+
 
 async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> TrackingResponse:
     key = normalize_airline(airline)
@@ -83,23 +112,34 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
             raw_meta={"supported": sorted(TRACKERS.keys())},
         )
     
+    if is_airline_blocked(key):
+        return TrackingResponse(
+            airline=airline.title(),
+            awb=awb,
+            status="Error",
+            message=f"circuit_breaker: {airline.title()} tracer temporarily blocked (cooldown)",
+            events=[]
+        )
+    
     import asyncio
-    import time
     
     t0 = time.time()
     res = None
     last_error_msg = ""
-    for attempt in range(2):
-        try:
-            res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=40.0)
-            if res.status != "Error" or res.events:
-                break
-            else:
-                last_error_msg = res.message
-        except asyncio.TimeoutError:
-            last_error_msg = f"Primary airline tracker timed out (attempt {attempt+1})"
-        except Exception as e:
-            last_error_msg = f"Primary tracker failed (attempt {attempt+1}): {str(e)[:40]}"
+    try:
+        # A single 55s timeout ensures we terminate before the 60s reverse proxy timeout
+        res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=55.0)
+        if res.status != "Error" or res.events:
+            record_airline_success(key)
+        else:
+            last_error_msg = res.message
+            record_airline_failure(key)
+    except asyncio.TimeoutError:
+        last_error_msg = "Primary airline tracker timed out (55s)"
+        record_airline_failure(key)
+    except Exception as e:
+        last_error_msg = f"Primary tracker failed: {str(e)[:40]}"
+        record_airline_failure(key)
             
     if not res or (res.status == "Error" and not getattr(res, "events", [])):
         res = TrackingResponse(
