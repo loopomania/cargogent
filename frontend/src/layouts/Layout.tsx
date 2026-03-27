@@ -80,7 +80,7 @@ export default function Layout({
           </button>
         </div>
       </aside>
-      <main style={{ flex: 1, padding: "2rem", maxWidth: 960 }}>
+      <main style={{ flex: 1, padding: "2rem" }}>
         {children}
       </main>
     </div>
