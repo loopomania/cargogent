@@ -160,12 +160,15 @@ class DeltaTracker(AirlineTracker):
         data = payload.get("data", payload)
         if not data:
             return events
+            
+        if isinstance(data, dict) and "trackShipment" in data:
+            data = data["trackShipment"]
 
         items = []
         if isinstance(data, list):
             items = data
         elif isinstance(data, dict):
-            for key in ("trackingInfo", "TrackingInfo", "events", "milestones", "legs",
+            for key in ("history", "trackingInfo", "TrackingInfo", "events", "milestones", "legs",
                         "shipmentEvents", "awbEvents", "items", "result"):
                 if key in data:
                     val = data[key]
@@ -174,28 +177,60 @@ class DeltaTracker(AirlineTracker):
             else:
                 items = [data]
 
-        for item in items:
-            if not isinstance(item, dict):
+        import re
+        for shipment in reversed(items):
+            if not isinstance(shipment, dict):
                 continue
-            status_code = (item.get("statusCode") or item.get("status") or
-                           item.get("milestoneCode") or item.get("eventCode") or "UNKN")
-            location = (item.get("location") or item.get("airport") or
-                        item.get("stationCode") or item.get("city"))
-            date = (item.get("date") or item.get("eventDate") or
-                    item.get("dateTime") or item.get("eventDateTime") or "")
-            flight = item.get("flightNumber") or item.get("flight") or item.get("flightNo")
-            pieces = str(item.get("pieces") or item.get("quantity") or "")
-            weight = str(item.get("weight") or "")
-            remarks = (item.get("description") or item.get("remarks") or
-                       item.get("milestone") or item.get("eventDescription") or "")
+                
+            history_items = shipment.get("history")
+            if not history_items:
+                history_items = [shipment] # fallback if it was already flattened
+                
+            global_pieces = str(shipment.get("pieces") or shipment.get("quantity") or "")
+            global_weight = str(shipment.get("weight") or "")
+            
+            for item in reversed(history_items):
+                if not isinstance(item, dict):
+                    continue
+                    
+                activity = item.get("activity", "")
+                clean_activity = re.sub(r'<[^>]+>', '', activity).strip()
+                
+                status_code = item.get("statusCode") or item.get("status") or item.get("milestoneCode") or item.get("eventCode")
+                if not status_code:
+                    act_lower = clean_activity.lower()
+                    if "delivered" in act_lower: status_code = "DLV"
+                    elif "arrived" in act_lower: status_code = "ARR"
+                    elif "departed" in act_lower: status_code = "DEP"
+                    elif "ready for customer" in act_lower: status_code = "NFD"
+                    elif "checked in" in act_lower or "accepted" in act_lower: status_code = "RCS"
+                    elif "booked" in act_lower: status_code = "BKD"
+                    else: status_code = "UNKN"
+                    
+                location = item.get("origin") or item.get("location") or item.get("stationCode")
+                
+                date = item.get("date", "")
+                if item.get("localTime"):
+                    date = f"{date} {item['localTime']}".strip()
+                    
+                flight = item.get("flightNo") or item.get("flightNumber")
+                
+                pieces = str(item.get("pieces") or global_pieces)
+                if not pieces and clean_activity:
+                    match = re.search(r'^(\d+)\s+pieces', clean_activity, re.IGNORECASE)
+                    if match:
+                        pieces = match.group(1)
+                        
+                weight = str(item.get("weight") or global_weight)
+                remarks = item.get("remarks") or clean_activity
 
-            events.append(TrackingEvent(
-                status_code=str(status_code)[:10],
-                location=str(location)[:3].upper() if location else None,
-                date=str(date),
-                flight=str(flight) if flight else None,
-                pieces=pieces,
-                weight=weight,
-                remarks=str(remarks)[:200],
-            ))
+                events.append(TrackingEvent(
+                    status_code=str(status_code)[:10],
+                    location=str(location)[:3].upper() if location else None,
+                    date=str(date),
+                    flight=str(flight) if flight else None,
+                    pieces=pieces,
+                    weight=weight,
+                    remarks=str(remarks)[:200],
+                ))
         return events
