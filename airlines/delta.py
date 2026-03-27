@@ -1,37 +1,39 @@
 """
-Delta Cargo tracker — Playwright + Residential Proxy implementation.
+Delta Cargo tracker — undetected-chromedriver + CDP network interception.
 
-KEY STRATEGY (verified working in production):
+KEY STRATEGY:
 - Navigate to trackShipment page with AWB in URL
-- The Angular app auto-fires a GET request to /Cargo/data/shipment/trackAwb
-- Intercept that response via page.on("response")
+- Provide residential proxy with extension auth (bypasses Akamai WAF)
+- Intercept Angular's GET request to /trackAwb using Chrome Performance logs
 - Parse the JSON payload
-
-The residential proxy allows the page to load (Akamai passes),
-and the Angular app's own GET call inherits the session, also passing.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
-import os
+import time
 from typing import List
 
-from playwright.async_api import async_playwright, Response
+import undetected_chromedriver as uc
 
 from .base import AirlineTracker
 from .common import normalize_awb, is_bot_blocked_html
-from .proxy_util import get_rotating_proxy
+from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingEvent, TrackingResponse
-
 
 class DeltaTracker(AirlineTracker):
     name = "delta"
     base_url = "https://www.deltacargo.com/Cargo/trackShipment"
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
+        """Offload sync UC/Selenium work to the shared browser executor."""
+        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
+
+    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
+        import sys
+        
+        print("DELTA SYNC START", file=sys.stderr)
         prefix, serial = normalize_awb(awb, default_prefix="006")
         awb_fmt = f"{prefix}-{serial}"
         awb_clean = f"{prefix}{serial}"
@@ -40,114 +42,103 @@ class DeltaTracker(AirlineTracker):
         blocked = False
         events: List[TrackingEvent] = []
         trace: List[str] = []
+        api_payloads = []
 
-        # Use display :99 for Linux (Xvfb) but don't force on Mac
-        if os.name != "nt" and os.uname().sysname == "Linux":
-            os.environ["DISPLAY"] = ":99"
-            trace.append("set_display_99_linux")
-
-        proxy_config = None
+        options = uc.ChromeOptions()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-gpu")
+        # Enable CDP performance logging to capture Network payloads
+        options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        
         if self.proxy:
-            # Request rotated IP for the scraping request
-            specialized_proxy = get_rotating_proxy(self.proxy)
-            
-            m = re.search(r'https?://(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)', specialized_proxy)
-            if m:
-                user, password, host, port = m.groups()
-                proxy_config = {
-                    "server": f"http://{host}:{port}",
-                    "username": user,
-                    "password": password,
-                }
-                trace.append(f"using_playwright_proxy:{host}")
+            rotated_proxy = get_rotating_proxy(self.proxy)
+            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
+            if ext_path:
+                options.add_argument(f"--load-extension={ext_path}")
+                trace.append("using_proxy_extension")
+                print("PROXY EXTENSION ADDED", file=sys.stderr)
+            else:
+                options.add_argument(f"--proxy-server={rotated_proxy}")
 
         source_url = f"{self.base_url}?awbNumber={awb_clean}"
-
-        is_linux = os.name != "nt" and os.uname().sysname == "Linux"
-        api_payloads: list = []
-        api_response_received = asyncio.Event()
-
+        trace.append(f"navigating:{source_url[-50:]}")
+        
+        driver = None
         try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=not is_linux,
-                    proxy=proxy_config,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
-                )
+            print("LAUNCHING DRIVER", file=sys.stderr)
+            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
+            print("DRIVER LAUNCHED", file=sys.stderr)
+            driver.set_page_load_timeout(30)
+            
+            print("GETTING URL", file=sys.stderr)
+            driver.get(source_url)
+            print("URL GOT", file=sys.stderr)
+            
+            # Wait up to 15s for the page to load, evaluate Akamai, and auto-fire trackAwb
+            end_time = time.time() + 15
+            found_api = False
+            while time.time() < end_time and not found_api:
+                # Poll logs for trackAwb URL
+                logs = driver.get_log("performance")
+                for entry in logs:
+                    try:
+                        log = json.loads(entry["message"])["message"]
+                        if log["method"] == "Network.responseReceived":
+                            params = log.get("params", {})
+                            resp_url = params.get("response", {}).get("url", "")
+                            if "trackAwb" in resp_url:
+                                trace.append(f"api_captured:{resp_url[-60:]}")
+                                req_id = params.get("requestId")
+                                # Extract Body using CDP command
+                                body_data = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": req_id})
+                                body_str = body_data.get("body", "")
+                                if body_str:
+                                    api_payloads.append(json.loads(body_str))
+                                    found_api = True
+                    except Exception as loop_e:
+                        pass
+                
+                if not found_api:
+                    time.sleep(1)
 
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-                    viewport={"width": 1440, "height": 900},
-                )
-                await context.add_init_script(
-                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
-                )
+            html = driver.page_source
+            page_len = len(html)
 
-                page = await context.new_page()
-
-                async def on_response(response: Response):
-                    url = response.url
-                    if "trackAwb" in url and response.status == 200:
-                        try:
-                            body = await response.body()
-                            data = json.loads(body.decode("utf-8", errors="ignore"))
-                            api_payloads.append(data)
-                            trace.append(f"api_captured:{url[-60:]}")
-                            api_response_received.set()
-                        except Exception as exc:
-                            trace.append(f"api_parse_error:{str(exc)[:60]}")
-
-                page.on("response", on_response)
-
-                trace.append(f"navigating:{source_url[-50:]}")
-                await page.goto(source_url, timeout=60000, wait_until="domcontentloaded")
-
-                # Wait for Akamai challenge to resolve and Angular to fire the API call.
-                # The API call is fired by the Angular app automatically when the page detects 
-                # the awbNumber in the URL. We wait up to 30s for it.
-                try:
-                    await asyncio.wait_for(api_response_received.wait(), timeout=30.0)
-                    trace.append("api_event_received")
-                except asyncio.TimeoutError:
-                    trace.append("api_timeout_30s")
-
-                # If no API captured, check if we're bot-blocked
-                if not api_payloads:
-                    html = await page.content()
-                    page_len = len(html)
-                    if (is_bot_blocked_html(html) or "access denied" in html.lower()) and page_len < 2000:
-                        blocked = True
-                        message = "Akamai / bot protection blocked the request."
-                        trace.append(f"akamai_blocked_len:{page_len}")
-                    else:
-                        # Page loaded but no API call captured yet
-                        trace.append(f"page_loaded_no_api_len:{page_len}")
-                        # Try falling back to text scraping
-                        page_text = await page.evaluate("document.body ? document.body.innerText : ''")
-                        events = self._extract_events_from_text(page_text)
-                        trace.append(f"text_events:{len(events)}")
-                        if not events:
-                            message = "Tracking page loaded but no tracking data found."
+            # If no API captured, check if we're bot-blocked
+            if not api_payloads:
+                if (is_bot_blocked_html(html) or "access denied" in html.lower()) and page_len < 3000:
+                    blocked = True
+                    message = "Akamai / bot protection blocked the request."
+                    trace.append(f"akamai_blocked_len:{page_len}")
                 else:
-                    for payload in api_payloads:
-                        parsed = self._parse_api_payload(payload)
-                        events.extend(parsed)
-                        # Check for Delta-specific "not found" message
-                        if not parsed:
-                            msgs = payload.get("messages", [])
-                            for msg in msgs:
-                                if msg.get("code") == "-213":
-                                    message = "AWB not found in Delta system."
-                                    trace.append("delta_not_found_-213")
-                    if events:
-                        trace.append(f"parsed_api_events:{len(events)}")
-
-                await browser.close()
+                    trace.append(f"page_loaded_no_api_len:{page_len}")
+                    message = "Tracking page loaded but API call not captured."
+            else:
+                for payload in api_payloads:
+                    parsed = self._parse_api_payload(payload)
+                    events.extend(parsed)
+                    # Check for Delta-specific "not found" message
+                    if not parsed:
+                        msgs = payload.get("messages", [])
+                        for msg in msgs:
+                            if msg.get("code") == "-213":
+                                message = "AWB not found in Delta system."
+                                trace.append("delta_not_found_-213")
+                if events:
+                    trace.append(f"parsed_api_events:{len(events)}")
 
         except Exception as exc:
             message = f"Delta tracking failed: {exc}"
             blocked = True
             trace.append(f"exception:{str(exc)[:80]}")
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
 
         origin, destination, status, flight = None, None, None, None
         if events:
@@ -165,28 +156,15 @@ class DeltaTracker(AirlineTracker):
         )
 
     def _parse_api_payload(self, payload) -> List[TrackingEvent]:
-        """Parse the trackAwb GET response.
-        
-        Observed structure:
-        {
-          "messages": [{"code": "-213", ...}],    # -213 = not found
-          "data": { ... tracking data ... },
-          "webTokens": { ... }
-        }
-        """
         events: List[TrackingEvent] = []
-
-        # Navigate into 'data' key
         data = payload.get("data", payload)
         if not data:
             return events
 
         items = []
-
         if isinstance(data, list):
             items = data
         elif isinstance(data, dict):
-            # Try common keys for event arrays
             for key in ("trackingInfo", "TrackingInfo", "events", "milestones", "legs",
                         "shipmentEvents", "awbEvents", "items", "result"):
                 if key in data:
@@ -194,7 +172,6 @@ class DeltaTracker(AirlineTracker):
                     items = val if isinstance(val, list) else [val]
                     break
             else:
-                # Use the whole data dict as a single item
                 items = [data]
 
         for item in items:
@@ -221,34 +198,4 @@ class DeltaTracker(AirlineTracker):
                 weight=weight,
                 remarks=str(remarks)[:200],
             ))
-        return events
-
-    def _extract_events_from_text(self, page_text: str) -> List[TrackingEvent]:
-        """Fallback: parse text content of the tracking page."""
-        events: List[TrackingEvent] = []
-        lines = page_text.split("\n")
-        for line in lines:
-            m = re.search(r"(\d{2}/\d{2}/\d{4})\s+(\d{4})\s+(.*)", line)
-            if m:
-                date_str, time_str, activity = m.group(1), m.group(2), m.group(3).strip()
-                location = None
-                loc_m = re.search(r"\b(at|from|to|in|for)\s+([A-Z]{3})\b", activity, re.IGNORECASE)
-                if loc_m:
-                    location = loc_m.group(2).upper()
-                status_code = "UNKN"
-                act_low = activity.lower()
-                if "accepted" in act_low or "received" in act_low:
-                    status_code = "RCS"
-                elif "departed" in act_low or "left" in act_low:
-                    status_code = "DEP"
-                elif "arrived" in act_low:
-                    status_code = "ARR"
-                elif "delivered" in act_low:
-                    status_code = "DLV"
-                events.append(TrackingEvent(
-                    status_code=status_code,
-                    location=location,
-                    date=f"{date_str} {time_str}",
-                    remarks=activity[:200],
-                ))
         return events
