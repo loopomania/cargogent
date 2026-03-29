@@ -167,15 +167,6 @@ class LufthansaTracker(AirlineTracker):
                         remarks="Extracted from milestone text",
                     )
                 )
-                events.append(
-                    TrackingEvent(
-                        status_code=status_code,
-                        location=location,
-                        date=f"{date_part} {time_part}",
-                        pieces=pieces,
-                        remarks="Extracted from milestone text",
-                    )
-                )
             
             # Fallback 2: Check for broad "Latest event" text if matches failed
             if not events:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker
+from airlines import AFKLMTracker, CargoPalTracker, CathayTracker, ChallengeTracker, DeltaTracker, ElAlTracker, EthiopianTracker, LufthansaTracker, UnitedTracker, AirCanadaTracker, SilkWayTracker, DHLAviationTracker, CargoBookingTracker
 from models import TrackingResponse
 
 
@@ -11,19 +11,25 @@ from dotenv import load_dotenv
 load_dotenv(".env") or load_dotenv("../.env")
 
 PROXY_URL = os.environ.get("PROXY_URL")
+PREMIUM_PROXY_URL = os.environ.get("PREMIUM_PROXY_URL")
 
 # Selective Proxying: Only use residential proxy for "Hard" airlines
-PROXY_REQUIRED = {"elal", "el-al", "ly", "delta", "dl", "cargopal", "pal", "pr"}
+PROXY_REQUIRED = {"elal", "el-al", "ly", "delta", "dl", "cargopal", "pal", "pr", "aircanada", "ac"}
 
-_elal      = ElAlTracker(proxy=PROXY_URL)
+_elal      = ElAlTracker(proxy=PREMIUM_PROXY_URL)
 _lufthansa = LufthansaTracker(proxy=PROXY_URL)
-_delta     = DeltaTracker(proxy=PROXY_URL)
+_delta     = DeltaTracker(proxy=PREMIUM_PROXY_URL)
 _afklm     = AFKLMTracker(proxy=PROXY_URL)
 _united    = UnitedTracker(proxy=PROXY_URL)
 _cargopal  = CargoPalTracker(proxy=PROXY_URL)
 _cathay    = CathayTracker(proxy=PROXY_URL)
 _ethiopian = EthiopianTracker(proxy=PROXY_URL)
 _challenge = ChallengeTracker(proxy=PROXY_URL)
+_aircanada = AirCanadaTracker(proxy=PREMIUM_PROXY_URL)
+_silkway   = SilkWayTracker()
+_cargobooking = CargoBookingTracker()
+_cargobooking = CargoBookingTracker()
+_dhl       = DHLAviationTracker()
 
 TRACKERS = {
     "elal": _elal, "el-al": _elal, "ly": _elal,
@@ -35,6 +41,10 @@ TRACKERS = {
     "cathay": _cathay, "cx": _cathay,
     "ethiopian": _ethiopian, "et": _ethiopian,
     "challenge": _challenge, "ch": _challenge,
+    "aircanada": _aircanada, "ac": _aircanada,
+    "silkway": _silkway, "7l": _silkway,
+    "cargobooking": _cargobooking, "281": _cargobooking,
+    "dhl": _dhl,
 }
 
 # AWB prefix (first 3 digits) -> airline key for router detection
@@ -49,8 +59,11 @@ AWB_PREFIX_TO_AIRLINE: dict[str, str] = {
     "071": "ethiopian",
     "700": "challenge",
     "752": "challenge",
-    "014": "elal",
+    "014": "aircanada",
     "079": "cargopal",
+    "501": "silkway",
+    "281": "cargobooking",
+    "615": "dhl",
 }
 
 
@@ -61,13 +74,13 @@ def normalize_airline(code: str) -> str:
 
 
 def get_airline_from_awb(awb: str) -> str:
-    """Detect airline from AWB number (first 3 digits). Returns airline key or 'elal' as default."""
+    """Detect airline from AWB number (first 3 digits). Returns airline key or 'unsupported'."""
     digits = "".join(c for c in awb.strip() if c.isdigit())
     if len(digits) >= 3:
         prefix = digits[:3]
         if prefix in AWB_PREFIX_TO_AIRLINE:
             return AWB_PREFIX_TO_AIRLINE[prefix]
-    return "elal"
+    return "unsupported"
 
 import time
 
@@ -127,15 +140,15 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None) -> Tra
     res = None
     last_error_msg = ""
     try:
-        # A single 55s timeout ensures we terminate before the 60s reverse proxy timeout
-        res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=55.0)
+        # A single 85s timeout ensures we allow enough time for complex browser automation on prod
+        res = await asyncio.wait_for(tracker.track(awb, hawb=hawb), timeout=85.0)
         if res.status != "Error" or res.events:
             record_airline_success(key)
         else:
             last_error_msg = res.message
             record_airline_failure(key)
     except asyncio.TimeoutError:
-        last_error_msg = "Primary airline tracker timed out (55s)"
+        last_error_msg = "Primary airline tracker timed out (85s)"
         record_airline_failure(key)
     except Exception as e:
         last_error_msg = f"Primary tracker failed: {str(e)[:40]}"

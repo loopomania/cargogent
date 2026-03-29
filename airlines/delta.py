@@ -44,101 +44,82 @@ class DeltaTracker(AirlineTracker):
         trace: List[str] = []
         api_payloads = []
 
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
-        # Enable CDP performance logging to capture Network payloads
-        options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        from playwright.sync_api import sync_playwright
+        import random
         
-        if self.proxy:
-            rotated_proxy = get_rotating_proxy(self.proxy)
-            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
-            if ext_path:
-                options.add_argument(f"--load-extension={ext_path}")
-                trace.append("using_proxy_extension")
-                print("PROXY EXTENSION ADDED", file=sys.stderr)
-            else:
-                options.add_argument(f"--proxy-server={rotated_proxy}")
-
         source_url = f"{self.base_url}?awbNumber={awb_clean}"
         trace.append(f"navigating:{source_url[-50:]}")
         
-        driver = None
-        try:
-            print("LAUNCHING DRIVER", file=sys.stderr)
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
-            print("DRIVER LAUNCHED", file=sys.stderr)
-            driver.set_page_load_timeout(30)
-            
-            print("GETTING URL", file=sys.stderr)
-            driver.get(source_url)
-            print("URL GOT", file=sys.stderr)
-            
-            # Wait up to 15s for the page to load, evaluate Akamai, and auto-fire trackAwb
-            end_time = time.time() + 15
-            found_api = False
-            while time.time() < end_time and not found_api:
-                # Poll logs for trackAwb URL
-                logs = driver.get_log("performance")
-                for entry in logs:
-                    try:
-                        log = json.loads(entry["message"])["message"]
-                        if log["method"] == "Network.responseReceived":
-                            params = log.get("params", {})
-                            resp_url = params.get("response", {}).get("url", "")
-                            if "trackAwb" in resp_url:
-                                trace.append(f"api_captured:{resp_url[-60:]}")
-                                req_id = params.get("requestId")
-                                # Extract Body using CDP command
-                                body_data = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": req_id})
-                                body_str = body_data.get("body", "")
-                                if body_str:
-                                    api_payloads.append(json.loads(body_str))
-                                    found_api = True
-                    except Exception as loop_e:
-                        pass
-                
-                if not found_api:
-                    time.sleep(1)
-
-            html = driver.page_source
-            page_len = len(html)
-
-            # If no API captured, check if we're bot-blocked
-            if not api_payloads:
-                if (is_bot_blocked_html(html) or "access denied" in html.lower()) and page_len < 3000:
-                    blocked = True
-                    message = "Akamai / bot protection blocked the request."
-                    trace.append(f"akamai_blocked_len:{page_len}")
-                else:
-                    trace.append(f"page_loaded_no_api_len:{page_len}")
-                    message = "Tracking page loaded but API call not captured."
-            else:
-                for payload in api_payloads:
-                    parsed = self._parse_api_payload(payload)
-                    events.extend(parsed)
-                    # Check for Delta-specific "not found" message
-                    if not parsed:
-                        msgs = payload.get("messages", [])
-                        for msg in msgs:
-                            if msg.get("code") == "-213":
-                                message = "AWB not found in Delta system."
-                                trace.append("delta_not_found_-213")
-                if events:
-                    trace.append(f"parsed_api_events:{len(events)}")
-
-        except Exception as exc:
-            message = f"Delta tracking failed: {exc}"
+        if not getattr(self, "proxy", None):
             blocked = True
-            trace.append(f"exception:{str(exc)[:80]}")
-        finally:
-            if driver:
-                try:
-                    driver.quit()
-                except Exception:
-                    pass
+            message = "A Scraping Browser WSS URI must be provided for Delta."
+        else:
+            try:
+                with sync_playwright() as p:
+                    print("LAUNCHING PLAYWRIGHT CDI", file=sys.stderr)
+                    browser = p.chromium.connect_over_cdp(self.proxy)
+                    page = browser.new_page()
+                    
+                    # Set up response interceptor
+                    def handle_response(response):
+                        if "trackAwb" in response.url:
+                            trace.append(f"api_captured:{response.url[-60:]}")
+                            try:
+                                body = response.json()
+                                api_payloads.append(body)
+                            except Exception:
+                                pass
+                    
+                    page.on("response", handle_response)
+                    
+                    trace.append("farming_akamai_telemetry_pw")
+                    page.goto(source_url, timeout=60000)
+                    time.sleep(random.uniform(2.5, 4.0)) # bm_sz pacing
+                    
+                    try:
+                        page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                        for _ in range(3):
+                            page.mouse.move(random.randint(50, 400), random.randint(50, 400))
+                            time.sleep(random.uniform(0.3, 1.2))
+                        
+                        page.mouse.wheel(delta_x=0, delta_y=random.randint(100, 400))
+                        time.sleep(random.uniform(1.0, 2.0))
+                    except Exception as act_e:
+                        trace.append(f"telemetry_fail:{str(act_e)[:20]}")
+                        
+                    # Delta Angular logic triggers internally. Wait for API to resolve natively.
+                    end_time = time.time() + 15
+                    while time.time() < end_time and not api_payloads:
+                        page.wait_for_timeout(1000)
+                        
+                    # Evaluate blocks
+                    text = page.evaluate("document.body.innerText") or ""
+                    
+                    if not api_payloads:
+                        if "access denied" in text.lower():
+                            blocked = True
+                            message = "Akamai / bot protection blocked the request."
+                            trace.append("akamai_blocked")
+                        else:
+                            message = "Tracking page loaded but API call not captured."
+                    else:
+                        for payload in api_payloads:
+                            parsed = self._parse_api_payload(payload)
+                            events.extend(parsed)
+                            if not parsed:
+                                msgs = payload.get("messages", [])
+                                for msg in msgs:
+                                    if msg.get("code") == "-213":
+                                        message = "AWB not found in Delta system."
+                                        trace.append("delta_not_found_-213")
+                        if events:
+                            trace.append(f"parsed_api_events:{len(events)}")
+                            
+                    browser.close()
+            except Exception as e:
+                message = f"Delta tracking failed: {e}"
+                blocked = True
+                trace.append(f"exception:{str(e)[:80]}")
 
         origin, destination, status, flight = None, None, None, None
         if events:
