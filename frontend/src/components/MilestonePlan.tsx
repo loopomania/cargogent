@@ -1,393 +1,548 @@
 
-import type { LucideIcon } from "lucide-react";
-import {
-  Bookmark,
-  PackageCheck,
-  PlaneTakeoff,
-  PlaneLanding,
-  BellRing,
-  CircleCheck,
-  AlertTriangle,
-  Clock
-} from "lucide-react";
+import { Plane, CheckCircle, Clock, Bookmark, Archive, Package } from "lucide-react";
 import type { TrackingEvent, TrackingResponse } from "../lib/api";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
-function formatDateShort(raw?: string | null): string | null {
-  if (!raw) return null;
-  // "12 FEB 09:42" or "12 FEB 2026"
-  const m1 = raw.match(/^(\d{1,2})\s+([A-Z]{3})(?:\s+(\d{2}:?\d{2}|\d{4}))?/i);
-  if (m1) {
-    const day = m1[1].padStart(2, "0");
-    const mon = m1[2].toUpperCase();
-    const time = m1[3] && !m1[3].match(/^\d{4}$/) ? m1[3] : null; 
-    return time ? `${day} ${mon} / ${time}` : `${day} ${mon}`;
+const C = {
+  bg:      "#0d1e40",
+  bgCard:  "#0f2347",
+  border:  "rgba(255,255,255,0.08)",
+  accent:  "#3b82f6",
+  green:   "#34d399",
+  amber:   "#f0b429",
+  dim:     "rgba(255,255,255,0.45)",
+  dim2:    "rgba(255,255,255,0.22)",
+  white:   "rgba(255,255,255,0.9)",
+  red:     "#f87171",
+  connLine:"rgba(255,255,255,0.18)",
+};
+
+// ─── Date helpers ───────────────────────────────────────────────────────────────
+
+function fmtDate(raw?: string | null): string {
+  if (!raw) return "—";
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (iso) {
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${iso[3]} ${months[parseInt(iso[2])-1]} ${iso[4]}:${iso[5]}`;
   }
-  
-  // "02/24/2026 1741" or "24/02/2026 17:41"
-  const m2 = raw.match(/^(\d{2})\/(\d{2})\/(\d{2,4})(?:\s+(\d{2}):?(\d{2}))?/);
-  if (m2) {
-    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-    let part1 = parseInt(m2[1], 10);
-    let part2 = parseInt(m2[2], 10);
-    // Auto-detect US vs EU format
-    let m = part2; let d = part1; 
-    if (part1 <= 12 && part2 > 12) { m = part1; d = part2; } // Definitely MM/DD
-    
-    const mon = months[Math.max(0, m - 1)] ?? "???";
-    const day = String(d).padStart(2, "0");
-    const time = m2[4] ? `${m2[4]}:${m2[5]}` : null;
-    return time ? `${day} ${mon} / ${time}` : `${day} ${mon}`;
+  // "10 Mar 26 00:00" or "10 Mar 26"
+  const m = raw.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})\s*(\d{2}:\d{2})?/i);
+  if (m) {
+    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const mo = (months.indexOf(m[2].toLowerCase())+1).toString().padStart(2,'0');
+    void mo;
+    return m[4] ? `${m[1].padStart(2,'0')} ${m[2]} ${yr.slice(2)} ${m[4]}` : `${m[1].padStart(2,'0')} ${m[2]} ${yr.slice(2)}`;
   }
-  return raw;
+  // "14/03/26 18:03"
+  const dm = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})\s*(\d{2}:\d{2})?/);
+  if (dm) {
+    const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${dm[1]} ${months[parseInt(dm[2])]} ${dm[3]}` + (dm[4] ? ` ${dm[4]}` : "");
+  }
+  return raw.length > 20 ? raw.slice(0, 20) : raw;
 }
 
-function extractPcsRaw(s?: string | null): number | null {
-  if (!s) return null;
-  const m = s.match(/(\d+)/);
-  return m ? parseInt(m[1], 10) : null;
-}
+// ─── Milestone definitions ──────────────────────────────────────────────────────
 
-// ─── Types and Grouping Logic ────────────────────────────────────────────────
+// @ts-ignore
+const MILESTONES: { code: string; label: string; desc: string; group: "pre"|"dep"|"arr"|"dlv" }[] = [
+  { code: "BKD", label: "Booked",      desc: "Booking Confirmed", group: "pre" },
+  { code: "RCS", label: "Received",    desc: "Cargo Accepted",    group: "pre" },
+  { code: "FOH", label: "On Hand",     desc: "Freight On Hand",   group: "pre" },
+  { code: "DIS", label: "Picked Up",   desc: "Picked Up",         group: "pre" },
+  { code: "MAN", label: "Manifested",  desc: "Manifested",        group: "dep" },
+  { code: "DEP", label: "Departed",    desc: "Departed",          group: "dep" },
+  { code: "ARR", label: "Arrived",     desc: "Arrived at Dest",   group: "arr" },
+  { code: "RCF", label: "Received",    desc: "Received at Dest",  group: "arr" },
+  { code: "NFD", label: "Notified",    desc: "Notified",          group: "arr" },
+  { code: "AWD", label: "Delivered",   desc: "Awaiting Delivery", group: "arr" },
+  { code: "DLV", label: "Delivered",   desc: "Delivered",         group: "dlv" },
+];
 
-interface UIMilestone {
-  id: string;
-  key: string;
-  label: string;
-  Icon: LucideIcon;
-  event: TrackingEvent | null;
-  isCompleted: boolean;
-  isActive: boolean;
-  flight?: string | null;
-  isAlert?: boolean;
-  alertMsg?: string;
-  pcsText?: string;
-  dateStr?: string | null;
-}
+// ─── Milestone icon ─────────────────────────────────────────────────────────────
 
-interface FlightLeg {
-  flight: string | null;
-  dep: TrackingEvent | null;
-  arr: TrackingEvent | null;
-}
-
-function buildDynamicSequence(events: TrackingEvent[], totalPiecesStr?: string): UIMilestone[] {
-  const sequence: UIMilestone[] = [];
-  const totalExpectedPcs = extractPcsRaw(totalPiecesStr) || 0;
-
-  // Since events are usually newest-first or oldest-first, let's just make a chronological copy
-  // by checking the first and last dates if possible. For simplicity, we assume they are oldest-first
-  // if not, we reverse. But we'll just read them as-is (assuming they are usually shown in chronological order 
-  // or we can sort them ideally. For now, let's just reverse them to process chronologically if they seem newest-first.
-  // Actually, CargoGent delta showed DEP 22nd then ARR 23rd at the top or bottom? The UI mapping loops them.
-  // Let's assume `events` inside API response is basically natural chronological order.
-  
-  // To be safe, we extract them chronologically by looking at the logical progression.
-  const bkdEvents = events.filter(e => e.status_code === "BKD");
-  const rcsEvents = events.filter(e => e.status_code === "RCS" || e.status_code === "RCF");
-  const depEvents = events.filter(e => e.status_code === "DEP");
-  const arrEvents = events.filter(e => e.status_code === "ARR");
-  const nfdEvents = events.filter(e => e.status_code === "NFD");
-  const dlvEvents = events.filter(e => e.status_code === "DLV");
-
-  // Format piece string
-  const formatPcs = (ev: TrackingEvent | null) => {
-    if (!ev) return undefined;
-    const actualPcs = extractPcsRaw(ev.pieces) || extractPcsRaw(ev.actual_pieces);
-    if (!actualPcs) return undefined;
-    if (totalExpectedPcs > 0 && actualPcs < totalExpectedPcs) {
-      return `${actualPcs}/${totalExpectedPcs} pcs`; // partial
-    }
-    return `${actualPcs} pcs`;
-  };
-
-  const isPartial = (ev: TrackingEvent | null) => {
-    if (!ev) return false;
-    const actualPcs = extractPcsRaw(ev.pieces) || extractPcsRaw(ev.actual_pieces);
-    return totalExpectedPcs > 0 && actualPcs !== null && actualPcs < totalExpectedPcs;
-  };
-
-  // 1. BKD
-  const bkd = bkdEvents[bkdEvents.length - 1]; 
-  sequence.push({
-    id: "BKD-0", key: "BKD", label: bkd?.location ? `${bkd.location} BKD` : "BKD", 
-    Icon: Bookmark, event: bkd || null, isCompleted: !!bkd, isActive: false,
-    pcsText: formatPcs(bkd), isAlert: isPartial(bkd)
-  });
-
-  // 2. RCS
-  const rcs = rcsEvents[rcsEvents.length - 1];
-  sequence.push({
-    id: "RCS-0", key: "RCS", label: rcs?.location ? `${rcs.location} RCS` : "RCS",
-    Icon: PackageCheck, event: rcs || null, isCompleted: !!rcs, isActive: false,
-    pcsText: formatPcs(rcs), isAlert: isPartial(rcs)
-  });
-
-  // 3. Flight Legs (Dynamic matching of DEP and ARR)
-  const legs: FlightLeg[] = [];
-  let currentLeg: FlightLeg | null = null;
-  
-  // We iterate through all events to capture DEP/ARR chronologically
-  for (const ev of events) {
-    if (ev.status_code === "DEP") {
-      if (currentLeg && !currentLeg.arr) legs.push(currentLeg); // close incomplete
-      currentLeg = { flight: ev.flight || null, dep: ev, arr: null };
-    } else if (ev.status_code === "ARR") {
-      if (currentLeg) {
-        currentLeg.arr = ev;
-        legs.push(currentLeg);
-        currentLeg = null;
-      } else {
-         // ARR without previous DEP in this sequence
-         legs.push({ flight: ev.flight || null, dep: null, arr: ev });
-      }
-    }
-  }
-  if (currentLeg) legs.push(currentLeg);
-
-  if (legs.length === 0 && (depEvents.length > 0 || arrEvents.length > 0)) {
-     // fallback if loop failed
-     legs.push({ flight: null, dep: depEvents[0] || null, arr: arrEvents[0] || null });
-  }
-
-  // If no flight legs at all, render a default blank leg placeholder
-  if (legs.length === 0) {
-    legs.push({ flight: null, dep: null, arr: null });
-  }
-
-  legs.forEach((leg, i) => {
-    sequence.push({
-      id: `DEP-${i}`, key: "DEP", label: leg.dep?.location ? `${leg.dep.location} DEP` : "DEP",
-      Icon: PlaneTakeoff, event: leg.dep, isCompleted: !!leg.dep, isActive: false,
-      flight: leg.flight || leg.dep?.flight || leg.arr?.flight,
-      pcsText: formatPcs(leg.dep), isAlert: isPartial(leg.dep),
-      alertMsg: isPartial(leg.dep) ? "Missing pieces" : undefined
-    });
-    sequence.push({
-      id: `ARR-${i}`, key: "ARR", label: leg.arr?.location ? `${leg.arr.location} ARR` : "ARR",
-      Icon: PlaneLanding, event: leg.arr, isCompleted: !!leg.arr, isActive: false,
-      flight: leg.flight || leg.dep?.flight || leg.arr?.flight,
-      pcsText: formatPcs(leg.arr), isAlert: isPartial(leg.arr),
-      alertMsg: isPartial(leg.arr) ? "Partial arrival" : undefined
-    });
-  });
-
-  // 4. NFD
-  const nfd = nfdEvents[nfdEvents.length - 1];
-  sequence.push({
-    id: "NFD-0", key: "NFD", label: nfd?.location ? `${nfd.location} NFD` : "NFD",
-    Icon: BellRing, event: nfd || null, isCompleted: !!nfd, isActive: false,
-    pcsText: formatPcs(nfd), isAlert: isPartial(nfd)
-  });
-
-  // 5. DLV
-  const dlv = dlvEvents[dlvEvents.length - 1];
-  sequence.push({
-    id: "DLV-0", key: "DLV", label: dlv?.location ? `${dlv.location} DLV` : "DLV",
-    Icon: CircleCheck, event: dlv || null, isCompleted: !!dlv, isActive: false,
-    pcsText: formatPcs(dlv), isAlert: isPartial(dlv)
-  });
-
-  // Determine ACTIVE pulsing node (the first uncompleted node whose PREVIOUS node IS completed)
-  let activeIndex = -1;
-  for (let i = sequence.length - 1; i >= 0; i--) {
-     if (sequence[i].isCompleted) {
-        activeIndex = i === sequence.length - 1 ? i : i + 1;
-        break;
-     }
-  }
-  if (activeIndex === -1) activeIndex = 0; // if nothing completed, BKD is active
-  if (activeIndex < sequence.length) sequence[activeIndex].isActive = true;
-
-  return sequence;
-}
-
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
-interface Props {
-  data: TrackingResponse;
-}
-
-export default function MilestonePlan({ data }: Props) {
-  const events = data.events || [];
-  
-  // Find shipment piece/weight total from the first available tracker property
-  const lastEventStr = events[events.length - 1];
-  const totalPieces = events.find(e => e.pieces)?.pieces || lastEventStr?.pieces;
-  
-  const milestones = buildDynamicSequence(events, totalPieces);
-
-  // Derive Current Status
-  const currentStatusNode = milestones.slice().reverse().find(m => m.isCompleted);
-  const currentStatusMsg = data.status === "Delivered" ? "Delivered" : 
-                            currentStatusNode ? `In Transit (${currentStatusNode.label})` : "Pending";
-  
-  const isDelivered = data.status === "Delivered" || milestones[milestones.length - 1].isCompleted;
-  const isError = data.status === "Error";
-  const statusColor = isError ? "#f87171" : isDelivered ? "#34d399" : "#60a5fa";
-
-  const DARK_BLUE = "#0d1e40";
-  const ACCENT    = "#1e4db7";
-  const GOLD      = "#f0b429";
-  const DIM_BLUE  = "#2a3f6e";
-  const ALERT_RED = "#ef4444";
+function MilestoneIcon({ code, active, done }: { code: string; active: boolean; done: boolean }) {
+  const color = done ? C.green : active ? C.amber : C.dim2;
+  const bg = done ? "rgba(52,211,153,0.12)" : active ? "rgba(240,180,41,0.12)" : "rgba(255,255,255,0.04)";
+  const sz = 20;
+  const icon = (() => {
+    if (code === "BKD") return <Bookmark size={sz} color={color} />;
+    if (code === "RCS" || code === "FOH" || code === "DIS") return <Archive size={sz} color={color} />;
+    if (code === "MAN") return <Package size={sz} color={color} />;
+    if (code === "DEP") return <Plane size={sz} color={color} />;
+    if (code === "ARR") return <Plane size={sz} color={color} style={{ transform: "rotate(90deg)" }} />;
+    if (code === "RCF") return <Archive size={sz} color={color} />;
+    if (code === "NFD" || code === "AWD") return <Clock size={sz} color={color} />;
+    if (code === "DLV") return <CheckCircle size={sz} color={color} />;
+    return <Clock size={sz} color={color} />;
+  })();
 
   return (
     <div style={{
-      background: DARK_BLUE,
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 12,
-      padding: "1.5rem 1.5rem",
-      marginBottom: "1rem",
+      width: 52, height: 52, borderRadius: "50%",
+      background: bg,
+      border: `2px solid ${done ? C.green : active ? C.amber : C.border}`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "all 0.2s",
+      flexShrink: 0,
     }}>
-      {/* High Visibility Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-         <div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: statusColor, display: "flex", alignItems: "center", gap: "8px" }}>
-               {isError ? <AlertTriangle size={20} /> : <Clock size={20} />} 
-               Current status: {currentStatusMsg}
-            </div>
-            {totalPieces && (
-              <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>
-                {totalPieces} pc(s)
-              </div>
-            )}
-         </div>
+      {icon}
+    </div>
+  );
+}
+
+// ─── Build legs from events ─────────────────────────────────────────────────────
+
+interface SegmentInfo { from: string; to: string; service: string; departureStr?: string | null }
+
+function parseSegmentRemark(remarks?: string | null): SegmentInfo | null {
+  if (!remarks) return null;
+  const seg = remarks.match(/Segment:\s*([A-Z]{2,4})\s+to\s+([A-Z]{2,4})/i);
+  const svc = remarks.match(/Service:\s*([A-Z]+)/i);
+  const dep = remarks.match(/Departure:\s*(.+?)(?:$|\n)/i);
+  if (!seg) return null;
+  return {
+    from: seg[1].toUpperCase(),
+    to:   seg[2].toUpperCase(),
+    service: (svc?.[1] ?? "FLIGHT").toUpperCase(),
+    departureStr: dep?.[1]?.trim() ?? null,
+  };
+}
+
+interface Leg {
+  from: string; to: string; service: string; flightNo: string | null;
+  atd: string | null; etd: string | null;
+  ata: string | null; eta: string | null;
+  pieces: string | null; weight: string | null;
+  // All events for this leg (for milestone row)
+  events: TrackingEvent[];
+}
+
+function buildLegs(allEvents: TrackingEvent[], origin: string, destination: string): Leg[] {
+  // Only true ARR events create legs — RCF is a scan/receipt code, not a segment arrival
+  // (El Al uses FOH/DIS/RCF/NFD/DLV; including RCF here causes phantom legs from ghost scans)
+  const depEvs = allEvents.filter(e => e.status_code === "DEP");
+  const arrEvs = allEvents.filter(e => ["ARR", "DLV"].includes(e.status_code ?? ""));
+
+  // Try segment-remark pairing (Challenge, AFKLM, etc.)
+  const arrByKey = new Map<string, TrackingEvent>();
+  const depByKey = new Map<string, TrackingEvent>();
+  for (const ev of arrEvs) {
+    const s = parseSegmentRemark(ev.remarks);
+    if (s) arrByKey.set(`${s.from}-${s.to}-${ev.flight || 'NOFLIGHT'}`, ev);
+  }
+  for (const ev of depEvs) {
+    const s = parseSegmentRemark(ev.remarks);
+    if (s) depByKey.set(`${s.from}-${s.to}-${ev.flight || 'NOFLIGHT'}`, ev);
+  }
+
+  const keys = new Set([...arrByKey.keys(), ...depByKey.keys()]);
+  if (keys.size > 0) {
+    const result: Leg[] = [];
+    for (const key of keys) {
+      const dep = depByKey.get(key);
+      const arr = arrByKey.get(key);
+      const seg = parseSegmentRemark(dep?.remarks ?? arr?.remarks) ?? { from: origin, to: destination, service: "FLIGHT" };
+      result.push({
+        from: seg.from, to: seg.to, service: seg.service,
+        flightNo: dep?.flight ?? arr?.flight ?? null,
+        atd: dep?.date ?? null, etd: seg.departureStr ?? null,
+        ata: arr?.date ?? null, eta: null,
+        pieces: dep?.pieces ?? arr?.pieces ?? null,
+        weight: dep?.weight ?? arr?.weight ?? null,
+        events: allEvents,
+      });
+    }
+    result.sort((a, b) => new Date(a.atd ?? a.etd ?? "").getTime() - new Date(b.atd ?? b.etd ?? "").getTime());
+    return result;
+  }
+
+  // Robust path reconstruction (handles missing/noisy scans dynamically)
+  const safeTime = (d?: string | null) => d ? new Date(d).getTime() || 0 : 0;
+  const chronoEvs = [...allEvents].sort((a, b) => safeTime(a.date) - safeTime(b.date));
+  
+  const path: string[] = [origin];
+  for (const e of chronoEvs) {
+     if (e.status_code === 'DEP' && e.location && e.location !== path[path.length - 1]) {
+         path.push(e.location);
+     }
+  }
+  // If the last arrival/delivery isn't the destination, add the destination.
+  // Actually, always ensure the final node is the destination.
+  if (path[path.length - 1] !== destination) {
+       path.push(destination);
+  }
+
+  // De-duplicate any consecutive identical locations
+  const purePath = path.filter((loc, i, arr) => i === 0 || loc !== arr[i-1]);
+
+  const legs: Leg[] = [];
+  for (let i = 0; i < purePath.length - 1; i++) {
+     const pFrom = purePath[i];
+     const pTo = purePath[i+1];
+     
+     // Find relevant events for this leg
+     const lDep = chronoEvs.find(e => e.status_code === 'DEP' && e.location === pFrom);
+     const lArr = chronoEvs.find(e => ['ARR','DLV'].includes(e.status_code || '') && e.location === pTo);
+     
+     legs.push({
+         from: pFrom,
+         to: pTo,
+         service: "FLIGHT",
+         flightNo: lDep?.flight || lArr?.flight || null,
+         atd: lDep?.date || null,
+         etd: null,
+         ata: lArr?.date || null,
+         eta: null,
+         pieces: lDep?.pieces || lArr?.pieces || null,
+         weight: lDep?.weight || lArr?.weight || null,
+         events: allEvents
+     });
+  }
+  
+  if (legs.length === 0) {
+      // Fallback 1 leg identical to origin->dest
+      legs.push({
+         from: origin, to: destination, service: "FLIGHT",
+         flightNo: null, atd: null, etd: null, ata: null, eta: null,
+         pieces: null, weight: null, events: allEvents
+      });
+  }
+
+  return legs;
+}
+
+// ─── Milestone node card ────────────────────────────────────────────────────────
+
+function MilestoneNode({
+  code, label, desc, done, active, event,
+}: {
+  code: string; label: string; desc: string; done: boolean; active: boolean;
+  event?: TrackingEvent | null;
+}) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      gap: "0.4rem", minWidth: 80, maxWidth: 100,
+    }}>
+      {/* Airport / Station */}
+      <span style={{
+        fontFamily: "monospace", fontSize: "0.8rem", fontWeight: 700,
+        color: done ? C.green : active ? C.amber : C.dim,
+        letterSpacing: "0.05em",
+      }}>
+        {event?.location ?? "—"}
+      </span>
+
+      {/* Icon circle */}
+      <MilestoneIcon code={code} done={done} active={active} />
+
+      {/* Code */}
+      <span style={{
+        fontFamily: "monospace", fontSize: "0.75rem", fontWeight: 700,
+        color: done ? C.green : active ? C.amber : C.dim,
+      }}>{label}</span>
+
+      {/* Description */}
+      <span style={{ fontSize: "0.6rem", color: C.dim2, textAlign: "center", lineHeight: 1.3 }}>
+        {desc}
+      </span>
+
+      {/* Flight number if available */}
+      {event?.flight && (
+        <span style={{
+          fontFamily: "monospace", fontSize: "0.68rem", fontWeight: 600,
+          color: C.accent, background: "rgba(59,130,246,0.12)",
+          borderRadius: 4, padding: "1px 5px",
+        }}>{event.flight}</span>
+      )}
+
+      {/* ETD/ATD for departure nodes, ETA/ATA for arrival */}
+      {event?.date && (
+        <span style={{
+          fontFamily: "monospace", fontSize: "0.63rem",
+          color: done ? C.green : C.amber,
+          textAlign: "center", lineHeight: 1.4,
+        }}>
+          {fmtDate(event.date)}
+        </span>
+      )}
+
+      {/* Pieces */}
+      {event?.pieces && (
+        <span style={{ fontSize: "0.6rem", color: C.dim }}>
+          {event.pieces} pcs
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Arrow connector ────────────────────────────────────────────────────────────
+
+function Arrow({ done }: { done: boolean }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center",
+      flexShrink: 0, padding: "0 0.4rem",
+      paddingBottom: "2.5rem", // offset to align with circles
+    }}>
+      <svg width="40" height="14" viewBox="0 0 40 14" fill="none">
+        <line x1="0" y1="7" x2="34" y2="7" stroke={done ? C.green : C.connLine} strokeWidth="2" strokeDasharray={done ? "none" : "4 3"} />
+        <polygon points="34,3 40,7 34,11" fill={done ? C.green : C.connLine} />
+      </svg>
+    </div>
+  );
+}
+
+// ─── Unified Timeline Engine ────────────────────────────────────────────────────────
+
+function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], events: TrackingEvent[], origin: string, destination: string }) {
+  const elements = [];
+  const presentCodes = new Set(events.map(e => e.status_code ?? ""));
+  
+  // 1. Origin: Ground services received
+  const originFromCodes = ["BKD", "RCS", "FOH", "DIS", "130"]; 
+  const originDone = originFromCodes.some(c => presentCodes.has(c));
+  const originEv = events.find(e => originFromCodes.includes(e.status_code ?? ""));
+  
+  elements.push(
+    <MilestoneNode 
+      key="origin-ground"
+      code="RCS" label="Ground services received" desc={`Origin: ${origin}`}
+      done={originDone} active={originDone && !presentCodes.has("DEP")}
+      event={originEv ? { ...originEv, location: origin } as any : { location: origin } as any}
+      
+    />
+  );
+  
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const legEvents = leg.events.filter(e => {
+      const locMatch = !e.location || e.location === leg.from || e.location === leg.to;
+      const flightMatch = !e.flight || !leg.flightNo || e.flight === leg.flightNo;
+      return locMatch && flightMatch;
+    });
+    const legCodes = new Set(legEvents.map(e => e.status_code ?? ""));
+
+    const takeOffDone = legCodes.has("DEP") || legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("ARR") || presentCodes.has("DLV");
+    const depEv = legEvents.find(e => e.status_code === "DEP");
+    const landingDone = legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("DLV");
+    const arrEv = legEvents.find(e => e.status_code === "ARR" || e.status_code === "DLV");
+
+    // Take off
+    elements.push(<Arrow key={`arr-dep-${i}`} done={takeOffDone} />);
+    elements.push(
+      <MilestoneNode 
+        key={`takeoff-${i}`}
+        code="DEP" label="Take off" desc={leg.flightNo ? `Flight ${leg.flightNo}` : "Flight"}
+        done={takeOffDone} active={takeOffDone && !landingDone}
+        event={depEv ? { ...depEv, location: leg.from } as any : { location: leg.from } as any}
+        
+      />
+    );
+    
+    // Landing
+    elements.push(<Arrow key={`arr-arr-${i}`} done={landingDone} />);
+    elements.push(
+      <MilestoneNode 
+        key={`landing-${i}`}
+        code="ARR" label="Landing" desc={`Arrived at ${leg.to}`}
+        done={landingDone} active={landingDone && !presentCodes.has("DLV") && !presentCodes.has("AWD") && !(i < legs.length - 1)}
+        event={arrEv ? { ...arrEv, location: leg.to } as any : { location: leg.to } as any}
+        
+      />
+    );
+
+    // If it's not the last leg, insert an intermediate "Ground services received"
+    if (i < legs.length - 1) {
+       const transitCodes = ["RCF", "NFD", "RCS"];
+       const transitEvs = events.filter(e => e.location === leg.to);
+       const tCodes = new Set(transitEvs.map(e => e.status_code ?? ""));
+       // Done if we have a transit scanner code, or if the next flight has departed!
+       const nextLegTakeOff = presentCodes.has("DEP"); // simplified
+       const transitDone = transitCodes.some(c => tCodes.has(c)) || landingDone; 
+       const transitEv = transitEvs.find(e => transitCodes.includes(e.status_code ?? ""));
+
+       elements.push(<Arrow key={`arr-transit-${i}`} done={transitDone} />);
+       elements.push(
+         <MilestoneNode 
+           key={`transit-ground-${i}`}
+           code="RCF" label="Ground services received" desc={`Transit: ${leg.to}`}
+           done={transitDone} active={transitDone && !nextLegTakeOff}
+           event={transitEv ? { ...transitEv, location: leg.to } as any : { location: leg.to } as any}
+           
+         />
+       );
+    }
+  }
+  
+  // Final Node: Ground service delivered
+  const destDone = ["DLV", "AWD"].some(c => presentCodes.has(c));
+  const destEv = events.find(e => ["DLV"].includes(e.status_code ?? "")) ?? events.find(e => ["AWD"].includes(e.status_code ?? ""));
+  
+  if (legs.length > 0) {
+    elements.push(<Arrow key={`arr-dest`} done={destDone} />);
+    elements.push(
+      <MilestoneNode 
+        key="dest-ground"
+        code="DLV" label="Ground service delivered" desc="Final Delivery"
+        done={destDone} active={destDone}
+        event={destEv ? { ...destEv, location: destination } as any : { location: destination } as any}
+        
+      />
+    );
+  }
+  
+  return (
+    <div style={{
+      padding: "3rem 1.5rem",
+      backgroundColor: C.bgCard,
+      overflowX: "auto",
+      width: "100%",
+    }}>
+      {legs.length > 0 ? (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: "max-content", margin: "0 auto" }}>
+           {elements}
+        </div>
+      ) : (
+        <div style={{ textAlign: "center", color: C.dim }}>
+          Awaiting airline updates...
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ─────────────────────────────────────────────────────────────
+
+interface Props { data: TrackingResponse }
+
+export default function MilestonePlan({ data }: Props) {
+  const events = data.events ?? [];
+  
+  function cleanCity(loc?: string | null): string | null {
+    if (!loc || loc === "???") return null;
+    return loc.replace(/\s*\(MAMAN\)/i, "").replace(/\s*\(Swissport\)/i, "").trim().toUpperCase();
+  }
+
+  let origin = cleanCity(data.origin);
+  let destination = cleanCity(data.destination);
+
+  if (!origin) {
+    const firstWithLoc = [...events].sort((a,b) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime()).find(e => cleanCity(e.location));
+    origin = firstWithLoc ? cleanCity(firstWithLoc.location) : "???";
+  }
+
+  if (!destination) {
+    const lastWithLoc = [...events].sort((a,b) => new Date(b.date||0).getTime() - new Date(a.date||0).getTime()).find(e => cleanCity(e.location));
+    destination = lastWithLoc ? cleanCity(lastWithLoc.location) : "???";
+  }
+  
+  origin = origin || "???";
+  destination = destination || "???";
+
+  // Ground events (Maman / Swissport — have source tag)
+  const groundEvents = events.filter(e =>
+    (e as any).source === "maman" || (e as any).source === "swissport" ||
+    (e.location?.includes("MAMAN") || e.location?.includes("Swissport"))
+  );
+
+  // Airline events
+  const airlineEvents = events.filter(e => !groundEvents.includes(e));
+
+  const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination);
+
+  const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
+  const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
+
+  // Latest status: prioritize DLV, else last airline event status
+  const overallStatus = isDlv
+    ? "Delivered"
+    : events.find(e => e.status_code === "DEP")?.status ?? data.status ?? "In progress";
+
+  const statusColor = isDlv ? C.green : isErr ? C.amber : C.accent;
+
+  const hasMaman = groundEvents.some(e => e.location?.includes("MAMAN") || (e as any).source === "maman");
+  const hasSwissport = groundEvents.some(e => e.location?.includes("Swissport") || (e as any).source === "swissport");
+  const groundHolders = [];
+  if (hasMaman) groundHolders.push("Maman");
+  if (hasSwissport) groundHolders.push("Swissport");
+  const groundNames = groundHolders.join(" & ");
+
+  return (
+    <div style={{
+      background: C.bg,
+      border: `1px solid ${C.border}`,
+      borderRadius: 14,
+      overflow: "hidden",
+      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+    }}>
+      {/* ── Header ── */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "1rem 1.5rem",
+        borderBottom: `1px solid ${C.border}`,
+        background: C.bgCard,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {origin}
+          </span>
+          <span style={{ color: C.accent, fontSize: "1.3rem" }}>→</span>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {destination}
+          </span>
+          <span style={{ fontSize: "0.7rem", color: C.dim2, marginLeft: 6 }}>
+            {legs.length} leg{legs.length !== 1 ? "s" : ""}
+          </span>
+          
+          {data.airline && (
+            <span style={{
+              marginLeft: "0.8rem",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              backgroundColor: "rgba(59, 130, 246, 0.15)",
+              color: C.accent,
+              padding: "3px 8px",
+              borderRadius: "6px",
+              letterSpacing: "0.02em"
+            }}>
+              {data.airline.toUpperCase()}
+            </span>
+          )}
+          
+          {groundNames && (
+            <span style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              backgroundColor: "rgba(240, 180, 41, 0.15)",
+              color: C.amber,
+              padding: "3px 8px",
+              borderRadius: "6px",
+              letterSpacing: "0.02em"
+            }}>
+              {groundNames.toUpperCase()}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          {isDlv
+            ? <CheckCircle size={15} color={C.green} />
+            : <Clock size={15} color={C.accent} />}
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
+            {overallStatus}
+          </span>
+        </div>
       </div>
 
-      {/* Wrapping Timeline Container */}
-      <div style={{ display: "flex", alignItems: "stretch", overflowX: "auto", paddingBottom: "1.5rem" }}>
-        {milestones.map((ms, idx) => {
-          const isLast = idx === milestones.length - 1;
-          const isDone = ms.isCompleted;
-
-          const nodeBg     = isDone ? (ms.isAlert ? ALERT_RED : ACCENT) : DIM_BLUE;
-          const iconColor  = isDone ? "#fff" : "rgba(255,255,255,0.3)";
-          const labelColor = ms.isAlert ? ALERT_RED : (isDone ? "#fff" : "rgba(255,255,255,0.3)");
-          const connColor  = isDone ? (ms.isAlert ? ALERT_RED : ACCENT) : DIM_BLUE;
-          const goldDlv    = ms.key === "DLV" && isDone && !ms.isAlert;
-
-          const evDate = ms.event
-            ? formatDateShort(
-                ms.event.date ??
-                ms.event.departure_date ??
-                ms.event.arrival_date ??
-                ms.event.reception_date ??
-                ms.event.release_date
-              )
-            : null;
-
-          return (
-            <div key={`${ms.id}-${idx}`} style={{ display: "flex", alignItems: "center", flex: ms.key === "DEP" ? 1.5 : 1, minWidth: 90 }}>
-              {/* Milestone node */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 64, position: "relative" }}>
-                
-                {/* Alert Badge hovering logic */}
-                {ms.isAlert && (
-                   <div style={{ position: "absolute", top: -25, zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <AlertTriangle size={16} color={GOLD} fill="rgba(240, 180, 41, 0.2)" />
-                      <span style={{ fontSize: "0.55rem", color: GOLD, marginTop: 2, whiteSpace: "nowrap" }}>{ms.alertMsg}</span>
-                   </div>
-                )}
-
-                {/* Icon circle */}
-                <div style={{
-                  width: 44, height: 44, borderRadius: "50%",
-                  background: nodeBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: isDone ? `0 0 0 3px rgba(30,77,183,0.35)` : "none",
-                  flexShrink: 0,
-                  position: "relative",
-                  transition: "background 0.3s",
-                }}>
-                  <ms.Icon
-                    size={18}
-                    strokeWidth={2}
-                    style={{ color: goldDlv ? GOLD : iconColor }}
-                  />
-                  {ms.isActive && (
-                    <span style={{
-                      position: "absolute", inset: -3, borderRadius: "50%",
-                      border: `2px solid ${ACCENT}`,
-                      animation: "milestone-pulse 1.6s ease-in-out infinite",
-                    }} />
-                  )}
-                </div>
-
-                {/* Label */}
-                <div style={{
-                  fontFamily: "monospace", fontWeight: 700, fontSize: "0.75rem",
-                  color: labelColor, marginTop: 10, whiteSpace: "nowrap",
-                }}>
-                  {ms.label}
-                </div>
-
-                {/* Date */}
-                {evDate && (
-                  <div style={{
-                    fontSize: "0.63rem",
-                    color: isDone ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.22)",
-                    marginTop: 3, whiteSpace: "nowrap",
-                  }}>
-                    {evDate}
-                  </div>
-                )}
-
-                {/* Dynamic Pieces format (1/3 pcs or 3 pcs) */}
-                {ms.pcsText && (
-                  <div style={{
-                    fontSize: "0.65rem",
-                    fontWeight: ms.isAlert ? 600 : 400,
-                    color: ms.isAlert ? GOLD : (isDone ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.18)"),
-                    marginTop: 3, whiteSpace: "nowrap",
-                    border: ms.isAlert ? `1px solid ${GOLD}` : "none",
-                    padding: ms.isAlert ? "1px 4px" : "0",
-                    borderRadius: "4px"
-                  }}>
-                    {ms.pcsText}
-                  </div>
-                )}
-              </div>
-
-              {/* Connector */}
-              {!isLast && (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", margin: "0 4px", minWidth: 30 }}>
-                  {/* Flight info above the DEP → ARR connector */}
-                  {ms.key === "DEP" && ms.flight && (
-                    <div style={{
-                      fontSize: "0.63rem", fontWeight: 600,
-                      color: "rgba(255,255,255,0.5)",
-                      marginBottom: 4, whiteSpace: "nowrap",
-                    }}>
-                      {ms.flight}
-                    </div>
-                  )}
-                  <div style={{ width: "100%", height: 2, background: connColor, borderRadius: 1, position: "relative" }}>
-                    <div style={{
-                      position: "absolute", right: -1, top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 0, height: 0,
-                      borderTop: "5px solid transparent",
-                      borderBottom: "5px solid transparent",
-                      borderLeft: `6px solid ${connColor}`,
-                    }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <style>{`
-        @keyframes milestone-pulse {
-          0%   { opacity: 1;  transform: scale(1);   }
-          70%  { opacity: 0;  transform: scale(1.45);}
-          100% { opacity: 0;  transform: scale(1.45);}
-        }
-      `}</style>
+      {/* ── Main body: Unified Timeline Flow ── */}
+      <UnifiedTimeline legs={legs} events={events} origin={origin} destination={destination} />
+      
     </div>
   );
 }

@@ -55,7 +55,7 @@ localhost {
 	import routes
 }
 
-# Production: HTTP on :80 — Caddy auto-upgrades to HTTPS when a domain is used
-:80 {
+# Production: Auto-HTTPS managed by Let's Encrypt
+cargogent.com, www.cargogent.com {
 	import routes
 }

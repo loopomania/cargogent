@@ -19,6 +19,7 @@ CargoGent is a multi-tenant shipment tracking platform for freight forwarders.
 - Airline tracking: MAWB + airline
 - Ground services: MAWB + HAWB
 - Providers: Maman, Swissport (same status model)
+- Export Tracking (Israel): Maman Ground Services are queried explicitly for export HAWBs out of Israel. The system overwrites the MAWB tracking response's total weight and pieces with the HAWB's authentic statistics, as the MAWB often behaves as a consolidated pallet. Maman ground events (Customs Status, Flight Assignment, Processing) are prepended to the shipment's history.
 
 ## Status Rules
 - Delivered only when ALL pieces delivered

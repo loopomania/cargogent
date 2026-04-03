@@ -175,6 +175,108 @@ function AnomalyCard({ a }: { a: Anomaly }) {
   );
 }
 
+/**
+ * DatePair — shows ETD/ATD or ETA/ATA with smart colour coding:
+ *   • Only one value exists → show it in muted style (no comparison possible)
+ *   • Both present and identical → green, single value
+ *   • Both present and different → yellow, show E- then A- on separate lines
+ */
+function DatePair({
+  estimatedLabel, estimated,
+  actualLabel, actual,
+}: {
+  estimatedLabel: string; estimated?: string | null;
+  actualLabel: string;   actual?: string | null;
+}) {
+  const hasEst = !!estimated;
+  const hasAct = !!actual;
+
+  // Normalise for comparison (strip seconds / extra whitespace)
+  const norm = (s?: string | null) => (s ?? "").trim().replace(/:\d{2}$/, "");
+  const same = hasEst && hasAct && norm(estimated) === norm(actual);
+
+  if (!hasEst && !hasAct) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+
+  // If only one value exists — no comparison possible, show muted/green
+  if (!hasEst && hasAct) {
+    return <span style={{ color: "#2e7d32", fontFamily: "monospace", fontWeight: 600, fontSize: "0.82rem" }}>{actual}</span>;
+  }
+  if (hasEst && !hasAct) {
+    return <span style={{ color: "var(--text-muted)", fontFamily: "monospace", fontSize: "0.82rem" }}>{estimated}</span>;
+  }
+
+  if (same) {
+    // Green: estimated === actual
+    return (
+      <span style={{ color: "#2e7d32", fontFamily: "monospace", fontWeight: 600, fontSize: "0.82rem" }}>
+        {estimated}
+      </span>
+    );
+  }
+
+  // Yellow: both exist and differ
+  const YELLOW = "#b45309";
+  const YELLOW_BG = "rgba(245,158,11,0.08)";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, background: YELLOW_BG, borderRadius: 4, padding: "2px 4px" }}>
+      <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: YELLOW }}>
+        <span style={{ opacity: 0.7, fontSize: "0.68rem", marginRight: 3 }}>{estimatedLabel}</span>
+        {estimated}
+      </span>
+      <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: YELLOW }}>
+        <span style={{ opacity: 0.7, fontSize: "0.68rem", marginRight: 3 }}>{actualLabel}</span>
+        {actual}
+      </span>
+    </div>
+  );
+}
+
+/** Inline version of DatePair for use in the summary metrics grid */
+function SummaryDatePair({
+  estimatedLabel, estimated,
+  actualLabel, actual,
+}: {
+  estimatedLabel: string; estimated?: string | null;
+  actualLabel: string;   actual?: string | null;
+}) {
+  const hasEst = !!estimated;
+  const hasAct = !!actual;
+  const norm = (s?: string | null) => (s ?? "").trim().replace(/:\d{2}$/, "");
+  const same = hasEst && hasAct && norm(estimated) === norm(actual);
+
+  if (!hasEst && !hasAct) return <span style={{ fontFamily: "monospace", fontWeight: 600 }}>—</span>;
+
+  // Only one side exists — show actual in green (confirmed), estimated in muted
+  if (!hasEst && hasAct) {
+    return <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.88rem", color: "#2e7d32" }}>{actual}</span>;
+  }
+  if (hasEst && !hasAct) {
+    return <span style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.88rem", color: "var(--text-muted)" }}>{estimated}</span>;
+  }
+
+  if (same) {
+    return (
+      <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.88rem", color: "#2e7d32" }}>
+        {estimated}
+      </span>
+    );
+  }
+
+  const YELLOW = "#b45309";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <span style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.82rem", color: YELLOW }}>
+        <span style={{ fontWeight: 400, fontSize: "0.65rem", marginRight: 3, opacity: 0.8 }}>{estimatedLabel}</span>
+        {estimated}
+      </span>
+      <span style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.82rem", color: YELLOW }}>
+        <span style={{ fontWeight: 400, fontSize: "0.65rem", marginRight: 3, opacity: 0.8 }}>{actualLabel}</span>
+        {actual}
+      </span>
+    </div>
+  );
+}
+
 function StatusBadge({ code }: { code?: string | null }) {
   if (!code) return <span style={{ color: "var(--text-muted)" }}>—</span>;
   const good = ["DLV", "ARR", "RCF"].includes(code);
@@ -266,6 +368,42 @@ export default function AdminDashboard() {
   const summaryToa   = data?.raw_meta?.toa as string | undefined;
   const summaryProduct = data?.raw_meta?.product as string | undefined;
 
+  // Delay from origin: difference between ATD and ETD if both exist and differ
+  const delayFromOrigin = (() => {
+    if (!etd || !atd) return null;
+    const etdMs = new Date(etd).getTime();
+    const atdMs = new Date(atd).getTime();
+    if (isNaN(etdMs) || isNaN(atdMs)) return null;
+    const diffHrs = (atdMs - etdMs) / 3_600_000;
+    if (Math.abs(diffHrs) < 0.25) return null; // ignore tiny diffs
+    const sign = diffHrs > 0 ? "+" : "-";
+    const abs = Math.abs(diffHrs);
+    if (abs < 24) return `${sign}${abs.toFixed(1)}h`;
+    return `${sign}${(abs / 24).toFixed(1)}d`;
+  })();
+
+  // Customs cleared: prefer canonical e.customs field, fall back to remarks scan
+  const customsCleared = (() => {
+    const allEvs = data?.events ?? [];
+    // 1. Prefer the canonical .customs field set by ground trackers
+    const withField = allEvs.find(e => e.customs);
+    if (withField) {
+      const c = withField.customs!;
+      if (/clear|yes|released/i.test(c)) return "Yes";
+      if (/hold|no|pending|seized/i.test(c)) return "No";
+      return "Pending";
+    }
+    // 2. Legacy: scan remarks for Hebrew / keywords
+    const gev = allEvs.find(e => e.remarks && /customs?:|מכס|יש|אין/i.test(e.remarks));
+    if (!gev) return null;
+    const val = gev.remarks ?? "";
+    if (/clear|approved|released/i.test(val)) return "Yes";
+    if (/יש/.test(val) && !/אין/.test(val)) return "Yes";
+    if (/אין/.test(val)) return "No";
+    if (/no|pending|hold/i.test(val)) return "No";
+    return "Pending";
+  })();
+
   // Conditional columns
   const has = (f: keyof TrackingEvent) => sortedEvents.some(e => e[f]);
 
@@ -355,7 +493,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Metrics grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: "0.75rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: "0.75rem" }}>
+              {/* Plain scalar fields */}
               {([
                 ["AWB", data.awb],
                 ["HAWB", data.hawb ?? "—"],
@@ -364,10 +503,6 @@ export default function AdminDashboard() {
                 summaryProduct ? ["Product", summaryProduct] : null,
                 ["Pieces", maxPcs ? String(maxPcs) : "—"],
                 ["Weight", maxWeight ? `${maxWeight} kg` : "—"],
-                ["ETD", etd ?? "—"],
-                ["ATD", atd ?? "—"],
-                ["ETA", eta ?? "—"],
-                ["ATA", ata ?? "—"],
                 summaryLat ? ["LAT", summaryLat] : null,
                 summaryToa ? ["TOA", summaryToa] : null,
               ] as ([string, string] | null)[]).filter((x): x is [string, string] => x !== null).map(([label, val]) => (
@@ -376,6 +511,44 @@ export default function AdminDashboard() {
                   <div style={{ fontFamily: "monospace", fontWeight: 600, fontSize: "0.9rem" }}>{val}</div>
                 </div>
               ))}
+
+              {/* ETD / ATD paired */}
+              <div>
+                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginBottom: "4px" }}>ETD / ATD</div>
+                <SummaryDatePair estimatedLabel="ETD" estimated={etd} actualLabel="ATD" actual={atd} />
+              </div>
+
+              {/* ETA / ATA paired */}
+              <div>
+                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginBottom: "4px" }}>ETA / ATA</div>
+                <SummaryDatePair estimatedLabel="ETA" estimated={eta} actualLabel="ATA" actual={ata} />
+              </div>
+
+              {/* Delay from origin */}
+              {(delayFromOrigin || atd) && (
+                <div>
+                  <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginBottom: "2px" }}>Delay from Origin</div>
+                  <div style={{
+                    fontFamily: "monospace", fontWeight: 700, fontSize: "0.9rem",
+                    color: !delayFromOrigin ? "#2e7d32" : delayFromOrigin.startsWith("+") ? "#b45309" : "#2e7d32",
+                  }}>
+                    {delayFromOrigin ?? "On time"}
+                  </div>
+                </div>
+              )}
+
+              {/* Customs Cleared */}
+              {customsCleared && (
+                <div>
+                  <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginBottom: "2px" }}>Customs Cleared</div>
+                  <div style={{
+                    fontFamily: "monospace", fontWeight: 700, fontSize: "0.9rem",
+                    color: customsCleared === "Yes" ? "#2e7d32" : customsCleared === "No" ? "#b71c1c" : "#b45309",
+                  }}>
+                    {customsCleared === "Yes" ? "✓ Yes" : customsCleared === "No" ? "✗ No" : "⏳ Pending"}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -507,8 +680,16 @@ export default function AdminDashboard() {
                             </td>
                           )}
                           {has("weight") && <Cell noWrap>{ev.weight ?? "—"}</Cell>}
-                          {has("departure_date") && <Cell noWrap>{ev.departure_date ?? "—"}</Cell>}
-                          {has("arrival_date") && <Cell noWrap>{ev.arrival_date ?? "—"}</Cell>}
+                          {has("departure_date") && (
+                            <td style={{ padding: "0.45rem 0.7rem", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>
+                              <DatePair estimatedLabel="ETD" estimated={ev.departure_date} actualLabel="ATD" actual={ev.date && ev.status_code === "DEP" ? ev.date : null} />
+                            </td>
+                          )}
+                          {has("arrival_date") && (
+                            <td style={{ padding: "0.45rem 0.7rem", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>
+                              <DatePair estimatedLabel="ETA" estimated={ev.arrival_date} actualLabel="ATA" actual={ev.date && ev.status_code === "ARR" ? ev.date : null} />
+                            </td>
+                          )}
                           {has("reception_date") && <Cell noWrap>{ev.reception_date ?? "—"}</Cell>}
                           {has("release_date") && <Cell noWrap>{ev.release_date ?? "—"}</Cell>}
                           {has("customs") && <Cell>{ev.customs ?? "—"}</Cell>}

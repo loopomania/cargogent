@@ -1,0 +1,9371 @@
+<html class="ltr eportal  redesignTheme yui3-js-enabled" dir="ltr" lang="en-US" style="scroll-behavior: auto;"><head>
+	<title>Shipment Tracking Platform</title>
+
+	<meta content="width=device-width,initial-scale=1,minimum-scale=1,shrink-to-fit=no,user-scalable=yes" name="viewport">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta content="text/html; charset=UTF-8" http-equiv="content-type">
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="https://app.usercentrics.eu/browser-ui/latest/loader.js" type="text/javascript" async="" id="usercentrics-cmp" data-settings-id="UdHSUMJdAKF08y" data-language="en" data-avoid-prefetch-services=""></script><script src="//tags.tiqcdn.com/utag/lufthansa/lh-cargo/prod/utag.js" id="utag-unique" type="text/javascript" async=""></script><script type="importmap">{"imports":{"react-dom":"/o/frontend-js-react-web/__liferay__/exports/react-dom.js","@clayui/breadcrumb":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$breadcrumb.js","@clayui/charts":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$charts.js","@clayui/empty-state":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$empty-state.js","react":"/o/frontend-js-react-web/__liferay__/exports/react.js","react-dom-16":"/o/frontend-js-react-web/__liferay__/exports/react-dom-16.js","@clayui/navigation-bar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$navigation-bar.js","@clayui/icon":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$icon.js","@clayui/table":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$table.js","@clayui/slider":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$slider.js","@clayui/multi-select":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$multi-select.js","@clayui/nav":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$nav.js","@clayui/provider":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$provider.js","@clayui/panel":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$panel.js","@liferay/dynamic-data-mapping-form-field-type":"/o/dynamic-data-mapping-form-field-type/__liferay__/index.js","@clayui/list":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$list.js","@clayui/date-picker":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$date-picker.js","@clayui/label":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$label.js","@liferay/frontend-js-api/data-set":"/o/frontend-js-dependencies-web/__liferay__/exports/@liferay$js-api$data-set.js","@clayui/core":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$core.js","@clayui/pagination-bar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$pagination-bar.js","@clayui/layout":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$layout.js","@clayui/multi-step-nav":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$multi-step-nav.js","@liferay/frontend-js-api":"/o/frontend-js-dependencies-web/__liferay__/exports/@liferay$js-api.js","@clayui/toolbar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$toolbar.js","@clayui/badge":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$badge.js","react-dom-18":"/o/frontend-js-react-web/__liferay__/exports/react-dom-18.js","@clayui/link":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$link.js","@clayui/card":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$card.js","@clayui/tooltip":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$tooltip.js","@clayui/button":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$button.js","@clayui/tabs":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$tabs.js","@clayui/sticker":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$sticker.js","@clayui/form":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$form.js","@clayui/popover":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$popover.js","@clayui/shared":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$shared.js","@clayui/localized-input":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$localized-input.js","@clayui/modal":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$modal.js","@clayui/color-picker":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$color-picker.js","@clayui/pagination":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$pagination.js","@clayui/autocomplete":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$autocomplete.js","@clayui/management-toolbar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$management-toolbar.js","@clayui/time-picker":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$time-picker.js","@clayui/upper-toolbar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$upper-toolbar.js","@clayui/loading-indicator":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$loading-indicator.js","@clayui/drop-down":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$drop-down.js","@clayui/data-provider":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$data-provider.js","@liferay/language/":"/o/js/language/","@clayui/css":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$css.js","@clayui/alert":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$alert.js","@clayui/progress-bar":"/o/frontend-taglib-clay/__liferay__/exports/@clayui$progress-bar.js","react-16":"/o/frontend-js-react-web/__liferay__/exports/react-16.js","react-18":"/o/frontend-js-react-web/__liferay__/exports/react-18.js"},"scopes":{}}</script><script data-senna-track="temporary">var Liferay = window.Liferay || {};Liferay.Icons = Liferay.Icons || {};Liferay.Icons.controlPanelSpritemap = 'https://www.lufthansa-cargo.com/o/admin-theme/images/clay/icons.svg'; Liferay.Icons.spritemap = 'https://www.lufthansa-cargo.com/o/eportal-theme/images/clay/icons.svg';</script>
+<script data-senna-track="permanent" type="text/javascript">window.Liferay = window.Liferay || {}; window.Liferay.CSP = {nonce: ''};</script>
+<script data-senna-track="permanent" src="/combo?browserId=chrome&amp;minifierType=js&amp;languageId=en_US&amp;t=1773836285951&amp;/o/frontend-js-jquery-web/jquery/jquery.min.js&amp;/o/frontend-js-jquery-web/jquery/init.js&amp;/o/frontend-js-jquery-web/jquery/ajax.js&amp;/o/frontend-js-jquery-web/jquery/bootstrap.bundle.min.js&amp;/o/frontend-js-jquery-web/jquery/collapsible_search.js&amp;/o/frontend-js-jquery-web/jquery/fm.js&amp;/o/frontend-js-jquery-web/jquery/form.js&amp;/o/frontend-js-jquery-web/jquery/popper.min.js&amp;/o/frontend-js-jquery-web/jquery/side_navigation.js" type="text/javascript"></script>
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking/-/awb/020/00958171" rel="canonical">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/es/eservices/etracking/tracking/-/awb/020/00958171" hreflang="es-ES" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/zh/eservices/etracking/tracking/-/awb/020/00958171" hreflang="zh-CN" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/it/eservices/etracking/tracking/-/awb/020/00958171" hreflang="it-IT" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/fr/eservices/etracking/tracking/-/awb/020/00958171" hreflang="fr-FR" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking/-/awb/020/00958171" hreflang="en-US" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/pt/eservices/etracking/tracking/-/awb/020/00958171" hreflang="pt-BR" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/de/eservices/etracking/tracking/-/awb/020/00958171" hreflang="de-DE" rel="alternate">
+<link data-senna-track="temporary" href="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking/-/awb/020/00958171" hreflang="x-default" rel="alternate">
+
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:site_name" content="Lufthansa Cargo">
+<meta property="og:title" content="Tracking - Lufthansa Cargo">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking/-/awb/020/00958171">
+
+
+<link href="https://www.lufthansa-cargo.com/o/eportal-theme/images/favicon.ico" rel="apple-touch-icon">
+<link href="https://www.lufthansa-cargo.com/o/eportal-theme/images/favicon.ico" rel="icon">
+
+
+
+<script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_35" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/event-base/event-base-min.js" async=""></script><link rel="stylesheet" id="yui_patched_v3_20_7_1_1774812888136_43" href="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/widget-base/assets/skins/sam/widget-base.css"><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_44" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/yui-throttle/yui-throttle-min.js&amp;/o/frontend-js-aui-web/aui/classnamemanager/classnamemanager-min.js&amp;/o/frontend-js-aui-web/aui/aui-classnamemanager/aui-classnamemanager-min.js&amp;/o/frontend-js-aui-web/aui/aui-debounce/aui-debounce-min.js&amp;/o/frontend-js-aui-web/aui/array-extras/array-extras-min.js&amp;/o/frontend-js-aui-web/aui/dom-core/dom-core-min.js&amp;/o/frontend-js-aui-web/aui/dom-base/dom-base-min.js&amp;/o/frontend-js-aui-web/aui/selector-native/selector-native-min.js&amp;/o/frontend-js-aui-web/aui/selector/selector-min.js&amp;/o/frontend-js-aui-web/aui/node-core/node-core-min.js&amp;/o/frontend-js-aui-web/aui/dom-style/dom-style-min.js&amp;/o/frontend-js-aui-web/aui/node-base/node-base-min.js&amp;/o/frontend-js-aui-web/aui/event-delegate/event-delegate-min.js&amp;/o/frontend-js-aui-web/aui/node-event-delegate/node-event-delegate-min.js&amp;/o/frontend-js-aui-web/aui/pluginhost-base/pluginhost-base-min.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_45" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/pluginhost-config/pluginhost-config-min.js&amp;/o/frontend-js-aui-web/aui/node-pluginhost/node-pluginhost-min.js&amp;/o/frontend-js-aui-web/aui/dom-screen/dom-screen-min.js&amp;/o/frontend-js-aui-web/aui/node-screen/node-screen-min.js&amp;/o/frontend-js-aui-web/aui/node-style/node-style-min.js&amp;/o/frontend-js-aui-web/aui/aui-node-base/aui-node-base-min.js&amp;/o/frontend-js-aui-web/aui/escape/escape-min.js&amp;/o/frontend-js-aui-web/aui/selector-css2/selector-css2-min.js&amp;/o/frontend-js-aui-web/aui/selector-css3/selector-css3-min.js&amp;/o/frontend-js-aui-web/aui/base-core/base-core-min.js&amp;/o/frontend-js-aui-web/aui/base-observable/base-observable-min.js&amp;/o/frontend-js-aui-web/aui/base-base/base-base-min.js&amp;/o/frontend-js-aui-web/aui/base-pluginhost/base-pluginhost-min.js&amp;/o/frontend-js-aui-web/aui/event-synthetic/event-synthetic-min.js&amp;/o/frontend-js-aui-web/aui/event-focus/event-focus-min.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_46" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/widget-base/widget-base-min.js&amp;/o/frontend-js-aui-web/aui/aui-widget-cssclass/aui-widget-cssclass-min.js&amp;/o/frontend-js-aui-web/aui/aui-widget-toggle/aui-widget-toggle-min.js&amp;/o/frontend-js-aui-web/aui/base-build/base-build-min.js&amp;/o/frontend-js-aui-web/aui/aui-component/aui-component-min.js&amp;/o/frontend-js-aui-web/aui/aui-event-base/aui-event-base-min.js&amp;/o/frontend-js-aui-web/aui/timers/timers-min.js&amp;/o/frontend-js-aui-web/aui/aui-event-input/aui-event-input-min.js&amp;/o/frontend-js-aui-web/aui/aui-form-validator/aui-form-validator-min.js&amp;/o/frontend-js-aui-web/liferay/form.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_170" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/aui-timer/aui-timer-min.js&amp;/o/frontend-js-aui-web/aui/event-touch/event-touch-min.js&amp;/o/frontend-js-aui-web/aui/event-move/event-move-min.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_189" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/cookie/cookie-min.js&amp;/o/frontend-js-aui-web/aui/plugin/plugin-min.js&amp;/o/frontend-js-aui-web/liferay/session.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_205" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/liferay/menu.js" async=""></script><script charset="utf-8" id="yui_patched_v3_20_7_1_1774812888136_206" src="/combo/?browserId=chrome&amp;minifierType=&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/array-invoke/array-invoke-min.js" async=""></script><link class="lfr-css-file" data-senna-track="temporary" href="https://www.lufthansa-cargo.com/o/eportal-theme/css/clay.css?browserId=chrome&amp;themeId=eportaltheme_WAR_eportaltheme&amp;minifierType=css&amp;languageId=en_US&amp;t=1773836220000" id="liferayAUICSS" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+
+
+	<link href="/combo?browserId=chrome&amp;minifierType=css&amp;themeId=eportaltheme_WAR_eportaltheme&amp;languageId=en_US&amp;com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt:%2Fo%2Fjournal-content-web%2Fcss%2Fmain.css&amp;com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearch:%2Fo%2Fportal-search-web%2Fcss%2Fmain.css&amp;com_liferay_product_navigation_product_menu_web_portlet_ProductMenuPortlet:%2Fo%2Fproduct-navigation-product-menu-web%2Fcss%2Fmain.css&amp;com_liferay_product_navigation_user_personal_bar_web_portlet_ProductNavigationUserPersonalBarPortlet:%2Fo%2Fproduct-navigation-user-personal-bar-web%2Fcss%2Fmain.css&amp;com_liferay_site_navigation_menu_web_portlet_SiteNavigationMenuPortlet:%2Fo%2Fsite-navigation-menu-web%2Fcss%2Fmain.css&amp;t=1773836220000" rel="stylesheet" type="text/css" data-senna-track="temporary" id="4cd15d51">
+
+
+
+
+
+
+
+
+<script type="text/javascript" data-senna-track="temporary">
+	// <![CDATA[
+		var Liferay = Liferay || {};
+
+		Liferay.Browser = {
+			acceptsGzip: function () {
+				return true;
+			},
+
+			
+
+			getMajorVersion: function () {
+				return 124.0;
+			},
+
+			getRevision: function () {
+				return '537.36';
+			},
+			getVersion: function () {
+				return '124.0';
+			},
+
+			
+
+			isAir: function () {
+				return false;
+			},
+			isChrome: function () {
+				return true;
+			},
+			isEdge: function () {
+				return false;
+			},
+			isFirefox: function () {
+				return false;
+			},
+			isGecko: function () {
+				return true;
+			},
+			isIe: function () {
+				return false;
+			},
+			isIphone: function () {
+				return false;
+			},
+			isLinux: function () {
+				return false;
+			},
+			isMac: function () {
+				return false;
+			},
+			isMobile: function () {
+				return false;
+			},
+			isMozilla: function () {
+				return false;
+			},
+			isOpera: function () {
+				return false;
+			},
+			isRtf: function () {
+				return true;
+			},
+			isSafari: function () {
+				return true;
+			},
+			isSun: function () {
+				return false;
+			},
+			isWebKit: function () {
+				return true;
+			},
+			isWindows: function () {
+				return true;
+			}
+		};
+
+		Liferay.Data = Liferay.Data || {};
+
+		Liferay.Data.ICONS_INLINE_SVG = true;
+
+		Liferay.Data.NAV_SELECTOR = '#navigation';
+
+		Liferay.Data.NAV_SELECTOR_MOBILE = '#navigationCollapse';
+
+		Liferay.Data.isCustomizationView = function () {
+			return false;
+		};
+
+		Liferay.Data.notices = [
+			
+		];
+
+		(function () {
+			var available = {};
+
+			var direction = {};
+
+			
+
+				available['en_US'] = 'English\x20\x28United\x20States\x29';
+				direction['en_US'] = 'ltr';
+
+			
+
+				available['fr_FR'] = 'French\x20\x28France\x29';
+				direction['fr_FR'] = 'ltr';
+
+			
+
+				available['de_DE'] = 'German\x20\x28Germany\x29';
+				direction['de_DE'] = 'ltr';
+
+			
+
+				available['pt_BR'] = 'Portuguese\x20\x28Brazil\x29';
+				direction['pt_BR'] = 'ltr';
+
+			
+
+				available['es_ES'] = 'Spanish\x20\x28Spain\x29';
+				direction['es_ES'] = 'ltr';
+
+			
+
+				available['it_IT'] = 'Italian\x20\x28Italy\x29';
+				direction['it_IT'] = 'ltr';
+
+			
+
+				available['zh_CN'] = 'Chinese\x20\x28China\x29';
+				direction['zh_CN'] = 'ltr';
+
+			
+
+			let _cache = {};
+
+			if (Liferay && Liferay.Language && Liferay.Language._cache) {
+				_cache = Liferay.Language._cache;
+			}
+
+			Liferay.Language = {
+				_cache,
+				available,
+				direction,
+				get: function(key) {
+					let value = Liferay.Language._cache[key];
+
+					if (value === undefined) {
+						value = key;
+					}
+
+					return value;
+				}
+			};
+		})();
+
+		var featureFlags = {"LPD-10964":false,"LPD-37927":false,"LPD-10889":false,"LPS-193884":false,"LPD-30371":false,"LPD-11131":true,"LPS-178642":false,"LPS-193005":false,"LPD-31789":false,"LPD-10562":false,"LPD-11212":false,"COMMERCE-8087":false,"LPD-39304":true,"LPD-13311":true,"LRAC-10757":false,"LPD-35941":false,"LPS-180090":false,"LPS-178052":false,"LPD-21414":false,"LPS-185892":false,"LPS-186620":false,"LPD-40533":true,"LPD-40534":true,"LPS-184404":false,"LPD-40530":true,"LPD-20640":false,"LPS-198183":false,"LPD-38869":true,"LPD-35678":false,"LPD-6378":false,"LPS-153714":false,"LPD-11848":false,"LPS-170670":false,"LPD-7822":false,"LPS-169981":false,"LPD-21926":false,"LPS-177027":false,"LPD-37531":false,"LPD-11003":false,"LPD-36446":false,"LPD-39437":false,"LPS-135430":false,"LPD-20556":false,"LPD-45276":false,"LPS-134060":false,"LPS-164563":false,"LPD-32050":false,"LPS-122920":false,"LPS-199086":false,"LPD-35128":false,"LPD-10588":false,"LPD-13778":true,"LPD-11313":false,"LPD-6368":false,"LPD-34594":false,"LPS-202104":false,"LPD-19955":false,"LPD-35443":false,"LPD-39967":false,"LPD-11235":false,"LPD-11232":false,"LPS-196935":true,"LPD-43542":false,"LPS-176691":false,"LPS-197909":false,"LPD-29516":false,"COMMERCE-8949":false,"LPD-11228":false,"LPS-153813":false,"LPD-17809":false,"COMMERCE-13024":false,"LPS-165482":false,"LPS-193551":false,"LPS-197477":false,"LPS-174816":false,"LPS-186360":false,"LPD-30204":false,"LPD-32867":false,"LPS-153332":false,"LPD-35013":true,"LPS-179669":false,"LPS-174417":false,"LPD-44091":true,"LPD-31212":false,"LPD-18221":false,"LPS-155284":false,"LRAC-15017":false,"LPD-19870":false,"LPS-200108":false,"LPD-20131":false,"LPS-159643":false,"LPS-181663":true,"LPS-129412":false,"LPS-169837":false,"LPD-20379":false};
+
+		Liferay.FeatureFlags = Object.keys(featureFlags).reduce(
+			(acc, key) => ({
+				...acc, [key]: featureFlags[key] === 'true' || featureFlags[key] === true
+			}), {}
+		);
+
+		Liferay.PortletKeys = {
+			DOCUMENT_LIBRARY: 'com_liferay_document_library_web_portlet_DLPortlet',
+			DYNAMIC_DATA_MAPPING: 'com_liferay_dynamic_data_mapping_web_portlet_DDMPortlet',
+			ITEM_SELECTOR: 'com_liferay_item_selector_web_portlet_ItemSelectorPortlet'
+		};
+
+		Liferay.PropsValues = {
+			JAVASCRIPT_SINGLE_PAGE_APPLICATION_TIMEOUT: 0,
+			UPLOAD_SERVLET_REQUEST_IMPL_MAX_SIZE: 10485760000
+		};
+
+		Liferay.ThemeDisplay = {
+
+			
+
+			
+				getLayoutId: function () {
+					return '1947';
+				},
+
+				
+
+				getLayoutRelativeControlPanelURL: function () {
+					return '/en/group/guest/~/control_panel/manage';
+				},
+
+				getLayoutRelativeURL: function () {
+					return '/en/eservices/etracking/tracking';
+				},
+				getLayoutURL: function () {
+					return 'https://www.lufthansa-cargo.com/en/eservices/etracking/tracking';
+				},
+				getParentLayoutId: function () {
+					return '2032';
+				},
+				isControlPanel: function () {
+					return false;
+				},
+				isPrivateLayout: function () {
+					return 'false';
+				},
+				isVirtualLayout: function () {
+					return false;
+				},
+			
+
+			getBCP47LanguageId: function () {
+				return 'en-US';
+			},
+			getCanonicalURL: function () {
+
+				
+
+				return 'https\x3a\x2f\x2fwww\x2elufthansa-cargo\x2ecom\x2fen\x2feservices\x2fetracking\x2ftracking\x2f-\x2fawb\x2f020\x2f00958171';
+			},
+			getCDNBaseURL: function () {
+				return 'https://www.lufthansa-cargo.com';
+			},
+			getCDNDynamicResourcesHost: function () {
+				return '';
+			},
+			getCDNHost: function () {
+				return '';
+			},
+			getCompanyGroupId: function () {
+				return '20197';
+			},
+			getCompanyId: function () {
+				return '20157';
+			},
+			getDefaultLanguageId: function () {
+				return 'en_US';
+			},
+			getDoAsUserIdEncoded: function () {
+				return '';
+			},
+			getLanguageId: function () {
+				return 'en_US';
+			},
+			getParentGroupId: function () {
+				return '20184';
+			},
+			getPathContext: function () {
+				return '';
+			},
+			getPathImage: function () {
+				return '/image';
+			},
+			getPathJavaScript: function () {
+				return '/o/frontend-js-web';
+			},
+			getPathMain: function () {
+				return '/en/c';
+			},
+			getPathThemeImages: function () {
+				return 'https://www.lufthansa-cargo.com/o/eportal-theme/images';
+			},
+			getPathThemeRoot: function () {
+				return '/o/eportal-theme';
+			},
+			getPlid: function () {
+				return '31556440';
+			},
+			getPortalURL: function () {
+				return 'https://www.lufthansa-cargo.com';
+			},
+			getRealUserId: function () {
+				return '20161';
+			},
+			getRemoteAddr: function () {
+				return '10.254.28.252';
+			},
+			getRemoteHost: function () {
+				return '10.254.28.252';
+			},
+			getScopeGroupId: function () {
+				return '20184';
+			},
+			getScopeGroupIdOrLiveGroupId: function () {
+				return '20184';
+			},
+			getSessionId: function () {
+				return '';
+			},
+			getSiteAdminURL: function () {
+				return 'https://www.lufthansa-cargo.com/group/guest/~/control_panel/manage?p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view';
+			},
+			getSiteGroupId: function () {
+				return '20184';
+			},
+			getTimeZone: function() {
+				return 'UTC';
+			},
+			getURLControlPanel: function() {
+				return '/en/group/control_panel?refererPlid=31556440';
+			},
+			getURLHome: function () {
+				return 'https\x3a\x2f\x2fwww\x2elufthansa-cargo\x2ecom\x2fweb\x2fguest\x2fhome';
+			},
+			getUserEmailAddress: function () {
+				return '';
+			},
+			getUserId: function () {
+				return '20161';
+			},
+			getUserName: function () {
+				return '';
+			},
+			isAddSessionIdToURL: function () {
+				return false;
+			},
+			isImpersonated: function () {
+				return false;
+			},
+			isSignedIn: function () {
+				return false;
+			},
+
+			isStagedPortlet: function () {
+				
+					
+						return false;
+					
+				
+			},
+
+			isStateExclusive: function () {
+				return false;
+			},
+			isStateMaximized: function () {
+				return false;
+			},
+			isStatePopUp: function () {
+				return false;
+			}
+		};
+
+		var themeDisplay = Liferay.ThemeDisplay;
+
+		Liferay.AUI = {
+
+			
+
+			getCombine: function () {
+				return true;
+			},
+			getComboPath: function () {
+				return '/combo/?browserId=chrome&minifierType=&languageId=en_US&t=1773836014080&';
+			},
+			getDateFormat: function () {
+				return '%m/%d/%Y';
+			},
+			getEditorCKEditorPath: function () {
+				return '/o/frontend-editor-ckeditor-web';
+			},
+			getFilter: function () {
+				var filter = 'raw';
+
+				
+					
+						filter = 'min';
+					
+					
+
+				return filter;
+			},
+			getFilterConfig: function () {
+				var instance = this;
+
+				var filterConfig = null;
+
+				if (!instance.getCombine()) {
+					filterConfig = {
+						replaceStr: '.js' + instance.getStaticResourceURLParams(),
+						searchExp: '\\.js$'
+					};
+				}
+
+				return filterConfig;
+			},
+			getJavaScriptRootPath: function () {
+				return '/o/frontend-js-web';
+			},
+			getPortletRootPath: function () {
+				return '/html/portlet';
+			},
+			getStaticResourceURLParams: function () {
+				return '?browserId=chrome&minifierType=&languageId=en_US&t=1773836014080';
+			}
+		};
+
+		Liferay.authToken = 'up4MIjbY';
+
+		
+
+		Liferay.currentURL = '\x2fen\x2feservices\x2fetracking\x2ftracking\x2f-\x2fawb\x2f020\x2f00958171\x3fsearchFilter\x3dawb';
+		Liferay.currentURLEncoded = '\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb';
+	// ]]>
+</script>
+
+<script data-senna-track="temporary" type="text/javascript">window.__CONFIG__= {basePath: '',combine: true, defaultURLParams: null, explainResolutions: false, exposeGlobal: false, logLevel: 'warn', moduleType: 'module', namespace:'Liferay', nonce: '', reportMismatchedAnonymousModules: 'warn', resolvePath: '/o/js_resolve_modules', url: '/combo/?browserId=chrome&minifierType=js&languageId=en_US&t=1773836014080&', waitTimeout: 25000};</script><script data-senna-track="permanent" src="/o/frontend-js-loader-modules-extender/loader.js?&amp;mac=9WaMmhziBCkScHZwrrVcOR7VZF4=&amp;browserId=chrome&amp;languageId=en_US&amp;minifierType=js" type="text/javascript"></script><script data-senna-track="permanent" src="/combo?browserId=chrome&amp;minifierType=js&amp;languageId=en_US&amp;t=1773836014080&amp;/o/frontend-js-aui-web/aui/aui/aui-min.js&amp;/o/frontend-js-aui-web/liferay/modules.js&amp;/o/frontend-js-aui-web/liferay/aui_sandbox.js&amp;/o/frontend-js-aui-web/aui/attribute-base/attribute-base-min.js&amp;/o/frontend-js-aui-web/aui/attribute-complex/attribute-complex-min.js&amp;/o/frontend-js-aui-web/aui/attribute-core/attribute-core-min.js&amp;/o/frontend-js-aui-web/aui/attribute-observable/attribute-observable-min.js&amp;/o/frontend-js-aui-web/aui/attribute-extras/attribute-extras-min.js&amp;/o/frontend-js-aui-web/aui/event-custom-base/event-custom-base-min.js&amp;/o/frontend-js-aui-web/aui/event-custom-complex/event-custom-complex-min.js&amp;/o/frontend-js-aui-web/aui/oop/oop-min.js&amp;/o/frontend-js-aui-web/aui/aui-base-lang/aui-base-lang-min.js&amp;/o/frontend-js-aui-web/liferay/dependency.js&amp;/o/frontend-js-aui-web/liferay/util.js&amp;/o/oauth2-provider-web/js/liferay.js&amp;/o/frontend-js-web/liferay/dom_task_runner.js&amp;/o/frontend-js-web/liferay/events.js&amp;/o/frontend-js-web/liferay/lazy_load.js&amp;/o/frontend-js-web/liferay/liferay.js&amp;/o/frontend-js-web/liferay/global.bundle.js&amp;/o/frontend-js-web/liferay/portlet.js&amp;/o/frontend-js-web/liferay/workflow.js" type="text/javascript"></script>
+<script src="/o/eportal-top-js-override/js/combined.min.js?v=3"></script> <script data-senna-track="temporary" type="text/javascript">window.Liferay = Liferay || {}; window.Liferay.OAuth2 = {getAuthorizeURL: function() {return 'https://www.lufthansa-cargo.com/o/oauth2/authorize';}, getBuiltInRedirectURL: function() {return 'https://www.lufthansa-cargo.com/o/oauth2/redirect';}, getIntrospectURL: function() { return 'https://www.lufthansa-cargo.com/o/oauth2/introspect';}, getTokenURL: function() {return 'https://www.lufthansa-cargo.com/o/oauth2/token';}, getUserAgentApplication: function(externalReferenceCode) {return Liferay.OAuth2._userAgentApplications[externalReferenceCode];}, _userAgentApplications: {}}</script><script data-senna-track="temporary" type="text/javascript">try {var MODULE_MAIN='exportimport-web@5.0.100/index';var MODULE_PATH='/o/exportimport-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			exportimportweb: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-export-import-export-import': {
+						path: 'main.js',
+						requires: [
+							'aui-datatype',
+							'aui-dialog-iframe-deprecated',
+							'aui-modal',
+							'aui-parse-content',
+							'aui-toggler',
+							'liferay-portlet-base',
+							'liferay-util-window',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='frontend-editor-alloyeditor-web@5.0.56/index';var MODULE_PATH='/o/frontend-editor-alloyeditor-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			alloyeditor: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-alloy-editor': {
+						path: 'alloyeditor.js',
+						requires: [
+							'aui-component',
+							'liferay-portlet-base',
+							'timers',
+						],
+					},
+					'liferay-alloy-editor-source': {
+						path: 'alloyeditor_source.js',
+						requires: [
+							'aui-debounce',
+							'liferay-fullscreen-source-editor',
+							'liferay-source-editor',
+							'plugin',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='portal-search-web@6.0.148/index';var MODULE_PATH='/o/portal-search-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			search: {
+				base: MODULE_PATH + '/js/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-search-custom-range-facet': {
+						path: 'custom_range_facet.js',
+						requires: ['aui-form-validator'],
+					},
+				},
+				root: MODULE_PATH + '/js/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='frontend-js-components-web@2.0.80/index';var MODULE_PATH='/o/frontend-js-components-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			components: {
+
+				// eslint-disable-next-line
+				mainModule: MODULE_MAIN,
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='@liferay/frontend-js-react-web@5.0.54/index';var MODULE_PATH='/o/frontend-js-react-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			react: {
+
+				// eslint-disable-next-line
+				mainModule: MODULE_MAIN,
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='@liferay/frontend-js-state-web@1.0.30/index';var MODULE_PATH='/o/frontend-js-state-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			state: {
+
+				// eslint-disable-next-line
+				mainModule: MODULE_MAIN,
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='calendar-web@5.0.105/index';var MODULE_PATH='/o/calendar-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			calendar: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-calendar-a11y': {
+						path: 'calendar_a11y.js',
+						requires: ['calendar'],
+					},
+					'liferay-calendar-container': {
+						path: 'calendar_container.js',
+						requires: [
+							'aui-alert',
+							'aui-base',
+							'aui-component',
+							'liferay-portlet-base',
+						],
+					},
+					'liferay-calendar-date-picker-sanitizer': {
+						path: 'date_picker_sanitizer.js',
+						requires: ['aui-base'],
+					},
+					'liferay-calendar-interval-selector': {
+						path: 'interval_selector.js',
+						requires: ['aui-base', 'liferay-portlet-base'],
+					},
+					'liferay-calendar-interval-selector-scheduler-event-link': {
+						path: 'interval_selector_scheduler_event_link.js',
+						requires: ['aui-base', 'liferay-portlet-base'],
+					},
+					'liferay-calendar-list': {
+						path: 'calendar_list.js',
+						requires: [
+							'aui-template-deprecated',
+							'liferay-scheduler',
+						],
+					},
+					'liferay-calendar-message-util': {
+						path: 'message_util.js',
+						requires: ['liferay-util-window'],
+					},
+					'liferay-calendar-recurrence-converter': {
+						path: 'recurrence_converter.js',
+						requires: [],
+					},
+					'liferay-calendar-recurrence-dialog': {
+						path: 'recurrence.js',
+						requires: [
+							'aui-base',
+							'liferay-calendar-recurrence-util',
+						],
+					},
+					'liferay-calendar-recurrence-util': {
+						path: 'recurrence_util.js',
+						requires: ['aui-base', 'liferay-util-window'],
+					},
+					'liferay-calendar-reminders': {
+						path: 'calendar_reminders.js',
+						requires: ['aui-base'],
+					},
+					'liferay-calendar-remote-services': {
+						path: 'remote_services.js',
+						requires: [
+							'aui-base',
+							'aui-component',
+							'liferay-calendar-util',
+							'liferay-portlet-base',
+						],
+					},
+					'liferay-calendar-session-listener': {
+						path: 'session_listener.js',
+						requires: ['aui-base', 'liferay-scheduler'],
+					},
+					'liferay-calendar-simple-color-picker': {
+						path: 'simple_color_picker.js',
+						requires: ['aui-base', 'aui-template-deprecated'],
+					},
+					'liferay-calendar-simple-menu': {
+						path: 'simple_menu.js',
+						requires: [
+							'aui-base',
+							'aui-template-deprecated',
+							'event-outside',
+							'event-touch',
+							'widget-modality',
+							'widget-position',
+							'widget-position-align',
+							'widget-position-constrain',
+							'widget-stack',
+							'widget-stdmod',
+						],
+					},
+					'liferay-calendar-util': {
+						path: 'calendar_util.js',
+						requires: [
+							'aui-datatype',
+							'aui-io',
+							'aui-scheduler',
+							'aui-toolbar',
+							'autocomplete',
+							'autocomplete-highlighters',
+						],
+					},
+					'liferay-scheduler': {
+						path: 'scheduler.js',
+						requires: [
+							'async-queue',
+							'aui-datatype',
+							'aui-scheduler',
+							'dd-plugin',
+							'liferay-calendar-a11y',
+							'liferay-calendar-message-util',
+							'liferay-calendar-recurrence-converter',
+							'liferay-calendar-recurrence-util',
+							'liferay-calendar-util',
+							'liferay-scheduler-event-recorder',
+							'liferay-scheduler-models',
+							'promise',
+							'resize-plugin',
+						],
+					},
+					'liferay-scheduler-event-recorder': {
+						path: 'scheduler_event_recorder.js',
+						requires: [
+							'dd-plugin',
+							'liferay-calendar-util',
+							'resize-plugin',
+						],
+					},
+					'liferay-scheduler-models': {
+						path: 'scheduler_models.js',
+						requires: [
+							'aui-datatype',
+							'dd-plugin',
+							'liferay-calendar-util',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='contacts-web@5.0.65/index';var MODULE_PATH='/o/contacts-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			contactscenter: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-contacts-center': {
+						path: 'main.js',
+						requires: [
+							'aui-io-plugin-deprecated',
+							'aui-toolbar',
+							'autocomplete-base',
+							'datasource-io',
+							'json-parse',
+							'liferay-portlet-base',
+							'liferay-util-window',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='portal-workflow-kaleo-designer-web@5.0.146/index';var MODULE_PATH='/o/portal-workflow-kaleo-designer-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			'kaleo-designer': {
+				base: MODULE_PATH + '/designer/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-kaleo-designer-autocomplete-util': {
+						path: 'autocomplete_util.js',
+						requires: ['autocomplete', 'autocomplete-highlighters'],
+					},
+					'liferay-kaleo-designer-definition-diagram-controller': {
+						path: 'definition_diagram_controller.js',
+						requires: [
+							'liferay-kaleo-designer-field-normalizer',
+							'liferay-kaleo-designer-utils',
+						],
+					},
+					'liferay-kaleo-designer-dialogs': {
+						path: 'dialogs.js',
+						requires: ['liferay-util-window'],
+					},
+					'liferay-kaleo-designer-editors': {
+						path: 'editors.js',
+						requires: [
+							'aui-ace-editor',
+							'aui-ace-editor-mode-xml',
+							'aui-base',
+							'aui-datatype',
+							'aui-node',
+							'liferay-kaleo-designer-autocomplete-util',
+							'liferay-kaleo-designer-utils',
+						],
+					},
+					'liferay-kaleo-designer-field-normalizer': {
+						path: 'field_normalizer.js',
+						requires: ['liferay-kaleo-designer-remote-services'],
+					},
+					'liferay-kaleo-designer-nodes': {
+						path: 'nodes.js',
+						requires: [
+							'aui-datatable',
+							'aui-datatype',
+							'aui-diagram-builder',
+							'liferay-kaleo-designer-editors',
+							'liferay-kaleo-designer-utils',
+						],
+					},
+					'liferay-kaleo-designer-remote-services': {
+						path: 'remote_services.js',
+						requires: ['aui-io'],
+					},
+					'liferay-kaleo-designer-templates': {
+						path: 'templates.js',
+						requires: ['aui-tpl-snippets-deprecated'],
+					},
+					'liferay-kaleo-designer-utils': {
+						path: 'utils.js',
+						requires: [],
+					},
+					'liferay-kaleo-designer-xml-definition': {
+						path: 'xml_definition.js',
+						requires: [
+							'aui-base',
+							'aui-component',
+							'dataschema-xml',
+							'datatype-xml',
+						],
+					},
+					'liferay-kaleo-designer-xml-definition-serializer': {
+						path: 'xml_definition_serializer.js',
+						requires: ['escape', 'liferay-kaleo-designer-xml-util'],
+					},
+					'liferay-kaleo-designer-xml-util': {
+						path: 'xml_util.js',
+						requires: ['aui-base'],
+					},
+					'liferay-portlet-kaleo-designer': {
+						path: 'main.js',
+						requires: [
+							'aui-ace-editor',
+							'aui-ace-editor-mode-xml',
+							'aui-tpl-snippets-deprecated',
+							'dataschema-xml',
+							'datasource',
+							'datatype-xml',
+							'event-valuechange',
+							'io-form',
+							'liferay-kaleo-designer-autocomplete-util',
+							'liferay-kaleo-designer-editors',
+							'liferay-kaleo-designer-nodes',
+							'liferay-kaleo-designer-remote-services',
+							'liferay-kaleo-designer-utils',
+							'liferay-kaleo-designer-xml-util',
+							'liferay-util-window',
+						],
+					},
+				},
+				root: MODULE_PATH + '/designer/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='staging-processes-web@5.0.65/index';var MODULE_PATH='/o/staging-processes-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			stagingprocessesweb: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'liferay-staging-processes-export-import': {
+						path: 'main.js',
+						requires: [
+							'aui-datatype',
+							'aui-dialog-iframe-deprecated',
+							'aui-modal',
+							'aui-parse-content',
+							'aui-toggler',
+							'liferay-portlet-base',
+							'liferay-util-window',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='@liferay/document-library-web@6.0.198/index';var MODULE_PATH='/o/document-library-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	AUI().applyConfig({
+		groups: {
+			dl: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: Liferay.AUI.getFilterConfig(),
+				modules: {
+					'document-library-upload-component': {
+						path: 'DocumentLibraryUpload.js',
+						requires: [
+							'aui-component',
+							'aui-data-set-deprecated',
+							'aui-overlay-manager-deprecated',
+							'aui-overlay-mask-deprecated',
+							'aui-parse-content',
+							'aui-progressbar',
+							'aui-template-deprecated',
+							'liferay-search-container',
+							'querystring-parse-simple',
+							'uploader',
+						],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='dynamic-data-mapping-web@5.0.115/index';var MODULE_PATH='/o/dynamic-data-mapping-web';/**
+ * SPDX-FileCopyrightText: (c) 2000 Liferay, Inc. https://liferay.com
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR LicenseRef-Liferay-DXP-EULA-2.0.0-2023-06
+ */
+
+(function () {
+	const LiferayAUI = Liferay.AUI;
+
+	AUI().applyConfig({
+		groups: {
+			ddm: {
+				base: MODULE_PATH + '/js/legacy/',
+				combine: Liferay.AUI.getCombine(),
+				filter: LiferayAUI.getFilterConfig(),
+				modules: {
+					'liferay-ddm-form': {
+						path: 'ddm_form.js',
+						requires: [
+							'aui-base',
+							'aui-datatable',
+							'aui-datatype',
+							'aui-image-viewer',
+							'aui-parse-content',
+							'aui-set',
+							'aui-sortable-list',
+							'json',
+							'liferay-form',
+							'liferay-map-base',
+							'liferay-translation-manager',
+							'liferay-util-window',
+						],
+					},
+					'liferay-portlet-dynamic-data-mapping': {
+						condition: {
+							trigger: 'liferay-document-library',
+						},
+						path: 'main.js',
+						requires: [
+							'arraysort',
+							'aui-form-builder-deprecated',
+							'aui-form-validator',
+							'aui-map',
+							'aui-text-unicode',
+							'json',
+							'liferay-menu',
+							'liferay-translation-manager',
+							'liferay-util-window',
+							'text',
+						],
+					},
+					'liferay-portlet-dynamic-data-mapping-custom-fields': {
+						condition: {
+							trigger: 'liferay-document-library',
+						},
+						path: 'custom_fields.js',
+						requires: ['liferay-portlet-dynamic-data-mapping'],
+					},
+				},
+				root: MODULE_PATH + '/js/legacy/',
+			},
+		},
+	});
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='null';var MODULE_PATH='/o/eportal-js-module';;(function() {
+	AUI().applyConfig(
+		{
+			groups: {
+				eportalMultiSelect: {
+					base: MODULE_PATH + '/eportal-js/',
+					combine: Liferay.AUI.getCombine(),
+					filter: Liferay.AUI.getFilterConfig(),
+					modules: {
+						'eportal-multiselect': {
+							path: 'jquery.multi-select.js',
+						},
+						'eportal-datepicker': {
+							path: 'eportalDatepicker.js',
+						},
+						'eportal-mapmarker': {
+							path: 'markerclusterer.js',
+						},
+						'eportal-maplabel': {
+							path: 'markerwithlabel.js',
+						},
+						'lottie-animation': {
+						    path: 'lottieAnimation.js',
+						},
+						'eportal-chartjs-date': {
+							path: 'chartjs-adapter-date-fns.bundle.min.js',
+						},
+						'eportal-chartjs-zoom-with-hammer': {
+							path: 'chartjs-plugin-zoom-with-hammer.min.js',
+						},
+						'eportal-chartjs-plugin-annotation': {
+							path: 'chartjs-plugin-annotation.min.js'
+						},
+						'eportal-excel-export': {
+							path: 'xlsx.full.min.js'
+						},
+						'eportal-station-selection': {
+							path: 'eportalStationSelection.js'
+						}
+					},
+					root: MODULE_PATH + '/eportal-js/'
+				}
+			}
+		}
+	);
+})();
+} catch(error) {console.error(error);}try {var MODULE_MAIN='null';var MODULE_PATH='/o/liferay-auto-field-web';;(function() {
+
+    var base = MODULE_PATH + '/js/';
+
+    AUI().applyConfig(
+        {
+            groups: {
+                eportalautofieldoverride: { 
+                    base: base,
+                    combine: Liferay.AUI.getCombine(),
+                    filter: Liferay.AUI.getFilterConfig(),
+                    modules: {
+                        'liferay-auto-fields-override': { 
+                            path: 'auto_fields_override.js', 
+                            condition: {
+                                name: 'liferay-auto-fields-override', //overridden module name
+                                trigger: 'liferay-auto-fields', //original module
+                                when: 'instead'
+                            }
+                        }
+                    },
+                    root: base
+                }
+            }
+        }
+    );
+})();} catch(error) {console.error(error);}</script>
+
+
+
+
+<script type="text/javascript" data-senna-track="temporary">
+	// <![CDATA[
+		
+			
+				
+		
+
+		
+	// ]]>
+</script>
+
+
+
+
+
+	
+		
+
+			
+
+			
+		
+		
+
+
+
+	
+		
+
+			
+
+			
+				<script type="text/javascript">
+var mmPageID=document.location.pathname.split('/').pop();
+var lhgData={"page": {"attributes": {"htmlTitle": document.title},"category": {"category1":"","category2":"","category3":"","category4":"","category5":""},"pageInfo": {"country":Liferay.ThemeDisplay.getLanguageId().split('_')[1],"language":Liferay.ThemeDisplay.getLanguageId().split('_')[0],"pageId":Liferay.ThemeDisplay.getLayoutId(),"pageName":mmPageID}}};
+var plids = [];
+plids.push("9425269"); // /footer/bottomnav/imprint
+plids.push("9425282"); // /footer/bottomnav/privacy
+plids.push("24479874"); // /cookie-information
+if (!(plids.indexOf(Liferay.ThemeDisplay.getPlid()) > -1)) {
+	(function(a,b,c,d,e){a='//tags.tiqcdn.com/utag/lufthansa/lh-cargo/prod/utag.js';b=document;e='utag-unique';if(!b.hidden&&b.getElementById(e)===null){c='script';d=b.createElement(c);d.src=a;d.id=e;d.type='text/java'+c;d.async=!0;a=b.getElementsByTagName(c)[0];a.parentNode.insertBefore(d,a)}})();
+	Liferay.on('endNavigate', function(event) {
+		utag.view();
+	});
+}
+var langId = Liferay.ThemeDisplay.getLanguageId().split('_')[0];
+function loadOnelinkScript(w, d, u, i, s, h){
+  h = d.getElementsByTagName('head')[0];
+  s = d.createElement('script');
+  s.async = 1;
+  s.src = u;
+  s.setAttribute("referrerpolicy","no-referrer-when-downgrade");
+  s.setAttribute("data-oljs",i);
+  h.appendChild(s);
+}
+if (langId === "es") {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "3CBC-5133-7641-82E2");
+} else if (langId === "fr") {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "8A65-99CB-98A3-4996");
+} else if (langId === "pt") {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "E07D-D137-9491-9842");
+}else if (langId === "it") {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "3E91-C30E-2E77-ACB4");
+}else if (langId === "zh") {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "0CFA-7D53-BAB3-1AD1");
+}else if (langId === "de" && ['9403917','23075852','31556243','31556245','31556251','31556318','31556312','31556166','31556168','31556170','31556172','31556316','31556529'].includes(Liferay.ThemeDisplay.getPlid())) {
+  loadOnelinkScript(window, document, "https://www.onelink-edge.com/moxie.min.js", "2D0D-BDF8-CC5F-6EDC");
+}
+</script>
+			
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link class="lfr-css-file" data-senna-track="temporary" href="https://www.lufthansa-cargo.com/o/eportal-theme/css/main.css?browserId=chrome&amp;themeId=eportaltheme_WAR_eportaltheme&amp;minifierType=css&amp;languageId=en_US&amp;t=1773836220000" id="liferayThemeCSS" rel="stylesheet" type="text/css">
+
+
+
+
+	<style data-senna-track="temporary" type="text/css">
+		.eportal #ToastAlertContainer .mb-3.alert.alert-dismissible.alert-danger {
+display:none;
+}
+.stickySidebar .bookIcon,.stickySidebar .supportIcon,.stickySidebar .feedbackIcon {
+display: none !important;
+}
+	</style>
+
+
+
+
+
+	<style data-senna-track="temporary" type="text/css">
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+		
+
+			
+
+				
+
+					
+
+#p_p_id_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_ > .portlet > .portlet-content {
+
+}
+#navigation .top-nav .dropdown.languagebox {padding: 10px 0 0 10px;}
+#portlet_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet .portlet-body select.form-control {text-transform: capitalize;}
+
+
+
+				
+
+			
+
+		
+
+			
+
+		
+
+	</style>
+
+
+<style data-senna-track="temporary" type="text/css">
+</style>
+<link data-senna-track="permanent" href="/o/frontend-js-aui-web/alloy_ui.css?&amp;mac=favIEq7hPo8AEd6k+N5OVADEEls=&amp;browserId=chrome&amp;languageId=en_US&amp;minifierType=css&amp;themeId=eportaltheme_WAR_eportaltheme" rel="stylesheet">
+<script type="module">
+import {init} from '/o/frontend-js-spa-web/__liferay__/index.js';
+{
+init({"navigationExceptionSelectors":":not(a):not(button):not([data-cke-saved-href]):not([data-cke-saved-href])","cacheExpirationTime":-1,"clearScreensCache":false,"portletsBlacklist":["com_liferay_login_web_portlet_CreateAccountPortlet","com_liferay_nested_portlets_web_portlet_NestedPortletsPortlet","com_liferay_site_navigation_directory_web_portlet_SitesDirectoryPortlet","com_liferay_questions_web_internal_portlet_QuestionsPortlet","com_liferay_account_admin_web_internal_portlet_AccountUsersRegistrationPortlet","com_liferay_login_web_portlet_ForgotPasswordPortlet","com_liferay_portal_language_override_web_internal_portlet_PLOPortlet","com_liferay_login_web_portlet_LoginPortlet","com_liferay_login_web_portlet_FastLoginPortlet"],"excludedTargetPortlets":["com_liferay_users_admin_web_portlet_UsersAdminPortlet","com_liferay_server_admin_web_portlet_ServerAdminPortlet"],"validStatusCodes":[221,490,494,499,491,496,492,493,495,220],"debugEnabled":false,"loginRedirect":"","excludedPaths":["/c/document_library","/documents","/image"],"preloadCSS":false,"userNotification":{"message":"It looks like this is taking longer than expected.","title":"Oops","timeout":30000},"requestTimeout":0});
+}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" data-senna-track="temporary">
+	if (window.Analytics) {
+		window._com_liferay_document_library_analytics_isViewFileEntry = false;
+	}
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+Liferay.on(
+	'ddmFieldBlur', function(event) {
+		if (window.Analytics) {
+			Analytics.send(
+				'fieldBlurred',
+				'Form',
+				{
+					fieldName: event.fieldName,
+					focusDuration: event.focusDuration,
+					formId: event.formId,
+					formPageTitle: event.formPageTitle,
+					page: event.page,
+					title: event.title
+				}
+			);
+		}
+	}
+);
+
+Liferay.on(
+	'ddmFieldFocus', function(event) {
+		if (window.Analytics) {
+			Analytics.send(
+				'fieldFocused',
+				'Form',
+				{
+					fieldName: event.fieldName,
+					formId: event.formId,
+					formPageTitle: event.formPageTitle,
+					page: event.page,
+					title:event.title
+				}
+			);
+		}
+	}
+);
+
+Liferay.on(
+	'ddmFormPageShow', function(event) {
+		if (window.Analytics) {
+			Analytics.send(
+				'pageViewed',
+				'Form',
+				{
+					formId: event.formId,
+					formPageTitle: event.formPageTitle,
+					page: event.page,
+					title: event.title
+				}
+			);
+		}
+	}
+);
+
+Liferay.on(
+	'ddmFormSubmit', function(event) {
+		if (window.Analytics) {
+			Analytics.send(
+				'formSubmitted',
+				'Form',
+				{
+					formId: event.formId,
+					title: event.title
+				}
+			);
+		}
+	}
+);
+
+Liferay.on(
+	'ddmFormView', function(event) {
+		if (window.Analytics) {
+			Analytics.send(
+				'formViewed',
+				'Form',
+				{
+					formId: event.formId,
+					title: event.title
+				}
+			);
+		}
+	}
+);
+
+</script><script>
+
+</script>
+
+
+
+
+
+
+
+	<link href="https://www.lufthansa-cargo.com/o/eportal-theme/images/favicon.ico" rel="icon" type="image/x-icon">
+	<link href="https://www.lufthansa-cargo.com/o/eportal-theme/images/favicon.ico" rel="shortcut icon" type="image/x-icon">
+	<script src="https://www.lufthansa-cargo.com/o/eportal-theme/js/eportal-combined.min.js?v=5"></script>
+
+
+	<script>
+		var imagefolderPath= 'https://www.lufthansa-cargo.com/o/eportal-theme/images/';
+		jQuery.fn.divLoad = jQuery.fn.load;
+		jQuery.fn.load = function(callback){ $(window).on("load", callback) };
+	</script>
+
+<link href="https://static.tracking.lufthansa-cargo.com/./styles-7T3XLY6H.css" rel="stylesheet" data-lhc-global-style="true" data-senna-track="temporary">
+        <style id="custom-css">
+            .eportal .rBellIconBtn .lcagBadge > .lcagBadge {
+                right: auto;
+                top: auto;
+                min-width: 0;
+                width: 0;
+                display: contents;
+            }
+        </style>
+    <script type="module" src="https://app.usercentrics.eu/browser-ui/3.95.0/index.module.js"></script><link rel="stylesheet" type="text/css" href="/o/frontend-js-web/liferay/modal/Modal.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-web/css/notification.css" nonce=""><style type="text/css">
+@keyframes shift-rightwards {
+	0% {
+		transform: translateX(-100%);
+	}
+	40% {
+		transform: translateX(0%);
+	}
+	60% {
+		transform: translateX(0%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+.lfr-spa-loading-bar {
+	background: var(--primary);
+	display: none;
+	height: 2px;
+	left: 0;
+	position: fixed;
+	right: 0;
+	top: 0;
+	transform: translateX(100%);
+	z-index: 2000;
+}
+
+.lfr-spa-loading .lfr-spa-loading-bar {
+	animation: shift-rightwards 1s ease-in-out infinite;
+	animation-delay: 0.4s;
+	display: block;
+}</style><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/code_mirror_keyboard_message/CodeMirrorKeyboardMessage.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/forms/common/FieldFeedback.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/forms/common/FieldBase.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/forms/input/InputLocalized.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/management_toolbar/ManagementToolbar.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-components-web/treeview/Treeview.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-codemirror-web/__liferay__/css/codemirror$addon$fold$foldgutter.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-codemirror-web/__liferay__/css/codemirror$addon$hint$show-hint.css" nonce=""><link rel="stylesheet" type="text/css" href="/o/frontend-js-codemirror-web/__liferay__/css/codemirror$lib$codemirror.css" nonce=""><script type="text/javascript" async="" charset="utf-8" id="tiqapp" src="//tags.tiqcdn.com/utag/tiqapp/utag.v.js?a=lufthansa/lh-cargo/202508201937&amp;cb=1774812890243"></script></head><body class="chrome controls-visible yui3-skin-sam guest-site signed-out public-page site overflowHidden" id="senna_surface1"><div id="senna_surface1-default" class="flipped" style="display: block;"><div class="loaderWrapper">
+		    <div class="loader">
+		        <span style="--i:1"></span>
+		        <span style="--i:2"></span>
+		        <span style="--i:3"></span>
+		        <span style="--i:4"></span>
+		        <span style="--i:5"></span>
+		        <span style="--i:6"></span>
+		        <span style="--i:7"></span>
+		        <span style="--i:8"></span>
+		        <span style="--i:9"></span>
+		        <span style="--i:10"></span>
+		        <span style="--i:11"></span>
+		        <span style="--i:12"></span>
+		        <span style="--i:13"></span>
+		        <span style="--i:14"></span>
+		        <span style="--i:15"></span>
+		        <span style="--i:16"></span>
+		        <span style="--i:17"></span>
+		        <span style="--i:18"></span>
+		        <span style="--i:19"></span>
+		        <span style="--i:20"></span>
+		    </div>
+		    <svg class="svg-calLoader" xmlns="http://www.w3.org/2000/svg" width="130" height="130" fill="#05164D"><path class="cal-loader__plane" d="M141.493 37.93c-1.087-.927-2.942-2.002-4.32-2.501-2.259-.824-3.252-.955-9.293-1.172-4.017-.146-5.197-.23-5.47-.37-.766-.407-1.526-1.448-7.114-9.773-4.8-7.145-5.344-7.914-6.327-8.976-1.214-1.306-1.396-1.378-3.79-1.473-1.036-.04-2-.043-2.153-.002-.353.1-.87.586-1 .952-.139.399-.076.71.431 2.22.241.72 1.029 3.386 1.742 5.918 1.644 5.844 2.378 8.343 2.863 9.705.206.601.33 1.1.275 1.125-.24.097-10.56 1.066-11.014 1.032a3.532 3.532 0 0 1-1.002-.276l-.487-.246-2.044-2.613c-2.234-2.87-2.228-2.864-3.35-3.309-.717-.287-2.82-.386-3.276-.163-.457.237-.727.644-.737 1.152-.018.39.167.805 1.916 4.373 1.06 2.166 1.964 4.083 1.998 4.27.04.179.004.521-.076.75-.093.228-1.109 2.064-2.269 4.088-1.921 3.34-2.11 3.711-2.123 4.107-.008.25.061.557.168.725.328.512.72.644 1.966.676 1.32.029 2.352-.236 3.05-.762.222-.171 1.275-1.313 2.412-2.611 1.918-2.185 2.048-2.32 2.45-2.505.241-.111.601-.232.82-.271.267-.058 2.213.201 5.912.8 3.036.48 5.525.894 5.518.914 0 .026-.121.306-.27.638-.54 1.198-1.515 3.842-3.35 9.021-1.029 2.913-2.107 5.897-2.4 6.62-.703 1.748-.725 1.833-.594 2.286.137.46.45.833.872 1.012.41.177 3.823.24 4.37.085.852-.25 1.44-.688 2.312-1.724 1.166-1.39 3.169-3.948 6.771-8.661 5.8-7.583 6.561-8.49 7.387-8.702.233-.065 2.828-.056 5.784.011 5.827.138 6.64.09 8.62-.5 2.24-.67 4.035-1.65 5.517-3.016 1.136-1.054 1.135-1.014.207-1.962-.357-.38-.767-.777-.902-.893z" fill="#05164D"></path></svg>
+	  	</div>
+
+
+
+
+
+	<input id="allowedDmns" type="hidden" value="https://static.lufthansa-cargo.com">
+
+	<input id="consentEnabled" type="hidden" value="true">
+	<input id="enableOldTypography" type="hidden" value="False">
+
+                   <script type="text/javascript">
+var isUserSignedIn = false; 
+$(document).on('click', '.crisisWrapper', function() {
+		if (isUserSignedIn === true) {
+
+	readCrisisNotificationPopup();
+	}
+});
+
+function readCrisisNotificationPopup(){
+var saveAction = '/c/portal/read_crisispopup_notification';
+$.ajax({
+ type : 'POST',
+ url  : saveAction,
+ data : '',
+ success : function(data){
+		 }
+});
+}
+</script>
+<div class="crisisWrapper">
+<a href="/current-information">
+		<div class="crisisBox d-flex flex-column">
+			<small class="crisisHeader red mt-0">Current flight information</small>
+			<small class="crisisDesc mt-0">	Information on flights to the Middle East and handling constraints in Frankfurt - Update March 23, 2026</small>
+		</div>
+		</a>
+	</div>
+
+
+	
+ 
+		
+	
+	
+
+	
+	<input id="noOfEmailRec" type="hidden" value="5">
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	<div class="container-fluid  " id="wrapper">
+<div class="hide">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+</div>
+<div class="hide notificationPortletDiv">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_lhcargo_eportal_information_alert_  portlet-static portlet-static-end decorate  " id="p_p_id_com_lhcargo_eportal_information_alert_">
+		<span id="p_com_lhcargo_eportal_information_alert"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_lhcargo_eportal_information_alert">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Information Alerts Display</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+<div class="notificationHeading">
+	<h3 class="mb-0">Notifications</h3>
+	<div class="notification-close text-right">
+		<a class="btn-link" href="javascript:void(0);">
+		<i class="lh-icon lh-icon-right lh lh-icon-close" aria-hidden="true"></i>
+		</a>
+	</div>
+</div>
+
+	
+		<ul class="notificationList">
+			
+				
+<li class="flyoutNotification notificationListItem">
+
+<div class="date"><span class="dateCaps">06 Mar 26, 07:56 </span> 
+	| Booking information
+</div>
+<a href="/notification-overview">
+<h4 class="heading">New booking process for Add-on Services from 10 March 2026</h4></a>
+<p class="notificationDetail"><span class="trimText">A fully integrated booking process for Add-on Services will be available. Get ready for an optimized booking experience!</span></p>
+
+</li>
+
+<script>
+
+$(document).ready(function(){
+   var showHeadlineChar = 70; 
+	 var notificationDetaillChar = 190;
+		var ellipsestextFlyout = " ";
+	 $('.notificationDetail .trimText').each(function() {
+			var contentFlyout = $(this).html();
+			if(contentFlyout.length > notificationDetaillChar) {
+	 
+				var flyoutShorttext = contentFlyout.substr(0, notificationDetaillChar);
+				var flyoutShorttextElipse =  flyoutShorttext + '&nbsp;... ';
+        $(this).html(flyoutShorttextElipse);
+			}
+	 
+		});
+$('.notificationList .flyoutNotification .heading').each(function() {
+			var contentFlyout = $(this).html();
+			if(contentFlyout.length > showHeadlineChar) {
+	 
+				var flyoutShorttext = contentFlyout.substr(0, showHeadlineChar);
+				var flyoutMoretext = contentFlyout.substr(showHeadlineChar, contentFlyout.length - showHeadlineChar);
+	 
+				var elipseText = flyoutShorttext + '<span class="moreellipses">' + ellipsestextFlyout+ '&nbsp;...</span><span class="morecontent"><span>' + flyoutMoretext + '</span>';
+	 
+				$(this).html(elipseText);
+			}
+	 
+		});
+
+});
+</script>
+
+<style>
+.dateCaps { text-transform: uppercase;} ;
+</style>
+
+			 
+				
+<li class="flyoutNotification notificationListItem">
+
+<div class="date"><span class="dateCaps">10 Feb 26, 11:02 </span> 
+	| Services &amp; Support
+</div>
+<a href="/notification-overview">
+<h4 class="heading">Display of cargo rates and currencies</h4></a>
+<p class="notificationDetail"><span class="trimText">Rates diplayed in currency of country of origin. Individual currency to be removed shortly.</span></p>
+
+</li>
+
+<script>
+
+$(document).ready(function(){
+   var showHeadlineChar = 70; 
+	 var notificationDetaillChar = 190;
+		var ellipsestextFlyout = " ";
+	 $('.notificationDetail .trimText').each(function() {
+			var contentFlyout = $(this).html();
+			if(contentFlyout.length > notificationDetaillChar) {
+	 
+				var flyoutShorttext = contentFlyout.substr(0, notificationDetaillChar);
+				var flyoutShorttextElipse =  flyoutShorttext + '&nbsp;... ';
+        $(this).html(flyoutShorttextElipse);
+			}
+	 
+		});
+$('.notificationList .flyoutNotification .heading').each(function() {
+			var contentFlyout = $(this).html();
+			if(contentFlyout.length > showHeadlineChar) {
+	 
+				var flyoutShorttext = contentFlyout.substr(0, showHeadlineChar);
+				var flyoutMoretext = contentFlyout.substr(showHeadlineChar, contentFlyout.length - showHeadlineChar);
+	 
+				var elipseText = flyoutShorttext + '<span class="moreellipses">' + ellipsestextFlyout+ '&nbsp;...</span><span class="morecontent"><span>' + flyoutMoretext + '</span>';
+	 
+				$(this).html(elipseText);
+			}
+	 
+		});
+
+});
+</script>
+
+<style>
+.dateCaps { text-transform: uppercase;} ;
+</style>
+
+			 
+		</ul>
+		<div class="eFloatingInputWrapper actionContainer">
+			<button class="btn btn-primary btn-primary notification-close-btn">Read all</button>
+		</div>
+	
+	
+
+
+<script>
+$(document).on('click', '.notification-close-btn, .rNotificationContainer .notificationList .notificationListItem .heading, .bell-icon', function() {
+	let bellIconClicked = false;
+	if($(this).hasClass('bell-icon')) {
+		bellIconClicked = true;
+		if($("body").hasClass("old-typo")) {
+			$("body").removeClass("old-typo").addClass("old");
+		}
+	}
+	
+	if($(window).width() > 1024) {
+		openNotificationFlyoutInDesktop();
+	} else {
+		openNotificationFlyoutInMobile();
+	}
+	if(Liferay.ThemeDisplay.isSignedIn()){
+	var readNotificationURL = '/c/portal/read_notification';
+		$.ajax({
+			url: readNotificationURL.toString(),
+			data: { bellIconClicked: bellIconClicked }, 
+			dataType: "html",
+			type: "post",
+			success: function(data) {
+				var notificationCount = data;
+					if(notificationCount && notificationCount!='') {
+						if(notificationCount>0) {
+							let notificationCountSpan = '<span class="lcagBadge pill small bold">'+notificationCount+'</span>';
+							$(".bell-icon.rHeaderItem.rBellIconBtn").html(notificationCountSpan);
+						} else {
+							$(".bell-icon.rHeaderItem.rBellIconBtn .lcagBadge").remove();
+						}
+					} 
+					if(bellIconClicked == false) {
+						window.location.href = "/notification-overview";
+					}
+			
+			}
+	});
+	}else{
+		if(bellIconClicked == false) {
+			window.location.href = "/notification-overview";
+		}
+	}
+	
+});
+
+$(document).ready(function() {
+	let notificationCount = '';
+	if(notificationCount && notificationCount!='') {
+		let notificationCountSpan = '<span class="lcagBadge pill small bold">'+notificationCount+'</span>';
+		$(notificationCountSpan).prependTo(".bell-icon.rHeaderItem.rBellIconBtn");
+	} 
+	let isPopupNotificationExists = '';
+	if(isPopupNotificationExists && isPopupNotificationExists=="true") {
+		$("#NotificalModal").prependTo("body");
+	}
+
+});
+$(document).on('click', '.notification-close', function(){
+	 if($("body").hasClass("old")) {
+			$("body").removeClass("old").addClass("old-typo");
+		}
+});
+</script>
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+</div>
+		<div class="rHeaderWrapper whHeader">
+			<header id="banner" class="container clearfix" role="banner">
+		        <div id="heading">
+		            <a class="logo custom-logo" href="/home" data-resource-href="true" title="Go to Lufthansa Cargo">
+		                <img alt="" height="36" src="/o/eportal-theme/images/redesign-images/brand-logo-blue.svg" width="300">
+		            </a>
+		        </div>	
+		        <div class="rHeaderComponents">
+		            <div class="rHeaderItem rBurgerBtn"></div>
+					
+					<div class="rWebOverlay">
+								<ul class="loginsection ">
+								<li class="dropdown "><a href="javascript:void(0)" class="service-login rHeaderItem rProfileBtn"></a>		
+										<div class="loginportlet"><div class="portlet-boundary portlet-boundary_com_liferay_login_web_portlet_LoginPortlet_  portlet-static portlet-static-end decorate portlet-login " id="p_p_id_com_liferay_login_web_portlet_LoginPortlet_">
+		<span id="p_com_liferay_login_web_portlet_LoginPortlet"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_login_web_portlet_LoginPortlet">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Sign In</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+.eportal .login-container .form-group input[type="text"],
+.eportal .login-container input[type="password"]{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-bottom: 10px;
+  height: 40px !important;
+}
+
+.login-container  .checkboxContainer .checkmark {
+left: 0;
+}
+
+ .login-container .lfr-portal-tooltip:nth-child(3){
+    position: absolute;
+    bottom: 60px;
+    left: 70px;
+	font-size: 14px;
+ }
+ 
+ 
+ .login-container .lfr-portal-tooltip:nth-child(4){
+    position: absolute;
+    bottom: 70px;
+    left: 80px;
+ }
+ 
+ .login-container .hidden-login-content .lfr-portal-tooltip:nth-child(3){
+    position: absolute;
+    bottom: 70px;
+    left: 70px;
+	font-size: 14px;
+ }
+  .login-container .hidden-login-content  .forgotpassword .lfr-portal-tooltip{
+	position: absolute;
+	bottom: 47px;
+	font-size: 14px;
+}
+.eportal .login-container .btn span{
+padding-left: 0px;
+
+}
+
+ 
+ 
+ input:-webkit-autofill {
+  -webkit-box-shadow: inset 0 0 0px 9999px white;
+}
+
+.login-container  input.success-field, .login-container select.success-field,
+ .login-container success textarea.success-field{
+	 border-color: #488f06;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,0.075);
+    -moz-box-shadow: inset 0 1px 1px rgba(0,0,0,0.075);
+     box-shadow: inset 0 1px 1px rgba(0,0,0,0.075);
+}
+.sign-in-form .control-group {
+       display: block;
+       margin-bottom: 10px;
+}
+
+.sign-in-form .checkbox input[type="checkbox"] {
+       margin-left: 0px;
+}
+
+.sign-in-form .hide-accessible {
+       position: static !important;
+}
+.sign-in-form .taglib-text{font-family: LufthansaTextWeb-Regular,Arial,sans-serif;}
+
+.sign-in-form .forgotpassword {
+       display: inline-block;
+       margin-left:0 !important;
+}
+
+.login-container i.icon-question-sign ,.loginportlet  i.icon-question-sign{
+display: none;
+}
+.login-container i.icon-plus, .loginportlet i.icon-plus{
+display: none;
+}
+
+.sign-in-form h4.sectionhead {
+       padding: 5px;
+}
+
+.portlet-login .sign-in-form  .navigation {
+       background: 0;
+       padding: 10px 0 0 0;
+}
+
+.portlet-login .portlet-topper .portlet-topper-toolbar {
+       display: none;
+}
+
+.creatreuser a {
+       margin-left: 0;
+}
+.marginT5{margin-top:5px;}
+
+
+.loginsection .service-login > .icon-caret-down{position: absolute;top: 10px;right: 15px;color: white;z-index: 9;}
+/*  .loginportlet h2.header{font-size: 16px;border-bottom:0;color:#666;font-weight: normal;} */
+/*  .loginportlet .btn{padding: 5px 24px 5px 35px !important;} */
+, body.portal-popup {background:none !important;background-color:none !important; border:0;}
+.sign-in-form .btn{width:auto;}
+.portal-popup .sign-in-form .forgotpassword{position: relative;top: -25px;left: 100px;}
+.portal-popup .sign-in-form .forgotpassword a,  .portal-popup .sign-in-form .creatreuser a{font-weight:bold;}
+.portal-popup .sign-in-form input[type='text'],  .portal-popup .sign-in-form input[type='password']{width:200px; height:20px; padding:2px 5px !important;}
+.loginModal .modal-header{ padding-top:0; padding-bottom:0;border-bottom:0;}
+.loginModal .modal-header h3{height:0;}
+.tooltip-help{font-size: 11px!important;}
+
+.login-placeholder { color: #999 !important; }                    
+
+@media screen and (max-width: 1020px){
+
+ .login-container .lfr-portal-tooltip:nth-child(3){
+    bottom: 60px;
+ }
+ 
+ .forgotpassword .lfr-portal-tooltip{
+	bottom: 37px;
+}
+
+}
+.eportal .comfortCookieErrorMsg, .eportal .comfortCookieErrorMsg a{
+    font-family: LufthansaTextWeb-Regular;
+    font-size: 13px;
+}
+.eportal .comfortCookieErrorMsg a{
+	text-decoration: underline !important;	
+}
+.eportal .customcheckbox.disabled label, .eportal .customcheckbox.disabled input[type="checkbox"] {
+	cursor: not-allowed !important;
+}
+.eportal .comfortCookieErrorMsg{
+	margin-top: 15px;
+}
+/* EPORT - 987259 starts */
+	.eportal .login-parent .loginSecondChild .registerLinkButton {
+		cursor: pointer;
+	}
+/* EPORT - 987259 ends */
+
+.eportal .login-parent .loginFirstChild .button-holder, .eportal .loginportlet .portlet-login .form .button-holder {
+    display: flex;
+}
+</style>
+
+<base target="_parent">
+
+
+
+   	 
+
+
+	
+	
+
+		
+
+		<div class="login-container rLoginContainer">
+			
+				
+			
+			
+				
+				
+					
+			<div class="modal">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<div class="modal-title">
+							<h3>Welcome to Lufthansa-Cargo.com</h3>
+						</div>
+						<div class="login-close close" tabindex="0"></div>
+					</div>					
+					<div class="modal-body loginPage ">
+						<div class="loginSection">
+						<h2>Login</h2>
+						
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<form action="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking?p_p_id=com_liferay_login_web_portlet_LoginPortlet&amp;p_p_lifecycle=1&amp;p_p_state=normal&amp;p_p_mode=view&amp;_com_liferay_login_web_portlet_LoginPortlet_javax.portlet.action=%2Flogin%2Flogin&amp;_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Flogin&amp;p_auth=up4MIjbY" class="form sign-in-form " data-fm-namespace="_com_liferay_login_web_portlet_LoginPortlet_" id="_com_liferay_login_web_portlet_LoginPortlet_loginForm" method="post" name="_com_liferay_login_web_portlet_LoginPortlet_loginForm" autocomplete="on">
+	
+		<div aria-label="Sign In" class="input-container" role="group">
+	
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_formDate" name="_com_liferay_login_web_portlet_LoginPortlet_formDate" type="hidden" value="1774812888255">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+							
+							
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_saveLastPath" name="_com_liferay_login_web_portlet_LoginPortlet_saveLastPath" type="hidden" value="false">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+							
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_redirect" name="_com_liferay_login_web_portlet_LoginPortlet_redirect" type="hidden" value="">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+							
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_doActionAfterLogin" name="_com_liferay_login_web_portlet_LoginPortlet_doActionAfterLogin" type="hidden" value="false">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+			
+							<div class="inline-alert-container lfr-alert-container"></div>
+			
+							
+			
+							
+								
+								
+							
+							
+							
+							
+							
+							
+							
+							
+							
+							
+			
+			
+								
+									
+                                        
+									
+									
+								
+			
+							
+							
+			
+							
+							
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+							
+							
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<fieldset class="">
+	
+		
+			<legend class="sr-only">
+				Sign In
+			</legend>
+		
+	
+
+	<div class="show  " id="Content" role="presentation">
+		<div class="panel-body">
+								
+								
+								
+			<div class="LoginSectionInnerWrapper customInputClass greyBoxSubSection">
+<div class="eFloatingInputWrapper w-100">
+
+
+<label class="control-label" id="loginLabel">Username</label>
+		
+			
+
+								
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<div class="form-group input-text-wrapper">
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field clearable form-control" id="_com_liferay_login_web_portlet_LoginPortlet_login" name="_com_liferay_login_web_portlet_LoginPortlet_login" type="text" value=""><span class="clearInput" style="display: none;"></span>
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+	</div>
+
+
+
+								</div>
+								<div class="eFloatingInputWrapper w-100">
+								<label class="control-label" id="passwordLabel">Password</label>
+									
+								
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<div class="form-group input-text-wrapper">
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_password" name="_com_liferay_login_web_portlet_LoginPortlet_password" type="password" value=""><span class="clearInput" style="display: none;"></span>
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+	</div>
+
+
+
+								</div>
+								<span id="_com_liferay_login_web_portlet_LoginPortlet_passwordCapsLockSpan" style="display: none;">Caps Lock is on.</span>
+								<div class="eFloatingInputWrapper m-0 w-100">
+									<div class="button-holder actionContainer">
+										
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+			<button class="btn btn-primary btn-primary" id="_com_liferay_login_web_portlet_LoginPortlet_loginButton" type="submit">
+		
+	
+
+	
+
+	
+		<span class="lfr-btn-label">Login</span>
+	
+
+	
+
+	
+		
+			</button>
+		
+	
+
+
+
+
+
+
+
+										
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+			<button class="btn btn-secondary close-btn btn-secondary" id="_com_liferay_login_web_portlet_LoginPortlet_CancelButton" type="button">
+		
+	
+
+	
+
+	
+		<span class="lfr-btn-label">Cancel</span>
+	
+
+	
+
+	
+		
+			</button>
+		
+	
+
+
+
+
+
+
+
+									</div>
+								</div>
+								
+									<div class="form-group customchkbox clearfix login-account w-100 customchk">
+										<div class="preventAction place-button customcheckbox disabled">
+											
+											
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<div class="form-group form-inline input-checkbox-wrapper">
+
+
+
+
+
+	<label class="lcagGrey7" for="_com_liferay_login_web_portlet_LoginPortlet_rememberMe">
+		
+
+
+
+
+
+	
+
+		
+
+		
+
+		
+			<input class="field customchk" id="_com_liferay_login_web_portlet_LoginPortlet_rememberMe" name="_com_liferay_login_web_portlet_LoginPortlet_rememberMe" onclick="" type="checkbox" disabled="disabled">
+		
+
+		
+	
+	
+
+
+
+
+	
+			Keep me logged in<span class="comfortCookieErrorMsg">*</span>
+		</label>
+	
+
+
+
+	</div>
+
+
+
+											<span class="checkmark"></span>
+											
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_tocContentWtihVersion" name="_com_liferay_login_web_portlet_LoginPortlet_tocContentWtihVersion" type="hidden" value="">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+										</div>
+									</div>
+								
+							<div class="w-100">
+								
+
+
+
+
+
+
+
+
+
+    
+
+	<a href="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking?p_p_id=com_liferay_login_web_portlet_LoginPortlet&amp;p_p_lifecycle=0&amp;p_p_state=maximized&amp;p_p_mode=view&amp;_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fforgot_userid" class="lcagLink hyperlinkIcon navigational">Forgotten your username
+</a>
+							</div>
+								<a href="https://www.lufthansa-cargo.com/en/eservices/etracking/tracking?p_p_id=com_liferay_login_web_portlet_LoginPortlet&amp;p_p_lifecycle=0&amp;p_p_state=maximized&amp;p_p_mode=view&amp;_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fforgot_password" class="lcagLink hyperlinkIcon navigational">Forgotten your password</a>
+	
+								<p class="note-text comfortCookieErrorMsg">Please note that this function is only available with the
+ComfortCookie.Please change your settings <a class="lcagLink textOnly" href="#" id="showConstentPopup" style="color: rgb(82,98,124) !important;">here</a>
+.</p>
+							</div>
+							
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		</div>
+	</div>
+</fieldset>
+
+
+						
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_login_web_portlet_LoginPortlet_checkboxNames" name="_com_liferay_login_web_portlet_LoginPortlet_checkboxNames" type="hidden" value="rememberMe">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+	
+
+	
+		</div>
+	
+</form>
+
+
+
+<script>
+AUI().use(
+  'liferay-form',
+function(A) {
+(function() {
+var $ = AUI.$;var _ = AUI._;
+	Liferay.Form.register(
+		{
+			id: '_com_liferay_login_web_portlet_LoginPortlet_loginForm'
+
+			
+				, fieldRules: [
+
+					
+
+				]
+			
+
+			
+				, onSubmit: function(event) {
+					event.preventDefault();
+				}
+			
+
+			, validateOnBlur: false
+		}
+	);
+
+	var onDestroyPortlet = function(event) {
+		if (event.portletId === 'com_liferay_login_web_portlet_LoginPortlet') {
+			delete Liferay.Form._INSTANCES['_com_liferay_login_web_portlet_LoginPortlet_loginForm'];
+		}
+	};
+
+	Liferay.on('destroyPortlet', onDestroyPortlet);
+
+	
+		A.all('#_com_liferay_login_web_portlet_LoginPortlet_loginForm .input-container').removeAttribute('disabled');
+	
+
+	Liferay.fire(
+		'_com_liferay_login_web_portlet_LoginPortlet_formReady',
+		{
+			formName: '_com_liferay_login_web_portlet_LoginPortlet_loginForm'
+		}
+	);
+})();
+});
+
+</script>
+					</div>
+					
+					
+					<div class="RegisterSection">
+                       <h2>User registration</h2>
+						
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	
+		<div class="journal-content-article " data-analytics-asset-id="REGISTRATION_WEB_CONTENT" data-analytics-asset-title="REGISTRATION_WEB_CONTENT" data-analytics-asset-type="web-content" data-analytics-web-content-resource-pk="29575243">
+			
+
+			<div class="RegisterSectionInnerWrapper">
+<div class="register-text">You would like to become a <u>user</u> of our eServices and your company already has an account with us?</div>
+
+<div class="RegisterSectionInnerWrapper"><a class="registerUserLink loginPortletLinks lcagLink hyperlinkIcon navigational" href="https://www.lufthansa-cargo.com/?p_p_id=com_liferay_login_web_portlet_LoginPortlet&amp;p_p_lifecycle=0&amp;p_p_state=maximized&amp;p_p_mode=view&amp;_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&amp;saveLastPath=false">Get your user login here</a>
+
+<div class="register-text">You would like to send shipments with us and your <u>company</u> does not have an account with us yet?</div>
+<a class="registerCompanyLink loginPortletLinks lcagLink hyperlinkIcon navigational" href="https://www.lufthansa-cargo.com/en/register-company-account?p_p_id=com_lhcargo_eportal_register_company_account&amp;p_p_lifecycle=0&amp;p_p_state=normal">Register your company here</a>
+</div>
+</div>
+			<div data-id="REGISTRATION_WEB_CONTENT">
+			<div class="videoOverlayConsent hide">
+<div class="consentText">External media content is blocked here. When loading or playing the embedded media content, connections to the servers of the respective provider are established. Personal data may be communicated to the provider in the process. For more information, please see our<a href="/footer/bottomnav/privacy"> data privacy statement.</a></div>
+<button class="btnConsent">Show content anyway</button></div>
+			</div>
+
+			
+		</div>
+
+		
+
+	
+
+
+
+<script>
+var sourceIdMap= {};
+$(window).load(function() {
+	let consentEnabled = 'true';
+	let allowedDomains = 'https://static.lufthansa-cargo.com';
+	let listOfAllowedDomains = allowedDomains.split(";");
+	let found=true;
+	let iframeSourceList = '[]';
+	if(consentEnabled=='true') {
+		let iframeFound = "false";
+		let articleDisplayId = "REGISTRATION_WEB_CONTENT";
+		if(iframeFound == "true") {
+			if (iframeSourceList.length > 0) {
+				found = !(listOfAllowedDomains.some(r=> iframeSourceList.includes(r)));
+			}
+			
+			if(found){
+				$('[data-id='+ articleDisplayId+']').insertAfter($('[data-analytics-asset-id='+ articleDisplayId+'] iframe'));
+				$('[data-id='+ articleDisplayId+'] .btnConsent').each(function(index){
+					$(this).attr('data-id', index++);
+				});
+				$('[data-id='+ articleDisplayId+'] .btnConsent').click(function(){
+					let clickedIndex = $(this).attr('data-id');
+					let iframesrcList = sourceIdMap["REGISTRATION_WEB_CONTENT"];
+					if(iframesrcList!=undefined && iframesrcList.length>0) {
+						$(this).parents('div').prev('iframe').attr('src', iframesrcList.split(", ")[clickedIndex].replace("[","").replace("]",""));
+						$(this).parents('.videoOverlayConsent').remove();
+					}
+				});
+				$('[data-analytics-asset-id='+ articleDisplayId+'] iframe').parent('p').addClass("videoOverlayMsg");
+				sourceIdMap[articleDisplayId]=iframeSourceList;
+				setTimeout(function(){
+					let isConsentGiven = false;
+					if(typeof utag != "undefined" && typeof utag.data["usercentrics_services_with_consent"] != "undefined" && 
+							iframeSourceList!=undefined && iframeSourceList.length>0){
+						for(let i=0;i<utag.data["usercentrics_services_with_consent"].length;i++){
+							let index = $('[data-id='+ articleDisplayId+'] .videoOverlayConsent .btnConsent').attr('data-id');
+							if(index < iframeSourceList.length && 
+									isConsentPresent(iframeSourceList.split(", ")[index], utag.data["usercentrics_services_with_consent"][i].toLowerCase())){
+								$('[data-id='+ articleDisplayId+']').prev('iframe').attr('src', iframeSourceList.split(", ")[index].replace("[","").replace("]",""));
+								$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').remove();
+								isConsentGiven = true;
+								 break;
+							 }
+						 }
+					} 
+					if(!isConsentGiven){
+						$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').removeClass('hide');
+					}
+				}, 500);
+			}
+		}
+	}
+});
+function isConsentPresent(iframeSource, consentValue){
+	if(consentValue.trim().includes("youtube") 
+			&& iframeSource.toLowerCase().trim().includes("youtube")){
+		return true;
+	}
+	return iframeSource.toLowerCase().trim().includes(consentValue.trim());
+}
+
+window.addEventListener('UC_UI_CMP_EVENT', function (e){
+	window.addEventListener('ucEvent', function(event){
+		if(event.detail && event.detail.event == "consent_status"){
+			for (let articleDisplayId in sourceIdMap) {
+			    if (sourceIdMap.hasOwnProperty(articleDisplayId)) {
+			        let iframeSourceList = sourceIdMap[articleDisplayId];
+			        let index = $('[data-id='+ articleDisplayId+'] .videoOverlayConsent .btnConsent').attr('data-id');
+					if(index < iframeSourceList.length){
+				        $('[data-id='+ articleDisplayId+']').prev('iframe').attr('src', iframeSourceList.split(", ")[index].replace("[","").replace("]",""));
+						$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').remove();
+					}
+			    }
+			}
+		}
+	});
+});
+
+
+</script>
+							
+							
+								<div class="creatreuser navigation">
+										
+								</div>
+							
+						</div>
+						</div>
+						</div>
+					</div>
+					
+				</div>
+						
+		
+		</div>
+
+		<script>
+AUI().use(
+  'liferay-form',
+function(A) {
+(function() {
+var $ = AUI.$;var _ = AUI._;
+			var form = document.getElementById('_com_liferay_login_web_portlet_LoginPortlet_loginForm');
+	    	 
+			if (form) {
+				var password = form.querySelector('#_com_liferay_login_web_portlet_LoginPortlet_password');
+				if (password) {
+					if(password == '' || password == 'Password') {
+						$('input[name=_com_liferay_login_web_portlet_LoginPortlet_password]').addClass('login-placeholder');
+					} else {
+						$('input[name=_com_liferay_login_web_portlet_LoginPortlet_password]').removeClass('login-placeholder');
+					}
+					password.addEventListener('keypress', (event) => {
+						Liferay.Util.showCapsLock(
+							event,
+							'_com_liferay_login_web_portlet_LoginPortlet_passwordCapsLockSpan'
+						);
+					});
+				}
+			}
+			$("#_com_liferay_login_web_portlet_LoginPortlet_loginButton").click(function(e) {
+				e.preventDefault();
+				let $loginButton = $(this);
+				$loginButton.prop('disabled', true);
+				var formValidator = Liferay.Form.get('_com_liferay_login_web_portlet_LoginPortlet_loginForm').formValidator;
+				formValidator.validate();
+				
+			if(!formValidator.hasErrors()){
+				$("#_com_liferay_login_web_portlet_LoginPortlet_loginForm").submit();
+			}
+			else {
+				$loginButton.prop('disabled', false);
+			}
+			});
+			$(".loginFirstChild input").keypress(function(event) {
+			    if (event.which == 13) {
+			    	var formValidator = Liferay.Form.get('_com_liferay_login_web_portlet_LoginPortlet_loginForm').formValidator;
+					formValidator.validate();
+			        event.preventDefault();
+			        if(!formValidator.hasErrors()){
+			       	 $("#_com_liferay_login_web_portlet_LoginPortlet_loginForm").submit();
+			        }
+			    }
+			});
+		
+})();
+});
+
+</script>
+	
+
+<script>
+AUI().use(
+  'liferay-form',
+function(A) {
+(function() {
+var $ = AUI.$;var _ = AUI._;
+var userIdErrorMsg = '\u0050\u006c\u0065\u0061\u0073\u0065\u0020\u0065\u006e\u0074\u0065\u0072\u0020\u0061\u0020\u0076\u0061\u006c\u0069\u0064\u0020\u0075\u0073\u0065\u0072\u006e\u0061\u006d\u0065';
+var passwordErrorMsg = '\u0050\u006c\u0065\u0061\u0073\u0065\u0020\u0065\u006e\u0074\u0065\u0072\u0020\u0079\u006f\u0075\u0072\u0020\u0070\u0061\u0073\u0073\u0077\u006f\u0072\u0064';
+Liferay.Form.register(
+      {
+          id: '_com_liferay_login_web_portlet_LoginPortlet_loginForm',
+          fieldRules: [
+               {
+                body: function (val, fieldNode, ruleValue) {
+         
+                   var result = false;
+					if(val.length > 5 && val.length < 41) {
+						var regex = /^[0-9a-zA-Z@_\\.\\-]+$/; 
+					    if(regex.test(val)) {
+					    	result = true;
+					    }
+					} 
+                return result;
+                },
+               custom: true,
+          		errorMessage: userIdErrorMsg,
+                fieldName: '_com_liferay_login_web_portlet_LoginPortlet_login',
+               validatorName: 'custom_rule_userid'
+               },
+               {
+                   body: '',
+                   custom: false,
+                   errorMessage: userIdErrorMsg,
+                   fieldName: '_com_liferay_login_web_portlet_LoginPortlet_login',
+                   validatorName: 'required'                    
+                },
+               {
+                body: '',
+                custom: false,
+                errorMessage: passwordErrorMsg,
+                fieldName: '_com_liferay_login_web_portlet_LoginPortlet_password',
+                validatorName: 'required'                    
+             }
+        	]
+   }
+);
+
+
+})();
+});
+
+</script>
+<script>
+$(document).ready(function(){
+	$("#_com_liferay_login_web_portlet_LoginPortlet_passwordLabel").html('Password');
+    $("#_com_liferay_login_web_portlet_LoginPortlet_loginLabel").html('Username');
+	var showComfortCookieErrorMg = '';
+	if(showComfortCookieErrorMg && showComfortCookieErrorMg=="true"){
+		disableRememberMeCheckbox();
+	}
+	$('.loginportlet .lfr-icon-item.taglib-icon,.login-container .lfr-icon-item.taglib-icon').addClass('loginPortletLinks links');
+	if($("div").hasClass("login-container") && $("div").hasClass("lcagNotification error")) {
+         $(".eportal .header-section .navbar-inner").show();   
+	}
+
+	$( ".login-close, .close-btn" ).click(function() {
+	  $(".loginsection .dropdown").removeClass("open");
+	  $('body').css('overflow-y','auto');
+	  $('.login-container .registerLinkContainer').hide();
+	  $('.login-container .login-parent').show();
+	  //add old-typo class on close of login popup.
+	  if($("body").hasClass("old")) {
+			$("body").removeClass("old").addClass("old-typo");
+		}
+	});
+	$("#showConstentPopup").click(function(){
+		event.preventDefault();
+		if(UC_UI) {
+			UC_UI.showSecondLayer().then(window.addEventListener("ucEvent", function(e) {
+	            location.reload();
+	        }));
+		}
+	});
+	/* EPORT-987259 starts */
+	$('.registerCompanyLink').attr('href', 'https://www.lufthansa-cargo.com/en/register-company-account?p_p_id=com_lhcargo_eportal_register_company_account&p_p_lifecycle=0&p_p_state=normal');
+	$('.registerUserLink').attr('href', 'https://www.lufthansa-cargo.com/?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false');
+	$('#loginPortletLink').click(function() {
+		$('.login-container .login-parent').show();
+		$('.login-container .registerLinkContainer').hide();
+	});
+	$('.registerLinkButton').click(function() {
+		$('.login-container .login-parent').hide();
+		$('.login-container .registerLinkContainer').show();
+	});
+	/* EPORT-987259 ends */
+})
+function disableRememberMeCheckbox(){
+	$("#_com_liferay_login_web_portlet_LoginPortlet_rememberMe").attr("disabled", true);
+	$(".preventAction").addClass("disabled");
+	$(".comfortCookieErrorMsg").removeClass("hide");
+}
+function enableRememberMeCheckbox(){
+	$("#_com_liferay_login_web_portlet_LoginPortlet_rememberMe").attr("disabled", false);
+	$(".preventAction").removeClass("disabled");
+	$(".comfortCookieErrorMsg").addClass("hide");
+}
+$(window).load(function() {
+	if($("div").hasClass("loginRequired") || $("div").hasClass("openLoginSection")) {
+		if($(window).width() < 992) {
+			$(".rHeaderItem.rBurgerBtn").click();
+		}
+		$(".loginsection .dropdown").addClass("open"); 
+	}
+});
+</script>
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>	
+											
+										</div>
+									</li>
+								</ul>
+						
+						<div class="bell-icon rHeaderItem rBellIconBtn">
+						</div>
+						
+							<a href="/support-and-contact" class="rSpeechIconBtn">
+						</a>
+						<div class="rLanguageBtn languagebox">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_  portlet-static portlet-static-end decorate portlet-language " id="p_p_id_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_">
+		<span id="p_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Language Selector</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+	.fciHeaderWrapper .lhcLanguageWrapper .lhcLangBtn {
+    background-color: transparent;
+    color: #fff;
+    font-size: 36px !important;
+    margin: -9px 0 0 0px;
+}
+.fciHeaderWrapper .lhcLanguageWrapper .lhcLangContent a {
+     padding: 10px;
+    font-size: 36px;
+}
+    .lhcLanguageWrapper {
+          position: relative;
+          display: inline-block;
+        }
+    .lhcLangBtn, .fciHeaderWrapper.shrinkHeader .lhcLangBtn {
+        font-family: LufthansaHeadWeb-Light !important;
+        background-color: #fff;
+        color: #05164d;
+        font-size: 18px !important;
+        border: none;
+        cursor: pointer;
+        margin: -3px 0 0 12px;
+    }
+    
+    .lhcLangContent {
+      display: none;
+      position: absolute;
+    background-color: #fff;
+    min-width: 3.5rem;
+    box-shadow: 2px 2px 3px 0px rgb(0 0 0 / 25%);
+    margin-top: 6px;
+			z-index: 9999;
+    }
+    
+    .lhcLangContent a, .fciHeaderWrapper.shrinkHeader .lhcLangContent a {
+         font-family: LufthansaTextWeb-Regular,Arial,sans-serif;
+      color: #05164d;
+    padding: 10px 18px;
+    display: block;
+    font-size: 18px;
+    text-decoration: none;
+			text-transform: uppercase;
+    }
+    
+    .lhcLanguageWrapper a:hover {background-color: #ddd;}
+    
+    .showLanguages {display: block;}
+    .eportal .rLanguageBtn.languagebox .portlet>.portlet-topper {
+        right: auto;
+        top: 70px;
+        left: -170px;
+    }
+</style>
+
+    <div class="lhcLanguageWrapper">
+      <button onclick="changeLanguage(this)" class="lhcLangBtn">EN</button>
+	<div id="lhcLanguageList" class="lhcLangContent">
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=de_DE">de</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=es_ES">es</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=fr_FR">fr</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=it_IT">it</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=pt_BR">pt</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=zh_CN">中文</a>
+	 </div>
+    </div>
+<script>
+    /* When the user clicks on the button, 
+    toggle between hiding and showing the dropdown content */
+     function changeLanguage(elm) {
+			elm.nextElementSibling.classList.toggle("showLanguages");
+    }
+    
+    // Close the dropdown if the user clicks outside of it
+    window.onclick = function(event) {
+      if (!event.target.matches('.lhcLangBtn')) {
+        var dropdowns = document.getElementsByClassName("lhcLangContent");
+        var i;
+        for (i = 0; i < dropdowns.length; i++) {
+          var openDropdown = dropdowns[i];
+          if (openDropdown.classList.contains('showLanguages')) {
+            openDropdown.classList.remove('showLanguages');
+          }
+        }
+      }
+    }
+</script>
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+					
+						</div>
+						
+
+
+
+						
+					</div>
+		        </div>
+				 <div class="rContainer rMainNav">
+				 <div class="fullWidthInnerWrapper">
+				 	<div class="rMobileOverlay">
+						<div class="rMobileSearchBox">
+							<div class="rContainer rSearchNav header-search-nav-warapper">
+<div class="col-sm-12 col-md-12 col-lg-6 pl-0 searchBoxWrapper">
+	<div class="search-box">
+        <button class="header-search-btn">Search <i class="lh-icon-form-search"></i></button>                          
+		<div id="vw-search" class="form">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_  portlet-static portlet-static-end decorate portlet-search-bar " id="p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_">
+		<span id="p_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Search Bar</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+<style>
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control{ 
+	color: #666;
+    padding: 6px 0;
+    border: 0;
+    border-bottom: 2px solid #666;
+    border-radius: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    font-size: 18px;
+    height: 36px !important;
+    margin-bottom: 0;
+    width: 100% !important;
+    max-width: 350px!important;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active {
+	padding: 6px 10px;
+	border-bottom-color: #52627c;
+	box-shadow: 0 0 0.6rem 0.1rem #52627c;
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper{
+	right: 13px
+}
+.eportal .pagebody .search-bar-search-button-wrapper,
+.eportal .searchBttmNav .search-bar-search-button-wrapper {
+    right: 3px;
+    top: 2px;
+    width: 26px;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group.search-bar.search-bar-simple,
+.eportal .searchBttmNav .input-group.search-bar.search-bar-simple {
+	margin-top: 30px;
+}
+.eportal .pagebody .search-bar .form-group.input-group-item,
+.eportal .searchBttmNav .search-bar .form-group.input-group-item  {
+    display: inline;
+    max-width: 350px;
+}
+.eportal .pagebody .search-bar-search-button-wrapper .lexicon-icon-search,
+.eportal .searchBttmNav .search-bar-search-button-wrapper .lexicon-icon-search {
+    width: 16px;
+    height: 16px;
+}
+</style>
+
+
+
+
+
+
+
+	
+	
+	<form action="https://www.lufthansa-cargo.com/en/search" id="dkrk___fm" method="get" name="dkrk___fm">			
+
+			
+
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				<div class="search-bar">
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field search-bar-empty-search-input form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_emptySearchEnabled" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_emptySearchEnabled" type="hidden" value="false">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+					<div class="input-group search-bar-simple">
+						
+							
+							
+								<div class="input-group-item search-bar-keywords-input-wrapper form-group">
+
+											<input aria-label="Search" autocomplete="off" class="form-control input-group-inset input-group-inset-after search-bar-keywords-input" data-qa-id="searchInput" id="dkrk___q" name="q" placeholder="Search..." title="Search" type="text" value=""><span class="clearInput" style="display: none;"></span>
+											
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_scope" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_scope" type="hidden" value="">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+											<div class="input-group-inset-item input-group-inset-item-after search-bar-search-button-wrapper">
+												<button class="btn btn-monospaced btn-unstyled" type="submit" aria-label="Submit"><span class="inline-item"><svg class="lexicon-icon lexicon-icon-search" role="presentation"><use xlink:href="https://www.lufthansa-cargo.com/o/eportal-theme/images/clay/icons.svg#search"></use></svg></span></button>
+											</div>
+										</div>
+							
+						
+					</div>
+				</div>
+			
+		</form>
+<script type="module">
+import {SearchBar as ComponentModule} from '/o/portal-search-web/__liferay__/index.js';
+{
+Liferay.component('__UNNAMED_COMPONENT__62963e01-3bc1-8b45-8a07-3dd4e3b17e1f', new ComponentModule({"formId":"dkrk___fm","namespace":"_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_","spritemap":"https:\/\/www.lufthansa-cargo.com\/o\/eportal-theme\/images\/clay\/icons.svg","initialKeywords":"","retainFacetSelections":false}), { destroyOnNavigate: true, portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile'});
+}
+
+</script>	
+
+
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+			
+		</div>
+	</div>
+	</div>
+							</div>
+						</div>
+						<div class="rMobileNavItemBox">
+									<ul class="loginsection ">
+									<li class="dropdown "><a href="javascript:void(0)" class="service-login rHeaderItem rProfileBtn"></a>
+										<div class="loginportlet">	
+										
+										</div>
+										</li>
+									</ul>
+							<a href="/support-and-contact" class="rSpeechIconBtn">
+						</a>
+						
+							<div class="bell-icon rHeaderItem rBellIconBtn">
+						</div>
+							<div class="rLanguageBtn languagebox">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_  portlet-static portlet-static-end decorate portlet-language " id="p_p_id_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_">
+		<span id="p_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Language Selector</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+	.fciHeaderWrapper .lhcLanguageWrapper .lhcLangBtn {
+    background-color: transparent;
+    color: #fff;
+    font-size: 36px !important;
+    margin: -9px 0 0 0px;
+}
+.fciHeaderWrapper .lhcLanguageWrapper .lhcLangContent a {
+     padding: 10px;
+    font-size: 36px;
+}
+    .lhcLanguageWrapper {
+          position: relative;
+          display: inline-block;
+        }
+    .lhcLangBtn, .fciHeaderWrapper.shrinkHeader .lhcLangBtn {
+        font-family: LufthansaHeadWeb-Light !important;
+        background-color: #fff;
+        color: #05164d;
+        font-size: 18px !important;
+        border: none;
+        cursor: pointer;
+        margin: -3px 0 0 12px;
+    }
+    
+    .lhcLangContent {
+      display: none;
+      position: absolute;
+    background-color: #fff;
+    min-width: 3.5rem;
+    box-shadow: 2px 2px 3px 0px rgb(0 0 0 / 25%);
+    margin-top: 6px;
+			z-index: 9999;
+    }
+    
+    .lhcLangContent a, .fciHeaderWrapper.shrinkHeader .lhcLangContent a {
+         font-family: LufthansaTextWeb-Regular,Arial,sans-serif;
+      color: #05164d;
+    padding: 10px 18px;
+    display: block;
+    font-size: 18px;
+    text-decoration: none;
+			text-transform: uppercase;
+    }
+    
+    .lhcLanguageWrapper a:hover {background-color: #ddd;}
+    
+    .showLanguages {display: block;}
+    .eportal .rLanguageBtn.languagebox .portlet>.portlet-topper {
+        right: auto;
+        top: 70px;
+        left: -170px;
+    }
+</style>
+
+    <div class="lhcLanguageWrapper">
+      <button onclick="changeLanguage(this)" class="lhcLangBtn">EN</button>
+	<div id="lhcLanguageList" class="lhcLangContent">
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=de_DE">de</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=es_ES">es</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=fr_FR">fr</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=it_IT">it</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=pt_BR">pt</a>
+				<a href="/en/c/portal/update_language?redirect=%2Fen%2Feservices%2Fetracking%2Ftracking%2F-%2Fawb%2F020%2F00958171%3FsearchFilter%3Dawb&amp;groupId=20184&amp;privateLayout=false&amp;layoutId=1947&amp;languageId=zh_CN">中文</a>
+	 </div>
+    </div>
+<script>
+    /* When the user clicks on the button, 
+    toggle between hiding and showing the dropdown content */
+     function changeLanguage(elm) {
+			elm.nextElementSibling.classList.toggle("showLanguages");
+    }
+    
+    // Close the dropdown if the user clicks outside of it
+    window.onclick = function(event) {
+      if (!event.target.matches('.lhcLangBtn')) {
+        var dropdowns = document.getElementsByClassName("lhcLangContent");
+        var i;
+        for (i = 0; i < dropdowns.length; i++) {
+          var openDropdown = dropdowns[i];
+          if (openDropdown.classList.contains('showLanguages')) {
+            openDropdown.classList.remove('showLanguages');
+          }
+        }
+      }
+    }
+</script>
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+							</div>
+							
+
+
+
+							
+						</div>
+					</div>
+<div class="rSearchNav header-search-nav-warapper mainMenuSearch">
+			    <div class="fullWidthInnerWrapper">
+<div class="col-sm-12 col-md-12 col-lg-6 pl-0 searchBoxWrapper">
+	<div class="search-box">
+        <button class="header-search-btn">Search <i class="lh-icon-form-search"></i></button>                          
+		<div id="vw-search" class="form">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_  portlet-static portlet-static-end decorate portlet-search-bar " id="p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_">
+		<span id="p_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Search Bar</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+<style>
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control{ 
+	color: #666;
+    padding: 6px 0;
+    border: 0;
+    border-bottom: 2px solid #666;
+    border-radius: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    font-size: 18px;
+    height: 36px !important;
+    margin-bottom: 0;
+    width: 100% !important;
+    max-width: 350px!important;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active {
+	padding: 6px 10px;
+	border-bottom-color: #52627c;
+	box-shadow: 0 0 0.6rem 0.1rem #52627c;
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper{
+	right: 13px
+}
+.eportal .pagebody .search-bar-search-button-wrapper,
+.eportal .searchBttmNav .search-bar-search-button-wrapper {
+    right: 3px;
+    top: 2px;
+    width: 26px;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group.search-bar.search-bar-simple,
+.eportal .searchBttmNav .input-group.search-bar.search-bar-simple {
+	margin-top: 30px;
+}
+.eportal .pagebody .search-bar .form-group.input-group-item,
+.eportal .searchBttmNav .search-bar .form-group.input-group-item  {
+    display: inline;
+    max-width: 350px;
+}
+.eportal .pagebody .search-bar-search-button-wrapper .lexicon-icon-search,
+.eportal .searchBttmNav .search-bar-search-button-wrapper .lexicon-icon-search {
+    width: 16px;
+    height: 16px;
+}
+</style>
+
+
+
+
+
+
+
+	
+	
+	<form action="https://www.lufthansa-cargo.com/en/search" id="wfkm___fm" method="get" name="wfkm___fm">			
+
+			
+
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				<div class="search-bar">
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field search-bar-empty-search-input form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_emptySearchEnabled" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_emptySearchEnabled" type="hidden" value="false">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+					<div class="input-group search-bar-simple">
+						
+							
+							
+								<div class="input-group-item search-bar-keywords-input-wrapper form-group">
+
+											<input aria-label="Search" autocomplete="off" class="form-control input-group-inset input-group-inset-after search-bar-keywords-input" data-qa-id="searchInput" id="wfkm___q" name="q" placeholder="Search..." title="Search" type="text" value=""><span class="clearInput" style="display: none;"></span>
+											
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_scope" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_scope" type="hidden" value="">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+											<div class="input-group-inset-item input-group-inset-item-after search-bar-search-button-wrapper">
+												<button class="btn btn-monospaced btn-unstyled" type="submit" aria-label="Submit"><span class="inline-item"><svg class="lexicon-icon lexicon-icon-search" role="presentation"><use xlink:href="https://www.lufthansa-cargo.com/o/eportal-theme/images/clay/icons.svg#search"></use></svg></span></button>
+											</div>
+										</div>
+							
+						
+					</div>
+				</div>
+			
+		</form>
+<script type="module">
+import {SearchBar as ComponentModule} from '/o/portal-search-web/__liferay__/index.js';
+{
+Liferay.component('__UNNAMED_COMPONENT__4dbaf999-acf2-3c4e-2ce4-005ced4d60e2', new ComponentModule({"formId":"wfkm___fm","namespace":"_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_","spritemap":"https:\/\/www.lufthansa-cargo.com\/o\/eportal-theme\/images\/clay\/icons.svg","initialKeywords":"","retainFacetSelections":false}), { destroyOnNavigate: true, portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation'});
+}
+
+</script>	
+
+
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+			
+		</div>
+	</div>
+	</div>
+		 		</div>
+</div>
+<div class="rNavigationWrapper">
+	<ul class="row">
+			<li class="col-sm-12 col-md-12 col-lg-3">
+				<div class="rNavHeading">
+					<div>eServices</div>
+				</div>
+					<ul class="rNavItemBox">
+							
+	
+												<li class="rNavItem">
+													<div class="hoverable">
+														<div class="hoverBox">
+															<span class="hoverableItem">Track</span>
+															<div class="hoveredNav">
+																<div class="rMobileHeaderBox">
+																	<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+																	<div class="rMobileNavHeader">Track</div>
+																</div>
+																<ul>
+																		<li><a href="https://www.lufthansa-cargo.com/en/eservices/etracking">eTracking</a></li>
+																</ul>
+															</div>
+														</div>
+													</div>
+												</li>
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/network/schedule-routings">Schedule</a></div></li>
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/eservices/etracking/quick-drop-off">Quick drop-off/Quick pick-up</a></div></li>
+					</ul>
+			</li>
+			<li class="col-sm-12 col-md-12 col-lg-3">
+				<div class="rNavHeading">
+					<div>Info-Hub</div>
+				</div>
+					<ul class="rNavItemBox">
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/network/maps/stations">Our stations</a></div></li>
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/support-and-contact">Support &amp; Contact</a></div></li>
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/portfolio">Portfolio</a></div></li>
+							
+	
+												<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/eservices/rates-conditions">Rates &amp; Conditions</a></div></li>
+							
+	
+												<!-- START Assign Subline  -->				                 			
+												<li class="rNavItem">
+													<div class="moreBtn">
+														<span class="showMore">
+															More info<span class="showMoreIcon">+</span>
+														</span>
+														<span class="showLess">
+															More info<span class="showLessIcon">-</span>
+														<span>
+													</span></span></div>
+												</li>
+											<div class="rExtendedNav">
+													<li class="rNavItem">
+														<div class="hoverable">
+															<div class="hoverBox">
+															<span class="hoverableItem">About eServices</span>
+																<div class="hoveredNav">
+																	<div class="rMobileHeaderBox">
+																		<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+																		<div class="rMobileNavHeader">About eServices</div>
+																	</div>
+																	<ul>
+																			<li><a href="https://www.lufthansa-cargo.com/en/ebooking-info">eBooking</a></li>
+																			<li><a href="https://www.lufthansa-cargo.com/en/etracking1">eTracking</a></li>
+																			<li><a href="https://www.lufthansa-cargo.com/en/eservices/efreight">eFreight</a></li>
+																	</ul>
+																</div>
+															</div>
+														</div>
+													</li>
+											</div>
+							
+	
+											<div class="rExtendedNav">
+													<li class="rNavItem">
+														<div class="hoverable">
+															<div class="hoverBox">
+															<span class="hoverableItem">Fleet &amp; ULD</span>
+																<div class="hoveredNav">
+																	<div class="rMobileHeaderBox">
+																		<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+																		<div class="rMobileNavHeader">Fleet &amp; ULD</div>
+																	</div>
+																	<ul>
+																			<li><a href="https://www.lufthansa-cargo.com/en/fleet-ulds/fleet">Our fleet</a></li>
+																			<li><a href="https://www.lufthansa-cargo.com/en/fleet-ulds/ulds">ULDs</a></li>
+																	</ul>
+																</div>
+															</div>
+														</div>
+													</li>
+											</div>
+							
+	
+											<div class="rExtendedNav">
+														<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/industries-in-focus">Industries</a></div></li>
+											</div>
+							
+	
+											<div class="rExtendedNav">
+														<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/process-changes">Process changes</a></div></li>
+											</div>
+							
+	
+											<div class="rExtendedNav">
+														<li class="rNavItem"><div class="clickableNav"><a href="https://www.lufthansa-cargo.com/en/eservices-app">Lufthansa Cargo App</a></div></li>
+											</div>
+							
+	
+											<div class="rExtendedNav">
+														<li class="rNavItem"><div class="clickableNav"><a href="https://developer.lufthansa-cargo.com/" target="_blank">Lufthansa Cargo APIs</a></div></li>
+											</div>
+					</ul>
+			</li>
+			<li class="col-sm-12 col-md-12 col-lg-3">
+				<div class="rNavHeading">
+					<div>Cargo inside</div>
+				</div>
+					<ul class="rNavItemBox">
+							
+	
+									
+										<li class="rNavItem companyPage">
+											<div class="hoverable">
+												<div class="hoverBox">
+													<span class="hoverableItem">What's up</span>
+													<div class="hoveredNav">
+														<div class="rMobileHeaderBox">
+															<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+															<div class="rMobileNavHeader">What's up</div>
+														</div>
+														<ul>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/whats-up-now">What's up now?</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/transport-stories">Transport stories</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/fanshop">Fanshop</a></li>
+														</ul>
+													</div>
+												</div>
+											</div>
+										</li>
+							
+	
+									
+										<li class="rNavItem companyPage">
+											<div class="hoverable">
+												<div class="hoverBox">
+													<span class="hoverableItem">News &amp; Media</span>
+													<div class="hoveredNav">
+														<div class="rMobileHeaderBox">
+															<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+															<div class="rMobileNavHeader">News &amp; Media</div>
+														</div>
+														<ul>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/newsroom">Newsroom</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/newsletter">Newsletter</a></li>
+														</ul>
+													</div>
+												</div>
+											</div>
+										</li>
+							
+	
+									
+										<li class="rNavItem companyPage">
+											<div class="hoverable">
+												<div class="hoverBox">
+													<span class="hoverableItem">Company</span>
+													<div class="hoveredNav">
+														<div class="rMobileHeaderBox">
+															<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+															<div class="rMobileNavHeader">Company</div>
+														</div>
+														<ul>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/facts-figures">Facts &amp; Figures</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/partnerships-subsidiaries">Partnerships &amp; Subsidiaries</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/fleet-infrastructure">Fleet &amp; Infrastructure</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/digitalization">Digitalization</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/security">Security</a></li>
+														</ul>
+													</div>
+												</div>
+											</div>
+										</li>
+							
+	
+									
+										<li class="rNavItem companyPage">
+											<div class="hoverable">
+												<div class="hoverBox">
+													<span class="hoverableItem">Responsibility</span>
+													<div class="hoveredNav">
+														<div class="rMobileHeaderBox">
+															<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+															<div class="rMobileNavHeader">Responsibility</div>
+														</div>
+														<ul>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/sustainable-development-goals">Sustainable development goals</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/environmental">Environmental</a></li>
+																<li class="companyPage"><a href="https://www.lufthansa-cargo.com/en/ci/social">Social</a></li>
+														</ul>
+													</div>
+												</div>
+											</div>
+										</li>
+							
+	
+									
+										<li class="rNavItem companyPage">
+											<div class="hoverable">
+												<div class="hoverBox">
+													<span class="hoverableItem">Career</span>
+													<div class="hoveredNav">
+														<div class="rMobileHeaderBox">
+															<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+															<div class="rMobileNavHeader">Career</div>
+														</div>
+														<ul>
+																<li class="companyPage"><a href="https://lufthansagroup.careers/lufthansa-cargo" target="_blank">lufthansagroup.careers</a></li>
+																<li class="companyPage"><a href="https://www.linkedin.com/company/lufthansa-group/" target="_blank">LinkedIn</a></li>
+														</ul>
+													</div>
+												</div>
+											</div>
+										</li>
+					</ul>
+			</li>
+	</ul>
+</div>
+
+<script>
+	$(document).ready(function(){
+	    $('.rNavigationWrapper ul li:nth-child(3) .openMenuItem').addClass('hide');
+		$('.rNavigationWrapper ul li:nth-child(3) .closeMenuItem ').removeClass('hide');
+		$(".showMore").click(function () {
+			$(this).parent().parent().siblings(".rExtendedNav").slideDown();
+			$(this).hide();
+			$(this).siblings('.showLess').show();
+			setNavItemWidth();
+		});
+		$(".showLess").click(function () { 
+			$(this).parent().parent().siblings(".rExtendedNav").slideUp();
+			$(this).hide();
+			$(this).siblings('.showMore').show();
+		});
+        if($(window).width() < 992) {
+            $(".hoverableItem").click(function () {
+				$(".rMobileOverlay").css('opacity', '0');
+				$(".hoveredNav .rMobileHeaderBox").show();
+                $(this).siblings('.hoveredNav').show('slide', {direction: 'right'});
+            });
+            $("#p_p_id_com_liferay_login_web_portlet_LoginPortlet_").prependTo(".rMobileNavItemBox .loginportlet");
+            $(".rWebOverlay .loginportlet #p_p_id_com_liferay_login_web_portlet_LoginPortlet_").remove();
+            $(".fciHeaderWrapper .loginportlet #p_p_id_com_liferay_login_web_portlet_LoginPortlet_").remove();
+        } else {
+            $("#p_p_id_com_liferay_login_web_portlet_LoginPortlet_").prependTo(".rWebOverlay .loginportlet");
+            $("#p_p_id_com_liferay_login_web_portlet_LoginPortlet_").prependTo(".fciHeaderWrapper .loginportlet");
+            $(".rMobileNavItemBox .loginportlet #p_p_id_com_liferay_login_web_portlet_LoginPortlet_").remove();
+        }
+		if($(window).width() > 992) {
+			$('.hoveredNav ul li a, .clickableNav a').click(function () {
+				if (!$("ul.loginsection").length) {
+					setTimeout(function() {
+						$('.rHeaderItem.adminBtn').removeClass('blankAdminNav');
+					}, 1000);
+				}
+			});
+		}
+	});
+</script>		            </div>
+			    </div>
+			    <div class="rContainer rSearchNav header-search-nav-warapper">
+			     <div class="fullWidthInnerWrapper">
+<div class="col-sm-12 col-md-12 col-lg-6 pl-0 searchBoxWrapper">
+	<div class="search-box">
+        <button class="header-search-btn">Search <i class="lh-icon-form-search"></i></button>                          
+		<div id="vw-search" class="form">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_  portlet-static portlet-static-end decorate portlet-search-bar " id="p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_">
+		<span id="p_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Search Bar</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+<style>
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control{ 
+	color: #666;
+    padding: 6px 0;
+    border: 0;
+    border-bottom: 2px solid #666;
+    border-radius: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    font-size: 18px;
+    height: 36px !important;
+    margin-bottom: 0;
+    width: 100% !important;
+    max-width: 350px!important;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active {
+	padding: 6px 10px;
+	border-bottom-color: #52627c;
+	box-shadow: 0 0 0.6rem 0.1rem #52627c;
+}
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper,
+.eportal .pagebody .input-group-item .input-group-inset-after.form-control:focus+input+.search-bar-search-button-wrapper,
+.eportal .searchBttmNav .input-group-item .input-group-inset-after.form-control:active+input+.search-bar-search-button-wrapper{
+	right: 13px
+}
+.eportal .pagebody .search-bar-search-button-wrapper,
+.eportal .searchBttmNav .search-bar-search-button-wrapper {
+    right: 3px;
+    top: 2px;
+    width: 26px;
+    transition: all .3s ease-in-out
+}
+.eportal .pagebody .input-group.search-bar.search-bar-simple,
+.eportal .searchBttmNav .input-group.search-bar.search-bar-simple {
+	margin-top: 30px;
+}
+.eportal .pagebody .search-bar .form-group.input-group-item,
+.eportal .searchBttmNav .search-bar .form-group.input-group-item  {
+    display: inline;
+    max-width: 350px;
+}
+.eportal .pagebody .search-bar-search-button-wrapper .lexicon-icon-search,
+.eportal .searchBttmNav .search-bar-search-button-wrapper .lexicon-icon-search {
+    width: 16px;
+    height: 16px;
+}
+</style>
+
+
+
+
+
+
+
+	
+	
+	<form action="https://www.lufthansa-cargo.com/en/search" id="xqvr___fm" method="get" name="xqvr___fm">			
+
+			
+
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				<div class="search-bar">
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field search-bar-empty-search-input form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_emptySearchEnabled" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_emptySearchEnabled" type="hidden" value="false">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+					<div class="input-group search-bar-simple">
+						
+							
+							
+								<div class="input-group-item search-bar-keywords-input-wrapper form-group">
+
+											<input aria-label="Search" autocomplete="off" class="form-control input-group-inset input-group-inset-after search-bar-keywords-input" data-qa-id="searchInput" id="xqvr___q" name="q" placeholder="Search..." title="Search" type="text" value=""><span class="clearInput" style="display: none;"></span>
+											
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+		
+			
+				
+					<input class="field form-control" id="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_scope" name="_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_scope" type="hidden" value="">
+				
+			
+		
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+											<div class="input-group-inset-item input-group-inset-item-after search-bar-search-button-wrapper">
+												<button class="btn btn-monospaced btn-unstyled" type="submit" aria-label="Submit"><span class="inline-item"><svg class="lexicon-icon lexicon-icon-search" role="presentation"><use xlink:href="https://www.lufthansa-cargo.com/o/eportal-theme/images/clay/icons.svg#search"></use></svg></span></button>
+											</div>
+										</div>
+							
+						
+					</div>
+				</div>
+			
+		</form>
+<script type="module">
+import {SearchBar as ComponentModule} from '/o/portal-search-web/__liferay__/index.js';
+{
+Liferay.component('__UNNAMED_COMPONENT__4ab264b9-8bf8-d231-8a7c-835f2b8b8481', new ComponentModule({"formId":"xqvr___fm","namespace":"_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_","spritemap":"https:\/\/www.lufthansa-cargo.com\/o\/eportal-theme\/images\/clay\/icons.svg","initialKeywords":"","retainFacetSelections":false}), { destroyOnNavigate: true, portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb'});
+}
+
+</script>	
+
+
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+			
+		</div>
+	</div>
+	</div>
+		 		    </div>
+			    </div>
+				
+                    <div class="rContainer rProfileNav">
+                     <div class="fullWidthInnerWrapper">
+						<div class="rMobileHeaderBox">
+							<img class="navBackBtn" alt="Back" src="/o/eportal-theme/images/redesign-images/Back-Button.svg">
+							<div class="rMobileNavHeader">Profile</div>
+						</div>
+						<div class="container p-0">
+						   
+    <ul>
+     <li><a class="logoutLink" href="/c/portal/logout">Logout</a></li>
+	<li><a href="/en/eservices/etracking/my-shipments">My shipments</a></li>
+	<li><a href="/en/manage-template">My templates</a></li>
+	<li><a href="/en/my-submissions">My submissions</a></li>
+	<li><a href="/en/profile">My profile</a></li>
+	<li><a><b>Logged in as: </b></a></li>
+	</ul>
+
+						 </div>
+						 </div>
+					</div>
+
+					<div class="rContainer rNotificationNav">
+						<div class="fullWidthInnerWrapper">
+							<div class="rNotificationContainer">
+							</div>
+							</div>
+					   </div>
+               
+			    
+		    </header>
+		</div>
+
+	<script type="text/jscript">
+		$( document ).ready(function() {
+		   if($(window).width() > 992) {
+				if(!$("ul.loginsection").length) {
+					$(".rHeaderItem.adminBtn").removeClass('blankAdminNav');  
+				}
+				let isexternal = '0';
+				if(isexternal != '0') {
+					$('.rHeaderComponents .rHeaderItem.adminBtn').addClass('blankAdminNav');
+				}
+			}
+			var shrinkHeaderTop = 50;
+			$(window).scroll(function() {
+			var scroll = getCurrentScroll();
+				if ( scroll >= shrinkHeaderTop ) {
+					$(".fciHeaderWrapper").addClass('shrinkHeader');
+				}
+				else {
+					$(".fciHeaderWrapper").removeClass('shrinkHeader');
+				}
+			});
+			function getCurrentScroll() {
+				return window.pageYOffset;
+			}
+		});
+	</script>		<div class="eportalBreadcrumbHolder">
+            
+		</div>
+
+		<div id="content" class="container pagebody" style="min-height:481.164px!important">
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	
+		<style type="text/css">
+			.master-layout-fragment .portlet-header {
+				display: none;
+			}
+		</style>
+
+		
+
+		<div class="columns-1" id="main-content" role="main">
+	<div class="portlet-layout row">
+		<div class="col-md-12 portlet-column portlet-column-only" id="column-1">
+			<div class="portlet-dropzone portlet-column-content portlet-column-content-only" id="layout-column_column-1">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_  portlet-static portlet-static-end decorate portlet-breadcrumb " id="p_p_id_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG_">
+		<span id="p_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">Breadcrumb</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<nav aria-label="Breadcrumb" id="_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG_breadcrumbs-defaultScreen">
+	
+				
+		<div class="eportalBreadcrumb">
+		<ul class="breadcrumb breadcrumb-horizontal d-none d-md-flex desktopBreadcrumb">
+		
+
+						<li>
+							<a href="/home">Home 	  
+							</a>
+						</li>
+					
+					
+						<li class="">
+									
+
+									
+															
+                                    
+                                        <a class="breadcrumbEntry" href="https://www.lufthansa-cargo.com/en/eservices/tracking">Track</a>
+                        </li>
+					
+						<li class="">
+									
+
+									
+															
+                                    
+                                        <a class="breadcrumbEntry" href="https://www.lufthansa-cargo.com/en/eservices/etracking">eTracking</a>
+                        </li>
+					
+						<li class="active">
+                                        Tracking
+                        </li>
+		</ul>
+		<ul class="breadcrumb breadcumb-horizontal d-flex d-md-none mobileBreadcrumb">
+			<li class="active backButton">Back</li>
+		</ul>
+	</div>
+							
+<script>
+$(document).ready(function(){
+  if($('.latestCrisisHeadline').length>0 && $('.latestCrisisHeadline').text().trim()!=""){
+		var crisis_headline = $('.latestCrisisHeadline').text();
+    crisis_headline = crisis_headline.substring(0, 70);
+		$(".eportalBreadcrumb .breadcrumb li:last-child").text(crisis_headline);
+	}
+});
+</script>
+	
+</nav>
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	<div class="portlet-boundary portlet-boundary_com_liferay_journal_content_web_portlet_JournalContentPortlet_  portlet-static portlet-static-end decorate portlet-journal-content " id="p_p_id_com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt_">
+		<span id="p_com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt"></span>
+
+
+
+
+	
+
+	
+		
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+<section class="portlet" id="portlet_com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt">
+
+
+	<div class="portlet-content">
+
+		<div class="autofit-float autofit-row portlet-header">
+			<div class="autofit-col autofit-col-expand">
+				<h2 class="portlet-title-text">SHIPMENT_TRACKING</h2>
+			</div>
+
+			<div class="autofit-col autofit-col-end">
+				<div class="autofit-section">
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="visible-interaction">
+
+	
+
+	
+</div>				</div>
+			</div>
+		</div>
+
+		
+			<div class=" portlet-content-container">
+				
+
+
+	<div class="portlet-body">
+
+
+
+	
+		
+			
+				
+					
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+
+
+
+
+
+
+
+	
+
+				
+
+				
+					
+						
+
+
+	
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+		
+			
+			
+				
+					
+					
+					
+					
+
+						
+
+						
+
+							
+
+							<div class="" data-fragments-editor-item-id="20109-53902259" data-fragments-editor-item-type="fragments-editor-mapped-item">
+								
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	
+		<div class="journal-content-article " data-analytics-asset-id="SHIPMENT_TRACKING" data-analytics-asset-title="SHIPMENT_TRACKING" data-analytics-asset-type="web-content" data-analytics-web-content-resource-pk="53902259">
+
+			<div data-id="SHIPMENT_TRACKING">
+			<div class="videoOverlayConsent hide">
+<div class="consentText">External media content is blocked here. When loading or playing the embedded media content, connections to the servers of the respective provider are established. Personal data may be communicated to the provider in the process. For more information, please see our<a href="/footer/bottomnav/privacy"> data privacy statement.</a></div>
+<button class="btnConsent">Show content anyway</button></div>
+			</div>
+
+			
+		</div>
+
+		
+
+	
+
+
+
+<script>
+var sourceIdMap= {};
+$(window).load(function() {
+	let consentEnabled = 'true';
+	let allowedDomains = 'https://static.lufthansa-cargo.com';
+	let listOfAllowedDomains = allowedDomains.split(";");
+	let found=true;
+	let iframeSourceList = '[]';
+	if(consentEnabled=='true') {
+		let iframeFound = "false";
+		let articleDisplayId = "SHIPMENT_TRACKING";
+		if(iframeFound == "true") {
+			if (iframeSourceList.length > 0) {
+				found = !(listOfAllowedDomains.some(r=> iframeSourceList.includes(r)));
+			}
+			
+			if(found){
+				$('[data-id='+ articleDisplayId+']').insertAfter($('[data-analytics-asset-id='+ articleDisplayId+'] iframe'));
+				$('[data-id='+ articleDisplayId+'] .btnConsent').each(function(index){
+					$(this).attr('data-id', index++);
+				});
+				$('[data-id='+ articleDisplayId+'] .btnConsent').click(function(){
+					let clickedIndex = $(this).attr('data-id');
+					let iframesrcList = sourceIdMap["SHIPMENT_TRACKING"];
+					if(iframesrcList!=undefined && iframesrcList.length>0) {
+						$(this).parents('div').prev('iframe').attr('src', iframesrcList.split(", ")[clickedIndex].replace("[","").replace("]",""));
+						$(this).parents('.videoOverlayConsent').remove();
+					}
+				});
+				$('[data-analytics-asset-id='+ articleDisplayId+'] iframe').parent('p').addClass("videoOverlayMsg");
+				sourceIdMap[articleDisplayId]=iframeSourceList;
+				setTimeout(function(){
+					let isConsentGiven = false;
+					if(typeof utag != "undefined" && typeof utag.data["usercentrics_services_with_consent"] != "undefined" && 
+							iframeSourceList!=undefined && iframeSourceList.length>0){
+						for(let i=0;i<utag.data["usercentrics_services_with_consent"].length;i++){
+							let index = $('[data-id='+ articleDisplayId+'] .videoOverlayConsent .btnConsent').attr('data-id');
+							if(index < iframeSourceList.length && 
+									isConsentPresent(iframeSourceList.split(", ")[index], utag.data["usercentrics_services_with_consent"][i].toLowerCase())){
+								$('[data-id='+ articleDisplayId+']').prev('iframe').attr('src', iframeSourceList.split(", ")[index].replace("[","").replace("]",""));
+								$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').remove();
+								isConsentGiven = true;
+								 break;
+							 }
+						 }
+					} 
+					if(!isConsentGiven){
+						$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').removeClass('hide');
+					}
+				}, 500);
+			}
+		}
+	}
+});
+function isConsentPresent(iframeSource, consentValue){
+	if(consentValue.trim().includes("youtube") 
+			&& iframeSource.toLowerCase().trim().includes("youtube")){
+		return true;
+	}
+	return iframeSource.toLowerCase().trim().includes(consentValue.trim());
+}
+
+window.addEventListener('UC_UI_CMP_EVENT', function (e){
+	window.addEventListener('ucEvent', function(event){
+		if(event.detail && event.detail.event == "consent_status"){
+			for (let articleDisplayId in sourceIdMap) {
+			    if (sourceIdMap.hasOwnProperty(articleDisplayId)) {
+			        let iframeSourceList = sourceIdMap[articleDisplayId];
+			        let index = $('[data-id='+ articleDisplayId+'] .videoOverlayConsent .btnConsent').attr('data-id');
+					if(index < iframeSourceList.length){
+				        $('[data-id='+ articleDisplayId+']').prev('iframe').attr('src', iframeSourceList.split(", ")[index].replace("[","").replace("]",""));
+						$('[data-id='+ articleDisplayId+'] .videoOverlayConsent').remove();
+					}
+			    }
+			}
+		}
+	});
+});
+
+
+</script>
+							</div>
+						
+					
+				
+			
+		
+	
+
+
+
+
+	
+
+	
+
+	
+
+	
+
+	
+
+
+
+
+	
+	
+					
+				
+			
+		
+	
+	
+
+
+	</div>
+
+			</div>
+		
+	</div>
+</section>
+	
+
+		
+		
+
+
+
+
+
+
+
+	</div>
+
+
+
+
+
+
+</div>
+		</div>
+	</div>
+</div>
+	
+
+
+<form action="#" aria-hidden="true" class="hide" id="hrefFm" method="post" name="hrefFm"><span></span><button hidden="" type="submit">Hidden</button></form>
+
+	
+		</div>
+
+ <ul class="stickySidebar" style="display: block;">
+    
+
+    
+    
+
+    <li class="topScroll chatBotVisible">
+        <div class="iconWrapper">
+            <img class="scrollArrowBtn" src="/o/eportal-theme/images/sprites/sprite-sheets/sprite-sidebar.svg" alt="back-to-top-icon">
+        </div>
+    </li>
+</ul>
+	</div>
+	<div id="footerdiv">
+		<footer id="footer" role="contentinfo">
+		<!-- Update this -->
+				  <div class="footer-bottom">
+<div class="container">
+<div class="row">
+<div class="col-md-10">
+<ul>
+	<li><a href="/footer/bottomnav/imprint">Imprint</a></li>
+	<li><a href="/footer/bottomnav/privacy">Privacy</a></li>
+	<li><a href="/footer/bottomnav/terms-of-use">Terms of Use</a></li>
+	<li><a href="/meta/meta/company/general-terms">General Terms</a></li>
+	<li><a href="javascript:void(0);" onclick="openCookieSetting();">Cookie Settings</a></li>
+</ul>
+</div>
+
+<div class="col-md-2"><a class="cargoIQ" href="https://www.cargoiq.org" rel="noopener noreferrer" style="display: inline;" target="_blank"><picture data-fileentryid="4510435"><source media="(max-width:128px)" srcset="/o/adaptive-media/image/4510435/Thumbnail-128x128/footerpartnericon.png?t=1687025400046"><source media="(max-width:132px) and (min-width:128px)" srcset="/o/adaptive-media/image/4510435/Preview-1000x0/footerpartnericon.png?t=1687025400046"><img alt="" src="/documents/20184/4510429/footerpartnericon.png/ef784b0d-9859-4bc1-887f-13401bce6526?t=1472562559000" data-fileentryid="4510435"></picture> </a></div>
+<script>
+            function openCookieSetting(){
+            			var languageId = themeDisplay.getLanguageId();
+            			utag.gdpr.showConsentPreferences(languageId.split('_')[0]);
+            }
+         </script></div>
+</div>
+</div>
+
+<div class="footer-copyright footer-social">
+<div class="container">
+<div class="row"><span>© Lufthansa Cargo</span>
+
+<ul class="footer-social">
+	<li><a class="headicon facebook-icon" href="https://www.facebook.com/lufthansacargoag" rel="noopener noreferrer" target="_blank">&nbsp;</a></li>
+	<li><a class="headicon youtube-icon" href="https://www.youtube.com/user/LHCargoAG" rel="noopener noreferrer" target="_blank">&nbsp;</a></li>
+	<li><a class="headicon insta-icon" href="https://www.instagram.com/lufthansacargoag/" rel="noopener noreferrer" target="_blank">&nbsp;</a></li>
+	<li><a class="headicon linkedin-icon" href="https://www.linkedin.com/company/lufthansa-cargo" rel="noopener noreferrer" target="_blank">&nbsp;</a></li>
+</ul>
+</div>
+</div>
+</div>
+<style type="text/css">.eportal #footer .footer-bottom {
+	background-color: rgb(245,245,245);
+	padding: 33.0px 0;
+}
+.eportal #footer .footer-bottom ul li a {
+	font-size: 16.0px !important;
+	color: rgb(5,22,77) !important;
+}
+.eportal #footer .footer-copyright {
+	background-color: rgb(5,22,77);
+	padding: 35.0px 0;
+	width: 100.0%;
+}
+.eportal #footer .footer-copyright span {
+	color: rgb(255,255,255);
+	font-size: 16.0px;
+	padding-top: 6.0px;
+}
+.eportal #footer .footer-copyright ul {
+	list-style: none;
+	margin: 0;
+}
+.eportal #footer .footer-copyright ul .headicon {
+  display:inline-block;
+}
+.eportal #footer .footer-copyright ul li {
+	display: inline;
+}
+.eportal #footer .footer-copyright .container {
+	padding: 0;
+}
+.eportal #footer .footer-copyright .row {
+  justify-content:space-between;
+}
+.eportal #footer .footer-bottom a.cargoIQ {
+	float: right;
+	margin: 0;
+}
+.eportal #footer .footer-bottom {
+	line-height: 33.0px !important;
+}
+.eportal #footer .footer-bottom ul li {
+	float: left;
+	margin: 0 40.0px 0 0 !important;
+	line-height: 34.0px !important;
+}
+.eportal #footer .footer-social .headicon {
+	margin-left: 20.0px;
+}
+</style>
+
+
+
+
+    <p>
+<style type="text/css">.topScroll{
+opacity: 0;
+}
+</style>
+<script>
+// Top scroll button script
+$(document).ready(function(){
+    $("html").css('scroll-behavior', 'auto');
+	var webpage = $("body");
+	var webpage_height = webpage.height();
+	var trigger_height = webpage_height * 0.60;
+	
+	$(window).scroll(function(){
+		if ($(window).scrollTop() > (webpage_height-trigger_height)) {
+			$(".topScroll").css("opacity","1");
+		}
+		else{
+			$(".topScroll").css("opacity","0");
+		}
+
+	});
+
+   var toTop = $('.scrollArrowBtn');
+   // logic
+   toTop.on('click', function() {
+     $('html, body').animate({
+       scrollTop: $('html, body').offset().top
+       }, 1500,
+     );
+   });
+});
+</script></p>
+<script>
+$(document).ready(function() {
+    $("#spanishConsent").click(function(){
+        setCookie("spanishLangConstent", true, 365);
+        $(".spanishPopupContent").addClass('hide');
+        $("#spanishLangModal").addClass('hide');
+    });
+    var spanishConstentCookie = getCookie("spanishLangConstent");
+    console.log("spanishConstentCookie: "+spanishConstentCookie);
+    if(spanishConstentCookie === null || spanishConstentCookie=="false") {
+        $(".spanishPopupContent").removeClass('hide');
+        $("#spanishLangModal").removeClass('hide');
+    }
+});
+    function setCookie(name,value,days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+}
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0;i < ca.length;i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+    }
+    return null;
+}
+function eraseCookie(name) {   
+    document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
+    
+    
+</script>
+		</footer>
+		
+	</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style type="text/css">
+	.surveyFirstPopupCss {
+		left: auto !important;
+		top: auto !important;
+		right: 0;
+		bottom: 0;
+	}
+
+	.eportal .surveyFirstPopupCss .modal-header {
+		marfgin-left: 0 !important;
+		margin-right: 0 !important;
+	}
+	.surveyFirstPopupCss .modal-body {
+		max-height: 400px !important;
+	}
+	#neverButton {
+	    font-family: 'LufthansaTextWeb-Bold';
+	    text-decoration: underline;
+	    padding-bottom: 10px;
+	}
+
+	.eportal .btn.close {
+	    font-size: 36px;
+	    color: #05164d;
+	    opacity: 1;
+	    filter: alpha(opacity=100);
+	}
+	.eportal #popUpDialog.alreadyAccepted {
+		width: 300px !important;
+		height: 150px !important;
+	}
+	.eportal #popUpDialog.alreadyAccepted .modal-header {
+	    margin-left: 0;
+	    margin-right: 1px;
+	    height: 25px;
+	    padding: 0 5px;
+	    border-bottom: 0;
+	}
+	.eportal #popUpDialog.alreadyAccepted .modal-header h3{
+		display: none;
+	}
+	.eportal #popUpDialog .yui3-widget-bd.modal-body.dialog-iframe-bd
+	{
+	 	height: 100% !important;
+	}
+	.eportal #popUpDialog .yui3-widget-content-expanded .yui3-widget-bd modal-body.dialog-iframe-bd .dialog-iframe-node {
+		height: 100% !important;
+	}
+</style>
+
+
+
+
+
+<script>
+
+	if('false' && ("" === "true")) {
+		
+		var surveyTitle = "";
+		var surveyInternalTimer;
+		$(document).ready(function() {
+				/* If it is a time based survey */
+				if("true" == "") {
+					/* check if time survey show time achieved at a interval of 1 minute */
+					surveyInternalTimer = setInterval(checkIfSurveyDisplayTimeAchieve, 30000);
+				} else {
+					openSurveyFirstPopup(surveyTitle);
+				}
+		});
+		function checkIfSurveyDisplayTimeAchieve() {
+			
+			var userLogInTime = '0';
+			var timeAfterDisplay = parseFloat("");
+			
+			if(userLogInTime >= timeAfterDisplay) {
+				openSurveyFirstPopup(surveyTitle);
+				clearInterval(surveyInternalTimer);
+			}
+			
+		}
+		function addSmallPopupClass() {
+			$('#popUpDialog').addClass('alreadyAccepted');
+		}
+		function hideWidgetMask() {
+			$('#popUpDialog').hide();
+			$(".yui3-widget-mask").hide();
+		}
+	}
+	
+</script>
+
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+
+	
+		
+
+			
+
+			
+		
+	
+
+
+</script><script>
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	
+
+	
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+	
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+		
+            
+
+
+<script type="text/javascript">
+(function() {var $ = AUI.$;var _ = AUI._;
+	var onVote = function (event) {
+		if (window.Analytics) {
+			let title = event.contentTitle;
+
+			if (!title) {
+				const dmNode = document.querySelector(
+					'[data-analytics-file-entry-id="' + event.classPK + '"]'
+				);
+
+				if (dmNode) {
+					title = dmNode.dataset.analyticsFileEntryTitle;
+				}
+			}
+
+			Analytics.send('VOTE', 'Ratings', {
+				className: event.className,
+				classPK: event.classPK,
+				ratingType: event.ratingType,
+				score: event.score,
+				title,
+			});
+		}
+	};
+
+	var onDestroyPortlet = function () {
+		Liferay.detach('ratings:vote', onVote);
+		Liferay.detach('destroyPortlet', onDestroyPortlet);
+	};
+
+	Liferay.on('ratings:vote', onVote);
+	Liferay.on('destroyPortlet', onDestroyPortlet);
+})();
+
+	function getValueByAttribute(node, attr) {
+		return (
+			node.dataset[attr] ||
+			(node.parentElement && node.parentElement.dataset[attr])
+		);
+	}
+
+	function sendDocumentDownloadedAnalyticsEvent(anchor) {
+		var fileEntryId = getValueByAttribute(
+			anchor,
+			'analyticsFileEntryId'
+		);
+		var title = getValueByAttribute(
+			anchor,
+			'analyticsFileEntryTitle'
+		);
+		var version = getValueByAttribute(
+			anchor,
+			'analyticsFileEntryVersion'
+		);
+
+		if (fileEntryId) {
+			Analytics.send('documentDownloaded', 'Document', {
+				groupId: themeDisplay.getScopeGroupId(),
+				fileEntryId,
+				preview:
+					!!window._com_liferay_document_library_analytics_isViewFileEntry,
+				title,
+				version,
+			});
+		}
+	}
+
+	function handleDownloadClick(event) {
+		if (window.Analytics) {
+			if (event.target.nodeName.toLowerCase() === 'a') {
+				sendDocumentDownloadedAnalyticsEvent(
+					event.target
+				);
+			}
+			else if (
+				event.target.parentNode &&
+				event.target.parentNode.nodeName.toLowerCase() === 'a'
+			) {
+				sendDocumentDownloadedAnalyticsEvent(
+					event.target.parentNode
+				);
+			}
+			else {
+				var target = event.target;
+				var matchTextContent =
+					target.textContent &&
+					target.textContent.toLowerCase() ===
+						'download';
+				var matchTitle =
+					target.title && target.title.toLowerCase() === 'download';
+				var matchAction = target.action === 'download';
+				var matchLexiconIcon = !!target.querySelector(
+					'.lexicon-icon-download'
+				);
+				var matchLexiconClassName = target.classList.contains(
+					'lexicon-icon-download'
+				);
+				var matchParentTitle =
+					target.parentNode &&
+					target.parentNode.title &&
+					target.parentNode.title.toLowerCase() === 'download';
+				var matchParentLexiconClassName =
+					target.parentNode &&
+					target.parentNode.classList.contains('lexicon-icon-download');
+
+				if (
+					matchTextContent ||
+					matchTitle ||
+					matchParentTitle ||
+					matchAction ||
+					matchLexiconIcon ||
+					matchLexiconClassName ||
+					matchParentLexiconClassName
+				) {
+					var selectedFiles = document.querySelectorAll(
+						'.form .custom-control-input:checked'
+					);
+
+					selectedFiles.forEach(({value}) => {
+						var selectedFile = document.querySelector(
+							'[data-analytics-file-entry-id="' + value + '"]'
+						);
+
+						sendDocumentDownloadedAnalyticsEvent(
+							selectedFile
+						);
+					});
+				}
+			}
+		}
+	}
+
+	Liferay.once('destroyPortlet', () => {
+		document.body.removeEventListener(
+			'click',
+			handleDownloadClick
+		);
+	});
+
+	Liferay.once('portletReady', () => {
+		document.body.addEventListener(
+			'click',
+			handleDownloadClick
+		);
+	});
+
+(function() {var $ = AUI.$;var _ = AUI._;
+	var onDestroyPortlet = function () {
+		Liferay.detach('messagePosted', onMessagePosted);
+		Liferay.detach('destroyPortlet', onDestroyPortlet);
+	};
+
+	Liferay.on('destroyPortlet', onDestroyPortlet);
+
+	var onMessagePosted = function (event) {
+		if (window.Analytics) {
+			const eventProperties = {
+				className: event.className,
+				classPK: event.classPK,
+				commentId: event.commentId,
+				text: event.text,
+			};
+
+			const blogNode = document.querySelector(
+				'[data-analytics-asset-id="' + event.classPK + '"]'
+			);
+
+			const dmNode = document.querySelector(
+				'[data-analytics-file-entry-id="' + event.classPK + '"]'
+			);
+
+			if (blogNode) {
+				eventProperties.title = blogNode.dataset.analyticsAssetTitle;
+			}
+			else if (dmNode) {
+				eventProperties.title = dmNode.dataset.analyticsFileEntryTitle;
+			}
+
+			Analytics.send('posted', 'Comment', eventProperties);
+		}
+	};
+
+	Liferay.on('messagePosted', onMessagePosted);
+})();
+(function() {var $ = AUI.$;var _ = AUI._;
+	var onShare = function (data) {
+		if (window.Analytics) {
+			Analytics.send('shared', 'SocialBookmarks', {
+				className: data.className,
+				classPK: data.classPK,
+				type: data.type,
+				url: data.url,
+			});
+		}
+	};
+
+	var onDestroyPortlet = function () {
+		Liferay.detach('socialBookmarks:share', onShare);
+		Liferay.detach('destroyPortlet', onDestroyPortlet);
+	};
+
+	Liferay.on('socialBookmarks:share', onShare);
+	Liferay.on('destroyPortlet', onDestroyPortlet);
+})();
+
+if('false' && ("" === "true")) {
+
+  var popUpWindow;
+  var userId = '20161';
+  var surveyDbId = "";
+  var userLastLoginTime = '1472737411000';
+  var urlWithExternalIdAndCDB = "";
+  var actionTakenByUser = "no";
+  var selectedExternalId = "";
+  var userLanguage = "";
+
+  function openSurveyFirstPopup(popUpTitle) {
+  	  
+	  AUI().use('aui-base',
+				'aui-io-plugin-deprecated',
+				'liferay-util-window',
+	     function(A) {
+			var surveyFirstPopupContent = $('#surveyFirstPopupContent').html();
+		    saveDataThroughAjax('displayed');
+		    popUpWindow=Liferay.Util.Window.getWindow(
+				{
+					dialog: {
+						cssClass: 'surveyFirstPopupCss',
+						destroyOnClose: true,
+						destroyOnHide: true,
+						modal: false,
+						resizable: false,
+						height: 350,
+						width: 500,
+						bodyContent: '<div id="surveyFirstPopupDiv"></div>'
+					},
+					title: popUpTitle
+				}
+				).plug(
+				A.Plugin.IO,
+				{
+					autoLoad: false
+				}).render();
+				popUpWindow.show();
+				A.one('#surveyFirstPopupDiv').html(surveyFirstPopupContent);
+	});
+}
+function saveDataThroughAjax(action) {
+	  	var urlString = 'https://www.lufthansa-cargo.com' + '/c/portal/survey_popup';
+	  	urlString = urlString + '?actionPerformed=' + action;
+		urlString = urlString + '&userId=' + userId;
+		urlString = urlString + '&surveyDbId=' + surveyDbId;
+		urlString = urlString + '&userLastLoginTime=' + userLastLoginTime;
+		urlString = urlString + '&selectedExternalId=' + selectedExternalId;
+		urlString = urlString + '&userLanguage=' + userLanguage;
+		
+		AUI().io.request(urlString, {
+			method: 'POST',
+			dataType: 'json',
+			cache: false,
+			on: {
+				success: function() {
+				}
+			}
+	  	});
+}
+function actionPerformed(action) {
+	
+		actionTakenByUser = action;
+		
+			var urlString = 'https://www.lufthansa-cargo.com' + '/c/portal/survey_popup';
+		  	urlString = urlString + '?actionPerformed=' + action;
+			urlString = urlString + '&userId=' + userId;
+			urlString = urlString + '&surveyDbId=' + surveyDbId;
+			urlString = urlString + '&userLastLoginTime=' + userLastLoginTime;
+			urlString = urlString + '&selectedExternalId=' + selectedExternalId;
+			urlString = urlString + '&userLanguage=' + userLanguage;
+			
+			popUpWindow.destroy();
+			openSurveyPopup(urlString);
+			$('#popUpDialog .close.close-content').on('click', function () {
+				console.log('close clicked!!');
+				$('#popUpDialog.dialog-iframe-modal').removeClass('show');
+			});
+}
+function openSurveyPopup(urlString) {
+	
+  AUI().use( 'aui-io',
+     'aui-dialog',
+     function(A) {
+
+	     Liferay.Util.openWindow(
+	              {
+	                   dialog: {
+	                       destroyOnClose: true,
+	                       destroyOnHide: true,
+	                       cache: false,
+	                       modal: true,
+			               height: 800,
+			               width: 1296,
+			               close: true
+	                  },
+	                  title: surveyTitle,
+	                  id:'popUpDialog',
+	                  uri: urlString
+       			});
+	        Liferay.provide(
+	               window,
+	               'close',
+	               function(popupIdToClose) {
+	                var popupDialog = Liferay.Util.Window.getById(popupIdToClose);
+	                popupDialog.destroy();
+	               }, 
+	               ['aui-base','aui-dialog','aui-dialog-iframe','liferay-util-window']
+	         );
+   });  
+}
+
+}
+  
+
+
+			AUI().ready('aui-dialog', function(A) {
+			 if( $('.close').length && A.DialogManager && A.DialogManager!=null && A.DialogManager!=undefined) 
+				{
+						A.one('.close').on('click', function() {
+							A.DialogManager.hideAll();
+						});
+				}
+				
+			});
+		
+(function() {var $ = AUI.$;var _ = AUI._;
+	function showDialog(uri, title) {
+		Liferay.Util.openModal({
+			id: 'sharingDialog',
+			iframeBodyCssClass: 'sharing-dialog',
+			height: '475px',
+			size: 'md',
+			title: title,
+			url: uri,
+		});
+	}
+
+	var Sharing = {
+		copyLink: function (link) {
+			navigator.clipboard.writeText(link);
+
+			Liferay.Util.openToast({
+				message:
+					'Copied link to the clipboard.',
+			});
+		},
+
+		manageCollaborators: function (classNameId, classPK) {
+			var manageCollaboratorsParameters = {
+				classNameId: classNameId,
+				classPK: classPK,
+			};
+
+			var manageCollaboratorsURL = Liferay.Util.PortletURL.createPortletURL(
+				'https://www.lufthansa-cargo.com/en/group/guest/~/control_panel/manage?p_p_id=com_liferay_sharing_web_portlet_ManageCollaboratorsPortlet&p_p_lifecycle=0&p_p_state=pop_up&p_p_auth=0To7CESN',
+				manageCollaboratorsParameters
+			);
+
+			showDialog(
+				manageCollaboratorsURL.toString(),
+				'Manage Collaborators'
+			);
+		},
+
+		share: function (classNameId, classPK, title) {
+			var sharingParameters = {
+				classNameId: classNameId,
+				classPK: classPK,
+			};
+
+			var sharingURL = Liferay.Util.PortletURL.createPortletURL(
+				'https://www.lufthansa-cargo.com/en/group/guest/~/control_panel/manage?p_p_id=com_liferay_sharing_web_portlet_SharingPortlet&p_p_lifecycle=0&p_p_state=pop_up&p_p_auth=rBfItGhU',
+				sharingParameters
+			);
+
+			showDialog(sharingURL.toString(), title);
+		},
+	};
+
+	Liferay.Sharing = Sharing;
+})();
+
+	if (window.svg4everybody && Liferay.Data.ICONS_INLINE_SVG) {
+		svg4everybody(
+			{
+				polyfill: true,
+				validate: function (src, svg, use) {
+					return !src || !src.startsWith('#');
+				}
+			}
+		);
+	}
+
+(function() {var $ = AUI.$;var _ = AUI._;
+	Liferay.Util.delegate(
+		document,
+		'focusin',
+		'.portlet',
+		function(event) {
+			event.delegateTarget.closest('.portlet').classList.add('open');
+		}
+	);
+
+	Liferay.Util.delegate(
+		document,
+		'focusout',
+		'.portlet',
+		function(event) {
+			event.delegateTarget.closest('.portlet').classList.remove('open');
+		}
+	);
+})();
+
+	// <![CDATA[
+
+		
+
+		Liferay.currentURL = '\x2fen\x2feservices\x2fetracking\x2ftracking\x2f-\x2fawb\x2f020\x2f00958171\x3fsearchFilter\x3dawb';
+		Liferay.currentURLEncoded = '\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb';
+
+	// ]]>
+
+
+		// <![CDATA[
+			(function() {
+				if($(window).width() > 992) {
+	if (!$("ul.loginsection").length) {
+		setTimeout(function() {
+			$('.rHeaderItem.adminBtn').removeClass('blankAdminNav');
+		}, 1000);
+	}
+} else {
+    $(".navBackBtn").click(function () {
+        if($(this).parent().parent()) {
+            $(this).parent().parent().hide('slide', {direction: 'right'});
+            $(".rContainer.rMainNav").css('overflow-y', 'auto');
+        } else {
+            $(this).parent().hide('slide', {direction: 'right'});
+            $(".rContainer.rMainNav").css('overflow-y', 'auto');
+        }
+    });
+    $(".hoverableItem").click(function () {
+        $(this).siblings('.hoveredNav').show('slide', {direction: 'right'});
+        $(".rContainer.rMainNav").css('overflow-y', 'unset');
+    });
+}
+if($("#content #footerdiv").length>0){
+ $("#footerdiv").insertAfter($("#content"));
+}
+$(".rMainNav .hoveredNav a").each(function(){
+    if( $(this).attr('href').includes("#")){
+        $(this).attr('href', $(this).attr('href').replace("#",''))
+    }
+});
+setTimeout(function(){
+    if($('.fciHeaderWrapper').length) {
+        $('.redesignBody').addClass('compPages');
+    }
+ if (typeof utag !== 'undefined') {
+    utag.gdpr={};
+    utag.gdpr.showConsentPreferences=function(x){window.openCookieSetting(x);};
+  }
+}, 100);
+var order =0;
+var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+            var hasClass = [].some.call(mutation.addedNodes, function(el) {
+            if(el.classList){
+                return el.classList.contains('modal-focused')
+            }
+            });
+            if (hasClass) {
+                $('.modal').removeClass('yui3-widget');
+            }
+        }
+    });
+});
+
+var observerConfig = {
+    attributes: true,
+    childList: true,
+    characterData: true
+};
+ 
+observer.observe(document.body, observerConfig);
+
+
+var customCSS = `
+        <style id="custom-css">
+            .eportal .rBellIconBtn .lcagBadge > .lcagBadge {
+                right: auto;
+                top: auto;
+                min-width: 0;
+                width: 0;
+                display: contents;
+            }
+        </style>
+    `;
+
+    // Check if the style is already added, if not, append it
+    if (!$('#custom-css').length) {
+        $("head").append(customCSS);
+    }
+			})();
+		// ]]>
+	
+(function() {var $ = AUI.$;var _ = AUI._;import(Liferay.ThemeDisplay.getPathContext() + '/o/frontend-js-web/__liferay__/index.js').then(
+           ({openToast}) => {
+		    AUI().use(
+			'liferay-session',
+			function() {
+				Liferay.Session = new Liferay.SessionBase(
+					{
+						autoExtend: true,
+						redirectOnExpire: true,
+						redirectUrl: '\x2fhome\x3fmenu\x3d1',
+						sessionLength: 900,
+						sessionTimeoutOffset: false,
+						warningLength: 0
+					}
+				);
+
+				
+			}
+		);
+		}
+)
+	})();
+
+	
+		Liferay.Portlet.register('com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG_',
+			portletId: 'com_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_site_navigation_breadcrumb_web_portlet_SiteNavigationBreadcrumbPortlet_INSTANCE_iEleJx76nofG\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dcolumn-1\x26p_p_col_pos\x3d0\x26p_p_col_count\x3d3\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation_',
+			portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForNewNavigation\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile_',
+			portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForMobile\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_login_web_portlet_LoginPortlet');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_login_web_portlet_LoginPortlet_',
+			portletId: 'com_liferay_login_web_portlet_LoginPortlet',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_login_web_portlet_LoginPortlet\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb\x26settingsScope\x3dportletInstance',
+			refreshURLData: {"_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName":["\/login\/login"],"_com_liferay_login_web_portlet_LoginPortlet_":[""],"searchFilter":["awb"]}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_',
+			portletId: 'com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet_',
+			portletId: 'com_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_site_navigation_language_web_portlet_SiteNavigationLanguagePortlet\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb_',
+			portletId: 'com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_INSTANCE_templateSearchForWeb\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 2,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt_',
+			portletId: 'com_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_liferay_journal_content_web_portlet_JournalContentPortlet_INSTANCE_HGwlrvBNNALt\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dcolumn-1\x26p_p_col_pos\x3d2\x26p_p_col_count\x3d3\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+	
+		Liferay.Portlet.register('com_lhcargo_eportal_information_alert');
+	
+
+	Liferay.Portlet.onLoad(
+		{
+			canEditTitle: false,
+			columnPos: 0,
+			isStatic: 'end',
+			namespacedId: 'p_p_id_com_lhcargo_eportal_information_alert_',
+			portletId: 'com_lhcargo_eportal_information_alert',
+			refreshURL: '\x2fen\x2fc\x2fportal\x2frender_portlet\x3fp_l_id\x3d31556440\x26p_p_id\x3dcom_lhcargo_eportal_information_alert\x26p_p_lifecycle\x3d0\x26p_t_lifecycle\x3d0\x26p_p_state\x3dnormal\x26p_p_mode\x3dview\x26p_p_col_id\x3dnull\x26p_p_col_pos\x3dnull\x26p_p_col_count\x3dnull\x26p_p_static\x3d1\x26p_p_isolated\x3d1\x26currentURL\x3d\x252Fen\x252Feservices\x252Fetracking\x252Ftracking\x252F-\x252Fawb\x252F020\x252F00958171\x253FsearchFilter\x253Dawb',
+			refreshURLData: {}
+		}
+	);
+
+
+</script><script type="module">
+import {InfoItemActionHandler as ComponentModule} from '/o/layout-taglib/__liferay__/index.js';
+AUI().use(
+  'liferay-menu',
+function(A) {
+{
+Liferay.component('infoItemActionComponent', new ComponentModule({"executeInfoItemActionURL":"https:\/\/www.lufthansa-cargo.com\/en\/c\/portal\/execute_info_item_action?p_l_mode=view&plid=31556440","namespace":"","spritemap":"https:\/\/www.lufthansa-cargo.com\/o\/eportal-theme\/images\/clay\/icons.svg"}), { destroyOnNavigate: true, portletId: ''});
+}
+(function() {
+var $ = AUI.$;var _ = AUI._;
+	new Liferay.Menu();
+
+	var liferayNotices = Liferay.Data.notices;
+
+	for (var i = 0; i < liferayNotices.length; i++) {
+		Liferay.Util.openToast(liferayNotices[i]);
+	}
+
+})();
+});
+
+</script>
+
+
+
+
+
+
+
+
+
+<script src="https://www.lufthansa-cargo.com/o/eportal-theme/js/main.js?browserId=chrome&amp;minifierType=js&amp;languageId=en_US&amp;t=1773836220000" type="text/javascript"></script>
+
+
+
+
+<script type="module">
+import {main} from '/o/frontend-js-tabs-support-web/__liferay__/index.js';
+{
+main();
+}
+
+</script><script type="module">
+import {main} from '/o/frontend-js-dropdown-support-web/__liferay__/index.js';
+{
+main();
+}
+
+</script><script type="module">
+import {main} from '/o/frontend-js-alert-support-web/__liferay__/index.js';
+{
+main();
+}
+
+</script><script type="module">
+import {main} from '/o/frontend-js-collapse-support-web/__liferay__/index.js';
+{
+main();
+}
+
+</script><script type="module">
+import {main} from '/o/frontend-js-tooltip-support-web/__liferay__/index.js';
+{
+main();
+}
+
+</script><script type="text/javascript">
+Liferay.CustomDialogs = {enabled: false};
+
+</script><script>
+
+</script><script type="module">
+import {runThirdPartyCookiesInterval} from '/o/cookies-banner-web/__liferay__/index.js';
+{
+runThirdPartyCookiesInterval();
+}
+
+</script>
+<script defer="" src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon="{&quot;rayId&quot;:&quot;9e415066cc302253&quot;,&quot;serverTiming&quot;:{&quot;name&quot;:{&quot;cfExtPri&quot;:true,&quot;cfEdge&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfL4&quot;:true,&quot;cfSpeedBrain&quot;:true,&quot;cfCacheStatus&quot;:true}},&quot;version&quot;:&quot;2025.9.1&quot;,&quot;token&quot;:&quot;855f92dddc724b22869ccefe25eeaa42&quot;}" crossorigin="anonymous"></script>
+
+<script>
+	$ = jQuery.noConflict();
+	Portal = window.Portal || {};
+	var restrictedExtentions = 'ACTION,APK,BAT,BIN,CMD,COM,COMMAND,EXE,CPL,CSH,GADGET,INF1,INS,INX,IPA,ISU,JOB,JSE,KSH,LNK,MSC,MSI,MSP,MST,OSX,OUT,PAF,PHP,PIF,PRG,PS1,REG,RGS,RUN,SCR,SCT,SHB,SHS,U3P,VB,VBE,VBS,VBSCRIPT,WORKFLOW,WS,WSF,WSH';
+
+	var filterExtensions = restrictedExtentions.split(",");
+
+
+
+	Portal.filterExtensions=filterExtensions;
+	Object.preventExtensions( Portal );
+	Object.freeze( Portal );
+	
+if (typeof CKEDITOR !== 'undefined') {
+  CKEDITOR.on('dialogDefinition', function (ev) {
+    if (ev.data.name === 'link') {
+      var dialogDefinition = ev.data.definition;
+      var infoTab = dialogDefinition.getContents('info');
+
+      if (infoTab) {
+        var linkTypeField = infoTab.get('linkType');
+
+        if (linkTypeField) {
+          linkTypeField.items.push(
+            ['Download Link', 'downloadlink'],
+            ['Phone Link', 'phonelink'],
+            ['External Link', 'externallink'],
+            ['Email Link', 'emaillink'],
+			['Navigation Link', 'navigationLink']
+          );
+        }
+      }
+
+      // Hook into the dialog's onOk event
+      dialogDefinition.onOk = function () {
+        let dialog = this;
+        let editor = dialog.getParentEditor();
+
+        let linkType = dialog.getValueOf('info', 'linkType');
+        let url = dialog.getValueOf('info', 'url');
+        let linkElement = dialog.getSelectedElement();
+
+        // If editing an existing link, reuse it — else create a new one
+        if (!linkElement) {
+          linkElement = CKEDITOR.dom.element.createFromHtml(
+            '<a href="' + url + '">' + url + '</a>',
+            editor.document
+          );
+        } else {
+          linkElement.setAttribute('href', url);
+        }
+
+        // Remove any previously assigned class attribute
+        linkElement.removeAttribute('class');
+
+        // Add classes based on link type
+        switch (linkType) {
+          case 'downloadlink':
+          linkElement.$.classList.add('lcagLink', 'downloadIcon', 'functional');
+          	break;
+          case 'phonelink':
+          linkElement.$.classList.add('lcagLink', 'phoneIcon', 'functional');
+          	break;
+          case 'externallink':
+            linkElement.$.classList.add('lcagLink', 'externalIcon', 'navigational');
+            break;
+          case 'emaillink':
+            linkElement.$.classList.add('lcagLink', 'mailIcon', 'navigational');
+            break;
+		  case 'navigationLink':
+            linkElement.$.classList.add('lcagLink', 'hyperlinkIcon', 'navigational');
+            break;
+        }
+      };
+    }
+  });
+}	
+
+var optionalConfigLabel= "";
+	var optnField= 'true';
+	if(optnField == "true"){
+		 optionalConfigLabel= 'optional';
+	}else{
+		 optionalConfigLabel= "";
+	}
+</script>
+
+
+		
+	
+
+<div id="usercentrics-root" data-created-at="1774812888788" style=""></div></div><div class="lfr-spa-loading-bar"></div><div id="tooltipContainer" class="lfr-tooltip-scope"></div><div id="yui3-css-stamp" class=""></div><iframe id="uc-cross-domain-bridge" src="https://app.usercentrics.eu/browser-sdk/4.60.0/cross-domain-bridge.html" style="display: none;"></iframe><style id="uc-overflow-style">.overflowHidden {overflow: hidden !important;}</style></body></html>

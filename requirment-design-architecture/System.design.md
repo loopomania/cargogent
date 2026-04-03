@@ -65,7 +65,10 @@ Persist per user (e.g. on `users` or `user_notification_settings`):
 - Same status model
 - Query:
   - Import: MAWB + HAWB
-  - Export: MAWB or fallback HAWB
+  - Export: For shipments originating from Israel, CargoGent queries Maman Ground Services directly via HAWB. 
+    * Maman returns the authentic piece count and weight for the HAWB.
+    * This dynamically overrides the consolidated MAWB's pieces/weight in the unified `TrackingResponse`.
+    * Synthetic events detailing storage type, customs status, and billing are prepended.
 
 ## Status Mapping
 Unified ground status:

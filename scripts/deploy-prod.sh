@@ -42,16 +42,13 @@ rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
   --exclude '*.pyc' \
   "$REPO_ROOT/" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/"
 
-# 3. Check for .env-prod on server
-echo "Checking for .env-prod on server..."
-ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "[ -f ${APP_DIR}/.env-prod ]" || {
-  if [ -f "$REPO_ROOT/.env-prod" ]; then
-    echo "Warning: .env-prod not found on server. Copying local .env-prod to server..."
-    rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$REPO_ROOT/.env-prod" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/.env-prod"
-  else
-    echo "Warning: .env-prod not found on server and missing locally."
-  fi
-}
+# 3. Sync .env-prod to server (always, to pick up new keys)
+echo "Syncing .env-prod to server..."
+if [ -f "$REPO_ROOT/.env-prod" ]; then
+  rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$REPO_ROOT/.env-prod" "${SERVER_USER}@${SERVER_IP}:${APP_DIR}/.env-prod"
+else
+  echo "Warning: .env-prod not found locally — skipping sync."
+fi
 
 # 4. Ensure Docker Compose on server, then up
 echo "Building and starting containers..."
