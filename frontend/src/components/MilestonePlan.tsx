@@ -217,66 +217,117 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
 
 // ─── Milestone node card ────────────────────────────────────────────────────────
 
+function MilestoneDatePair({ actual, estimated }: { actual?: string | null, estimated?: string | null }) {
+  if (!actual && !estimated) return null;
+  
+  const hasAct = !!actual;
+  const hasEst = !!estimated;
+  
+  // Normalize for comparison
+  const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
+  const same = hasAct && hasEst && norm(actual) === norm(estimated);
+  
+  if (same || (hasAct && !hasEst)) {
+     return (
+       <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.green, textAlign: "center", lineHeight: 1.4, fontWeight: 600 }}>
+         {fmtDate(actual)}
+       </span>
+     );
+  }
+  
+  if (!hasAct && hasEst) {
+     return (
+       <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.amber, textAlign: "center", lineHeight: 1.4 }}>
+         {fmtDate(estimated)}
+       </span>
+     );
+  }
+  
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+       <span style={{ fontFamily: "monospace", fontSize: "0.6rem", color: C.amber, opacity: 0.9 }}>
+         {fmtDate(estimated)}
+       </span>
+       <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.green, fontWeight: 600 }}>
+         {fmtDate(actual)}
+       </span>
+    </div>
+  );
+}
+
 function MilestoneNode({
   code, label, desc, done, active, event,
 }: {
   code: string; label: string; desc: string; done: boolean; active: boolean;
   event?: TrackingEvent | null;
 }) {
+  let actual = event?.date;
+  let estimated = event?.estimated_date;
+  
+  if (code === "DEP" && !estimated) estimated = event?.departure_date;
+  if (code === "ARR" && !estimated) estimated = event?.arrival_date;
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      gap: "0.4rem", minWidth: 80, maxWidth: 100,
+      minWidth: 100, maxWidth: 110, height: 230, // Fixed height container
     }}>
-      {/* Airport / Station */}
-      <span style={{
-        fontFamily: "monospace", fontSize: "0.8rem", fontWeight: 700,
-        color: done ? C.green : active ? C.amber : C.dim,
-        letterSpacing: "0.05em",
-      }}>
-        {event?.location ?? "—"}
-      </span>
-
-      {/* Icon circle */}
-      <MilestoneIcon code={code} done={done} active={active} />
-
-      {/* Code */}
-      <span style={{
-        fontFamily: "monospace", fontSize: "0.75rem", fontWeight: 700,
-        color: done ? C.green : active ? C.amber : C.dim,
-      }}>{label}</span>
-
-      {/* Description */}
-      <span style={{ fontSize: "0.6rem", color: C.dim2, textAlign: "center", lineHeight: 1.3 }}>
-        {desc}
-      </span>
-
-      {/* Flight number if available */}
-      {event?.flight && (
+      {/* 1. Location / Station */}
+      <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{
-          fontFamily: "monospace", fontSize: "0.68rem", fontWeight: 600,
-          color: C.accent, background: "rgba(59,130,246,0.12)",
-          borderRadius: 4, padding: "1px 5px",
-        }}>{event.flight}</span>
-      )}
-
-      {/* ETD/ATD for departure nodes, ETA/ATA for arrival */}
-      {event?.date && (
-        <span style={{
-          fontFamily: "monospace", fontSize: "0.63rem",
-          color: done ? C.green : C.amber,
-          textAlign: "center", lineHeight: 1.4,
+          fontFamily: "monospace", fontSize: "0.8rem", fontWeight: 700,
+          color: done ? C.green : active ? C.amber : C.dim,
+          letterSpacing: "0.05em",
         }}>
-          {fmtDate(event.date)}
+          {event?.location ?? "—"}
         </span>
-      )}
+      </div>
 
-      {/* Pieces */}
-      {event?.pieces && (
-        <span style={{ fontSize: "0.6rem", color: C.dim }}>
-          {event.pieces} pcs
+      {/* 2. Icon circle */}
+      <div style={{ height: 62, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <MilestoneIcon code={code} done={done} active={active} />
+      </div>
+
+      {/* 3. Label (Milestone name) */}
+      <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "0.5rem" }}>
+        <span style={{
+          fontFamily: "monospace", fontSize: "0.75rem", fontWeight: 700,
+          color: done ? C.green : active ? C.amber : C.dim,
+          textAlign: "center", lineHeight: 1.2,
+        }}>{label}</span>
+      </div>
+
+      {/* 4. Description & Flight number (Variable Middle) */}
+      <div style={{ 
+        flexGrow: 1, maxHeight: 50, // This section swallows the variability
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: "0.2rem", padding: "0 4px", overflow: "hidden"
+      }}>
+        <span style={{ fontSize: "0.6rem", color: C.dim2, textAlign: "center", lineHeight: 1.2 }}>
+          {desc}
         </span>
-      )}
+        {event?.flight && (
+          <span style={{
+            fontFamily: "monospace", fontSize: "0.65rem", fontWeight: 600,
+            color: C.accent, background: "rgba(59,130,246,0.12)",
+            borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap"
+          }}>{event.flight}</span>
+        )}
+      </div>
+
+      {/* 5. Date (Anchor) */}
+      <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <MilestoneDatePair actual={actual} estimated={estimated} />
+      </div>
+
+      {/* 6. Pieces (Bottom Anchor) */}
+      <div style={{ height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {event?.pieces && (
+          <span style={{ fontSize: "0.6rem", color: C.dim, fontWeight: 500 }}>
+            {event.pieces} pcs
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -312,7 +363,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
   elements.push(
     <MilestoneNode 
       key="origin-ground"
-      code="RCS" label="Ground services received" desc={`Origin: ${origin}`}
+      code="RCS" label="Ground service" desc={`Origin: ${origin}`}
       done={originDone} active={originDone && !presentCodes.has("DEP")}
       event={originEv ? { ...originEv, location: origin } as any : { location: origin } as any}
       
@@ -340,7 +391,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
         key={`takeoff-${i}`}
         code="DEP" label="Take off" desc={leg.flightNo ? `Flight ${leg.flightNo}` : "Flight"}
         done={takeOffDone} active={takeOffDone && !landingDone}
-        event={depEv ? { ...depEv, location: leg.from } as any : { location: leg.from } as any}
+        event={depEv ? { ...depEv, location: leg.from } as any : { location: leg.from, date: leg.atd || leg.etd } as any}
         
       />
     );
@@ -357,7 +408,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
       />
     );
 
-    // If it's not the last leg, insert an intermediate "Ground services received"
+    // If it's not the last leg, insert an intermediate "Ground service"
     if (i < legs.length - 1) {
        const transitCodes = ["RCF", "NFD", "RCS"];
        const transitEvs = events.filter(e => e.location === leg.to);
@@ -371,7 +422,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
        elements.push(
          <MilestoneNode 
            key={`transit-ground-${i}`}
-           code="RCF" label="Ground services received" desc={`Transit: ${leg.to}`}
+           code="RCF" label="Ground service" desc={`Transit: ${leg.to}`}
            done={transitDone} active={transitDone && !nextLegTakeOff}
            event={transitEv ? { ...transitEv, location: leg.to } as any : { location: leg.to } as any}
            
@@ -389,7 +440,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
     elements.push(
       <MilestoneNode 
         key="dest-ground"
-        code="DLV" label="Ground service delivered" desc="Final Delivery"
+        code="DLV" label="Ground service" desc="Final Delivery"
         done={destDone} active={destDone}
         event={destEv ? { ...destEv, location: destination } as any : { location: destination } as any}
         

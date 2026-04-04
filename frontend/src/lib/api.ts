@@ -44,6 +44,7 @@ export interface TrackingEvent {
   release_date?: string;
   customs?: string;
   extended_sm?: string;
+  estimated_date?: string;
   source: string;
 }
 
