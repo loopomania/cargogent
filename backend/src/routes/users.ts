@@ -16,6 +16,48 @@ const router = Router();
 // Only Admins can manage users
 router.use(authOptional, requireAdmin);
 
+/** Build the styled HTML email body */
+function buildEmailHtml(
+  name: string,
+  inviteUrl: string,
+  flowType: "invite" | "reset"
+): { subject: string; html: string } {
+  const greeting = name ? `Hi ${name},` : "Hi there,";
+  const isInvite = flowType === "invite";
+
+  const subject = isInvite
+    ? "Welcome to CargoGent – Set Up Your Account"
+    : "CargoGent – Password Reset Request";
+
+  const heading = isInvite ? "You've been invited 🎉" : "Reset your password 🔐";
+  const bodyText = isInvite
+    ? "An administrator has created a CargoGent account for you. Click the button below to set your password and get started."
+    : "We received a request to reset your CargoGent password. Click the button below to choose a new password.";
+  const buttonText = isInvite ? "Set Your Password →" : "Reset My Password →";
+  const buttonGradient = isInvite
+    ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+    : "linear-gradient(135deg,#f59e0b,#ef4444)";
+  const footerText = isInvite
+    ? "If you didn't expect this invitation, you can safely ignore this email. This link will expire after 24 hours."
+    : "If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.";
+
+  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#0f1117;color:#e2e8f0;border-radius:12px">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="font-size:28px;font-weight:700;color:#ffffff;margin:0">CargoGent</h1>
+    <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Cargo Intelligence Platform</p>
+  </div>
+  <h2 style="font-size:20px;font-weight:600;color:#ffffff;margin:0 0 12px">${heading}</h2>
+  <p style="color:#cbd5e1;line-height:1.6;margin:0 0 8px">${greeting}</p>
+  <p style="color:#cbd5e1;line-height:1.6;margin:0 0 24px">${bodyText} This link expires in <strong style="color:#fff">24 hours</strong>.</p>
+  <div style="text-align:center;margin:32px 0">
+    <a href="${inviteUrl}" style="display:inline-block;background:${buttonGradient};color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;letter-spacing:0.3px">${buttonText}</a>
+  </div>
+  <p style="color:#4b5563;font-size:12px;line-height:1.6;border-top:1px solid #1f2937;padding-top:16px;margin:0">${footerText}</p>
+</div>`;
+
+  return { subject, html };
+}
+
 /** Helper: fire n8n webhook or fall back to SMTP */
 async function sendUserEmail(
   email: string,
@@ -23,25 +65,19 @@ async function sendUserEmail(
   inviteUrl: string,
   flowType: "invite" | "reset"
 ) {
+  const { subject, html } = buildEmailHtml(name, inviteUrl, flowType);
+
   if (config.n8nInviteWebhookUrl) {
+    // Send pre-built HTML to n8n — no expression interpolation needed
     const res = await fetch(config.n8nInviteWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, inviteUrl, flow_type: flowType }),
+      body: JSON.stringify({ email, subject, html_body: html, flow_type: flowType }),
     });
     if (!res.ok) throw new Error(`n8n webhook failed: ${res.status}`);
   } else {
     // SMTP fallback for local dev
-    const subject =
-      flowType === "invite"
-        ? "Welcome to CargoGent – Set Up Your Account"
-        : "CargoGent – Password Reset";
-    const greeting = name ? `Hi ${name},` : "Hi,";
-    const body =
-      flowType === "invite"
-        ? `<p>${greeting}</p><p>You've been invited to CargoGent. Click below to set your password (link valid 24 hours):</p><p><a href="${inviteUrl}">${inviteUrl}</a></p>`
-        : `<p>${greeting}</p><p>Click below to reset your CargoGent password (link valid 24 hours):</p><p><a href="${inviteUrl}">${inviteUrl}</a></p><p>If you did not request this, ignore this email.</p>`;
-    await sendMail(email, subject, body);
+    await sendMail(email, subject, html);
   }
 }
 
