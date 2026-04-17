@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { trackByAwb, trackByAirline, type TrackingEvent, type TrackingResponse } from "../lib/api";
 import MilestonePlan from "../components/MilestonePlan";
 
@@ -18,23 +19,31 @@ const AIRLINES = [
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function parseEventDate(ev: TrackingEvent): Date {
-  // Priority: date > departure_date > arrival_date > reception_date > release_date
-  const raw =
+  const raw = (
     ev.date ||
     ev.departure_date ||
     ev.arrival_date ||
     ev.reception_date ||
     ev.release_date ||
-    "";
+    ""
+  ).trim();
   if (!raw) return new Date(0);
 
-  // "12/02/26 03:28" → dd/mm/yy hh:mm
+  // ISO or YYYY-MM-DD (e.g., United, Maman)
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (iso) {
+    const [, y, m, d, hh = "00", mi = "00", ss = "00"] = iso;
+    return new Date(`${y}-${m}-${d}T${hh}:${mi}:${ss}`);
+  }
+
+  // DD/MM/YY HH:MM (Delta, Lufthansa, etc.)
   const ddmmyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
   if (ddmmyy) {
     const [, dd, mm, yy, hh = "00", mi = "00"] = ddmmyy;
     return new Date(`20${yy}-${mm}-${dd}T${hh}:${mi}:00`);
   }
-  // "11 FEB 09:42"
+
+  // DD MON HH:MM
   const ddmon = raw.match(/^(\d{1,2})\s+([A-Z]{3})(?:\s+(\d{2}:\d{2}))?/i);
   if (ddmon) {
     const months: Record<string, string> = {
@@ -46,7 +55,10 @@ function parseEventDate(ev: TrackingEvent): Date {
     const year = new Date().getFullYear();
     return new Date(`${year}-${m}-${ddmon[1].padStart(2, "0")}T${time}:00`);
   }
-  return new Date(0);
+
+  // Last resort: Standard JS Date
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? new Date(0) : d;
 }
 
 function extractKg(s?: string | null): number | null {
@@ -328,10 +340,13 @@ export default function AdminDashboard() {
   const [data, setData] = useState<TrackingResponse | null>(null);
   const [sortDesc, setSortDesc] = useState(true); // newest first
 
+  const [savedToList, setSavedToList] = useState(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setData(null);
+    setSavedToList(false);
     const a = awb.trim();
     if (!a) { setError("Enter AWB number"); return; }
     setLoading(true);
@@ -339,6 +354,7 @@ export default function AdminDashboard() {
       const h = hawb.trim() || undefined;
       const res = airline ? await trackByAirline(airline, a, h) : await trackByAwb(a, h);
       setData(res);
+      if (res.events && res.events.length > 0) setSavedToList(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -418,6 +434,10 @@ export default function AdminDashboard() {
     fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap",
   };
 
+  const latestEvent = data?.events.length 
+    ? [...data.events].sort((a, b) => parseEventDate(b).getTime() - parseEventDate(a).getTime())[0]
+    : null;
+
   return (
     <div>
       <style>{`@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
@@ -448,9 +468,9 @@ export default function AdminDashboard() {
           {loading ? "Querying…" : "Query"}
         </button>
       </form>
-
+ 
       {error && <p style={{ color: "var(--error)", marginBottom: "1rem" }}>{error}</p>}
-
+ 
       {/* ── Spinner ── */}
       {loading && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, marginBottom: "1.5rem" }}>
@@ -458,26 +478,34 @@ export default function AdminDashboard() {
           <span style={{ marginLeft: "1rem", color: "var(--text-muted)", fontWeight: 500 }}>Executing Live Tracking…</span>
         </div>
       )}
-
+      {/* ── Saved to Tracked List banner ── */}
+      {savedToList && !loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.65rem 1.1rem", background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", borderRadius: 8, marginBottom: "1rem", fontSize: "0.85rem" }}>
+          <span style={{ fontSize: "1rem" }}>✅</span>
+          <span style={{ color: "#16a34a", fontWeight: 500 }}>Query saved — this shipment now appears in the</span>
+          <Link to="/admin/tracked" style={{ color: "#16a34a", fontWeight: 700, textDecoration: "underline" }}>AWB Tracked List →</Link>
+        </div>
+      )}
+ 
       {data && !loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
+ 
           {/* ── 0. Milestone Plan ── */}
           <MilestonePlan data={data} />
-
+ 
           {/* ── 1. Status summary card ── */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
-            {/* Top row: route + status + timing */}
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+            {/* Top row: route + status + timing — left aligned */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "1.1rem" }}>{data.origin ?? "???"}</span>
                 <span style={{ color: "var(--accent)", fontSize: "1.3rem" }}>→</span>
                 <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "1.1rem" }}>{data.destination ?? "???"}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                <StatusBadge code={data.events.length ? sortedEvents[0]?.status_code : undefined} />
+                <StatusBadge code={latestEvent?.status_code} />
                 <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                  {sortedEvents[0]?.status ?? data.status ?? ""}
+                  {latestEvent?.status ?? data.status ?? ""}
                 </span>
               </div>
               {(() => {

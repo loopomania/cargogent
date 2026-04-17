@@ -1,0 +1,18 @@
+Testing Challenge (700) AWBs (n=10)
+
+STATISTICS:
+Maman | Import | Both MAWB and HAWB were used unchanged -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Maman | Import | Only MAWB was used -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Maman | Import | Both MAWB and HAWB prefix removed -> Count: 5, Example: MAWB: 70074334164, HAWB: EWR00676253
+Maman | Import | MAWB was used also in HAWB -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Import | Both MAWB and HAWB were used unchanged -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Import | Only MAWB was used -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Import | Both MAWB and HAWB prefix removed -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Import | MAWB was used also in HAWB -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Export | Both MAWB and HAWB were used unchanged -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Export | Only MAWB was used -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Export | Both MAWB and HAWB prefix removed -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+Swissport | Export | MAWB was used also in HAWB -> Count: 10, Example: MAWB: 70074334164, HAWB: EWR00676253
+
+Number of MAWBs that returned data: 10 out of 10
+Number of MAWBs where MORE than one query type worked: 10 out of 10

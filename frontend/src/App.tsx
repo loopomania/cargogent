@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import InviteExpired from "./pages/InviteExpired";
 import AdminDashboard from "./pages/AdminDashboard";
+import TrackedAwbsList from "./pages/TrackedAwbsList";
 import Users from "./pages/Users";
 import Logs from "./pages/Logs";
 import CustomerAwbs from "./pages/CustomerAwbs";
@@ -46,6 +47,7 @@ export default function App() {
             <Layout role="admin">
               <Routes>
                 <Route path="/" element={<AdminDashboard />} />
+                <Route path="/tracked" element={<TrackedAwbsList />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/logs" element={<Logs />} />
               </Routes>

@@ -34,6 +34,7 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://cargogent:dev@postgres:5432/cargogent
       AWBTRACKERS_URL: http://awbtrackers:8000
+      N8N_INVITE_WEBHOOK_URL: http://n8n:5678/webhook/user-email
     depends_on:
       postgres:
         condition: service_healthy

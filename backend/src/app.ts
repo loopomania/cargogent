@@ -7,6 +7,7 @@ import usersRoutes from "./routes/users.js";
 import logsRoutes from "./routes/logs.js";
 import meRoutes from "./routes/me.js";
 import alertsRoutes from "./routes/alerts.js";
+import ingestRoutes from "./routes/ingest.js";
 import { config } from "./config/index.js";
 import { ping as dbPing } from "./services/db.js";
 
@@ -47,6 +48,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/track", trackRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/alerts", alertsRoutes);
+app.use("/api/ingest", ingestRoutes);
 app.use("/api/me", meRoutes);
 
 export default app;

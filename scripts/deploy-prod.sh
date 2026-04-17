@@ -78,7 +78,7 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
       -v /app/cargogent/backend/migrations:/migrations \
       -e "DATABASE_URL=$DB_URL" \
       postgres:16-alpine sh -c \
-      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql && psql "$DATABASE_URL" -f /migrations/005_add_is_protected.sql && psql "$DATABASE_URL" -f /migrations/006_hawb_mawb_lines.sql' \
+      'psql "$DATABASE_URL" -f /migrations/001_tenants.sql && psql "$DATABASE_URL" -f /migrations/002_users.sql && psql "$DATABASE_URL" -f /migrations/003_query_logs.sql && psql "$DATABASE_URL" -f /migrations/004_add_user_name.sql && psql "$DATABASE_URL" -f /migrations/005_add_is_protected.sql && psql "$DATABASE_URL" -f /migrations/006_hawb_mawb_lines.sql && psql "$DATABASE_URL" -f /migrations/007_ingest_query_rework.sql' \
       && echo "Migrations applied." || echo "Warning: Some migrations may have failed (idempotent — check logs)."
 
     # Sync admin credentials from .env into DB on every deploy (migration uses ON CONFLICT DO NOTHING)
@@ -91,6 +91,17 @@ ssh -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "bash -s" << 'REMO
   else
     echo "Warning: DATABASE_URL not found in .env — skipping migrations."
   fi
+
+  echo "Skipping n8n workflow auto-import to preserve manual Active toggles."
+  #  if [ -d "/app/cargogent/n8n-workflows" ] || [ -d "/app/cargogent/backend/n8n_workflows" ]; then
+  #    for f in /app/cargogent/n8n-workflows/*.json /app/cargogent/backend/n8n_workflows/*.json; do
+  #      if [ -f "$f" ]; then
+  #        echo "Importing $(basename "$f")..."
+  #        docker cp "$f" cargogent-n8n-1:"/tmp/$(basename "$f")"
+  #        docker exec cargogent-n8n-1 n8n import:workflow --input="/tmp/$(basename "$f")" || echo "Warning: Workflow import failed for $f"
+  #      fi
+  #    done
+  #  fi
 
 REMOTE
 

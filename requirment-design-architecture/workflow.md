@@ -22,7 +22,7 @@ Workflow: Incoming email with AWB:
  3. the excel contains MAWB and HAWB, and columns that define the shipment and may change during the shipment and others that are static
  4. The excel contains new MAWB  and already existing MAWB 
  5. In case of new MAWB, we need to create a new shipment in the database and add the MAWB to the database. And schedule a tracking job for this MAWB.
- 6. In case of existing MAWB, we need to check the differences between the excel and the database, and anderstand why ?
+ 6. In case of existing MAWB, we need to check the differences between the excel and the database, and anderstand why.
  7. it may be that the excel is not updated with the latest information from the airline or ground services.
  8. it may be that the database is not updated with the latest information from the airline or ground services.
  9. so in case of a difference we need to see where is the truth. if the excel is with a later data or stage then the MAWB needs to be change with airline or ground services. 
@@ -50,6 +50,18 @@ Workflow: Incoming email with AWB:
  4. the email should contain the AWB, the latest information from the airline or ground services and the date of the last update
  5. the email should be sent in a format that is easy to read and understand
  6. users gets also one a day or twice a day , deponding on the notification settings , a full excel file with all the shipments and the latest information from the airline or ground services
+
+Workflow: Daily Return Excel (NEW)
+ 1. the trigger is a daily noon n8n scheduled workflow (tenant timezone)
+ 2. for each tenant, query all active shipments from excel_transport_lines
+ 3. group by excel_template (import / export) — one return file per template
+ 4. for each row, compare values_original vs values_latest JSONB
+ 5. if a field's latest value differs from original, mark the cell RED and show "original → latest"
+ 6. for import shipments: include tracker-discovered leg rows (source = 'tracker') as additional lines
+ 7. the return Excel mirrors the exact layout of the original template (same columns, same order, same headers)
+ 8. use raw_excel_row JSONB to ensure all original columns are reproduced faithfully
+ 9. record the generated file in excel_return_snapshots (audit trail)
+ 10. email the return Excel to the tenant users per their notification settings
 
 Workflow: Sending slack notifications on alert
 1. triger is internal api from Incoming email with AWB workflow 

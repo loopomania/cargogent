@@ -1,0 +1,23 @@
+,Unnamed: 0,DSV Air & Sea Ltd. (IL1) ,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6,Unnamed: 7,Unnamed: 8,Unnamed: 9,Unnamed: 10,Unnamed: 11,Unnamed: 12,Unnamed: 13,Unnamed: 14,Unnamed: 15,Unnamed: 16,Unnamed: 17,Unnamed: 18,Unnamed: 19,Unnamed: 20,Unnamed: 21,Unnamed: 22,Unnamed: 23,Unnamed: 24,Unnamed: 25,Unnamed: 26,Unnamed: 27,Unnamed: 28
+0,,Shipment Profile Report,,,,,,,,,,,,,,,,,,,,,,,,,,,
+1,,Shipment Filters: ,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2,,"Transport Mode: AIR, ETD: From: 01-Mar-26 To: 10-Apr-26, ETA: , Freight Direction: ALL, ",,,,,,,,,,,,,,,,,,,,,,,,,,,
+3,,"Origin: IL, Shipment Registered: From: 01-Jan-26 To: 10-Apr-26, ",,,,,,,,,,,,,,,,,,,,,,,,,,,
+4,,Invoicing Job Filters:,,,,,,,,,,,,,,,,,,,,,,,,,,,
+5,,"
+
+",,,,,,,,,,,,,,,,,,,,,,,,,,,
+6,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+7,,Only Listing Shipments that have Accounting/Workflow Job Headers in DSV Air & Sea Ltd. (IL1),,,,,,,,,,,,,,,,,,,,,,,,,,,
+8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+9,,"Because a TRANSACTIONS RECOGNIZED DATE RANGE  was used, results listed are PROFIT MOVEMENTS RECOGNIZED IN THAT DATE RANGE.",,,,,,,,,,,,,,,,,,,,,,,,,,,
+10,,Printed by Evgeni Rouvinsky  10-Apr-26 15:23,,,,,,,,,,,,,,,,,,,,,,,,,,,
+11,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+12,,,Shipment ID,Origin,Origin Ctry,Destination,Dest Ctry,Master,House Ref,INCO,Additional Terms,PPD/CCX,Weight,UQ,Volume,UQ,Chargeable,UQ,Inner,UQ,Outer,UQ,Shipment Event (WHR - %),Origin ETD,Dest ETA,Leg Load Port,Leg Discharge Port,Leg ATD,Leg ATA
+13,,,SAMS0337103,ILTLV,IL,NLAMS,NL,70050870562,AMS0337103,FOB,,CCX,780,KG,4.83,M3,805,KG,0,CTN,6,PLT,,2026-03-15 05:00:00,2026-03-15 12:17:00,ILTLV,NLAMS,,2026-03-16 08:27:00
+14,,,SEDC1658114,ILTLV,IL,INMAA,IN,16083499360,ISR10051862,DAP,Chennai (ex Madras) (INMAA),PPD,236,KG,3.38,M3,564,KG,0,CTN,1,PLT,2026-02-25 16:04:00,2026-03-01 00:00:00,2026-03-23 00:35:00,ILTLV,CYLCA,2026-03-18 18:24:00,2026-03-18 19:10:00
+15,,,SEDC1658114,ILTLV,IL,INMAA,IN,16083499360,ISR10051862,DAP,Chennai (ex Madras) (INMAA),PPD,236,KG,3.38,M3,564,KG,0,CTN,1,PLT,2026-02-25 16:04:00,2026-03-01 00:00:00,2026-03-23 00:35:00,CYLCA,HKHKG,2026-03-18 21:55:00,2026-03-19 18:41:00
+16,,,SEDC1658114,ILTLV,IL,INMAA,IN,16083499360,ISR10051862,DAP,Chennai (ex Madras) (INMAA),PPD,236,KG,3.38,M3,564,KG,0,CTN,1,PLT,2026-02-25 16:04:00,2026-03-01 00:00:00,2026-03-23 00:35:00,HKHKG,INMAA,2026-03-22 21:23:00,2026-03-23 00:33:00
+17,,,SEDC1688913,ILTLV,IL,CAYYZ,CA,01437623401,ISR10053192,DAP,,PPD,1035,KG,9.324,M3,1650,KG,0,CTN,6,PLT,2026-03-16 07:21:48,2026-03-17 12:25:00,2026-03-20 00:00:00,ILTLV,GRATH,2026-03-17 12:53:00,2026-03-17 14:53:00
+18,,,SEDC1688913,ILTLV,IL,CAYYZ,CA,01437623401,ISR10053192,DAP,,PPD,1035,KG,9.324,M3,1650,KG,0,CTN,6,PLT,2026-03-16 07:21:48,2026-03-17 12:25:00,2026-03-20 00:00:00,GRATH,CAYYZ,2026-03-19 12:05:00,2026-03-19 16:30:00
+19,,,SEDC1726012,ILTLV,IL,INMAA,IN,60753067696,ISR10055080,DAP,Chennai (ex Madras) (INMAA),PPD,76,KG,3.38,M3,564,KG,0,CTN,1,PLT,2026-04-07 06:31:48,2026-04-09 00:00:00,2026-04-14 00:00:00,ILTLV,DEFRA,,

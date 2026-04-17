@@ -57,6 +57,7 @@
         "subject": "={{ $json.body.subject }}",
         "emailType": "html",
         "message": "={{ $json.body.html_body }}",
+        "html": "={{ $json.body.html_body }}",
         "options": {
           "appendAttribution": false
         }
@@ -83,6 +84,7 @@
         "subject": "={{ $json.body.subject }}",
         "emailType": "html",
         "message": "={{ $json.body.html_body }}",
+        "html": "={{ $json.body.html_body }}",
         "options": {
           "appendAttribution": false
         }

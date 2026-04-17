@@ -42,6 +42,9 @@ export default function Layout({
               <Link to="/admin" style={navItemStyle}>
                 AWB Query
               </Link>
+              <Link to="/admin/tracked" style={navItemStyle}>
+                AWB Tracked List
+              </Link>
               <Link to="/admin/users" style={navItemStyle}>
                 User Management
               </Link>

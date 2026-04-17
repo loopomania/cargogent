@@ -108,6 +108,7 @@ export default function Users() {
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Jane Smith"
               required
+              autoComplete="off"
               style={inputStyle}
             />
           </div>
@@ -119,6 +120,7 @@ export default function Users() {
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="user@example.com"
               required
+              autoComplete="off"
               style={inputStyle}
             />
           </div>

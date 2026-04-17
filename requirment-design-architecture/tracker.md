@@ -37,5 +37,26 @@ Different trackers employ varying techniques based on the target website's anti-
 
 When querying a shipment (Export/Import), the router initiates:
 1. **Primary Carrier Query**: Resolves the air telemetry.
-2. **Ground Execution**: Concurrently contacts local ground services by injecting `HAWB`. Handlers like Swissport are queried initially with `HAWB`, dynamically falling back to `MAWB` queries if unsuccessful. 
+2. **Ground Execution**: Concurrently contacts local ground services by injecting `HAWB`.
+
+### Ground Service Mapping
+The system maps incoming AWBs (by prefix) or Carrier Names to designated handler APIs (Maman or Swissport) for Israeli import/export operations:
+- **Challenge Airlines (700)**: Both (Maman & Swissport)
+- **Maman Group**: El Al (114), Lufthansa (020), United (016), Air Canada (014), Air France/KLM (057/074), Ethiopian (071), Silk Way (501), AZAL (771), Air India (098), Delta (006), Cathay (160), UPS (406), FedEx (023)
+- **Swissport**: Etihad (607), Finnair (105), Air Baltic (657), Tarom (281), Air China (999), DHL (615)
+
+### Query Strategy & Validation Fallbacks
+Ground service implementations utilize a prioritized fallback cascade to fetch data:
+1. **Primary**: Query using both `MAWB + HAWB` unchanged.
+2. If Primary fails, **Fallback 1**: Query using `Only MAWB`.
+3. If Fallback 1 fails, **Fallback 2**: Remove 3-letter prefix from `HAWB`.
+4. If Fallback 2 fails, **Fallback 3**: Mirror `MAWB` into `HAWB` parameter.
+
+**Data Integrity Constraint**:
+- When a query is made for `MAWB+HAWB` and it fails, but subsequently succeeds using *only* `MAWB` (or other fallbacks), this typically implies DSV has not yet populated the Ground Service with the HAWB specifics.
+- **Rules of Engagement**: 
+  1. This means we are NOT able to validate the true HAWB details and status (e.g., pieces, weight).
+  2. The system flags this in the database query results (`hawb_validated = false`).
+  3. The *only* reliable data that can be safely extracted globally during this MAWB-level phase is the arrival date to the ground service and the customs clearance state.
+
 3. **Merge**: Events from disparate queries are consolidated chronologically in the Unified Frontend View.

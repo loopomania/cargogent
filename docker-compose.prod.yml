@@ -8,6 +8,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8433:8433"
     env_file:
       - .env-prod
     volumes:
@@ -35,6 +36,7 @@ services:
     environment:
       NODE_ENV: production
       AWBTRACKERS_URL: http://awbtrackers:8000
+      N8N_INVITE_WEBHOOK_URL: http://n8n:5678/webhook/user-email
     depends_on:
       awbtrackers:
         condition: service_started
@@ -57,8 +59,7 @@ services:
     environment:
       N8N_HOST: 0.0.0.0
       N8N_PORT: "5678"
-      N8N_PROTOCOL: http
-      N8N_PATH: /n8n/
+      WEBHOOK_URL: https://168.119.228.149:8433/
       N8N_BACKEND_URL: ${N8N_BACKEND_URL:-}
     depends_on:
       - backend

@@ -26,6 +26,32 @@ CargoGent is a multi-tenant shipment tracking platform for freight forwarders.
 - Otherwise: In Transit
 
 ## User screens
+1. user sign in shows different screens based on the user role
+    - admin user
+    - customer user
+
+2. admin user screens
+    1. Query screen  - allow to query by HAWB or MAWB)(already exists in its base forum ,without database)
+    2. Query Logs - show all queries that were made in the system
+    3. user management - allow to create new users, reset passwords, generate 16-character access keys, and revoke access (already exists in its base forum)
+3. customer user screens
+    1. AWBs - show all AWBs for the customer
+       1. top bar -  show the number of open (in process) AWBs
+       2. alert table - show all AWBs that need attention (stale or on ground + special treatment)
+       3. open AWBs table - show all open AWBs
+          1. with pagination 500 AWBs per page
+       4. all table shows MAWB and HAWB wieght , pieces , ATD(ETD) , ATA(ETA) 
+       5. when cliecking on a row in the table, it will open the shipment detail view on top of the table
+       6. shipment detail view:
+          1. show smae screen of the existing query page, with on option to refresh query
+          2. if the query data is different from the data arrived from the excel, show the query data with a note that it is different from the excel data and the date of the excel data
+    2. settings
+       1. dark mode toggle
+       2. update notification settings
+          1. incremental email interval
+          2. full report frequency per day
+        
+    
 
 ### 1. Settings
 - Same capabilities as **Notifications** below: incremental email interval, full-report frequency per day, and any other account/preferences the product adds later.

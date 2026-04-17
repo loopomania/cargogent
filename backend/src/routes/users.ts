@@ -68,11 +68,14 @@ async function sendUserEmail(
   const { subject, html } = buildEmailHtml(name, inviteUrl, flowType);
 
   if (config.n8nInviteWebhookUrl) {
+    const payload = { email, subject, html_body: html, flow_type: flowType };
+    console.log(`[User Email] Sending to n8n webhook:`, JSON.stringify(payload, null, 2));
+    
     // Send pre-built HTML to n8n — no expression interpolation needed
     const res = await fetch(config.n8nInviteWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, subject, html_body: html, flow_type: flowType }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`n8n webhook failed: ${res.status}`);
   } else {

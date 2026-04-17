@@ -88,6 +88,48 @@ export async function trackByAirline(airline: string, awb: string, hawb?: string
   return res.json();
 }
 
+export interface TrackedListItem {
+  mawb: string;
+  hawb: string;
+  last_query_date: string | null;
+  number_of_legs: string;
+  number_of_pieces: string;
+  origin: string;
+  destination: string;
+  eta: string | null;
+  ata: string | null;
+  status: string | null;
+}
+
+export async function fetchTrackedList(): Promise<TrackedListItem[]> {
+  const res = await fetch(`${API_BASE}/track/list`, { ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+  const data = await res.json();
+  return data.awbs || [];
+}
+
+/** GET /api/track/stored/:mawb/:hawb — load persisted events from DB without a live query */
+export async function fetchStoredTracking(mawb: string, hawb: string): Promise<TrackingResponse> {
+  const url = `${API_BASE}/track/stored/${encodeURIComponent(mawb)}/${encodeURIComponent(hawb)}`;
+  const res = await fetch(url, { ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+  return res.json();
+}
+
+/** DELETE /api/track/remove/:mawb/:hawb — remove a shipment from all tracking tables */
+export async function removeTrackedAwb(mawb: string, hawb: string): Promise<void> {
+  const url = `${API_BASE}/track/remove/${encodeURIComponent(mawb)}/${encodeURIComponent(hawb)}`;
+  const res = await fetch(url, { method: "DELETE", ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+}
+
+/** POST /api/track/mark-delivered/:mawb/:hawb — Mark a shipment as delivered manually */
+export async function markDeliveredTrackedAwb(mawb: string, hawb: string): Promise<void> {
+  const url = `${API_BASE}/track/mark-delivered/${encodeURIComponent(mawb)}/${encodeURIComponent(hawb)}`;
+  const res = await fetch(url, { method: "POST", ...withCreds, headers: authHeaders() });
+  await handleResponse(res);
+}
+
 /** User Management APIs */
 export interface User {
   id: string;

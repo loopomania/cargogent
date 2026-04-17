@@ -22,26 +22,37 @@ const C = {
 
 function fmtDate(raw?: string | null): string {
   if (!raw) return "—";
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  
+  // ISO: 2026-03-03T08:57:09 or 2026-03-03 08:57:09
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
   if (iso) {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return `${iso[3]} ${months[parseInt(iso[2])-1]} ${iso[4]}:${iso[5]}`;
+    return `${iso[3]} ${months[parseInt(iso[2])-1]} ${iso[1].slice(2)} ${iso[4]}:${iso[5]}`;
   }
-  // "10 Mar 26 00:00" or "10 Mar 26"
-  const m = raw.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})\s*(\d{2}:\d{2})?/i);
-  if (m) {
-    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
-    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
-    const mo = (months.indexOf(m[2].toLowerCase())+1).toString().padStart(2,'0');
-    void mo;
-    return m[4] ? `${m[1].padStart(2,'0')} ${m[2]} ${yr.slice(2)} ${m[4]}` : `${m[1].padStart(2,'0')} ${m[2]} ${yr.slice(2)}`;
+
+  // DD MON HH:MM (Lufthansa) -> 27 FEB 13:34
+  const luf = raw.match(/^(\d{1,2})\s+([A-Z]{3})\s+(\d{2}:\d{2})/i);
+  if (luf) {
+    return `${luf[1].padStart(2, '0')} ${luf[2]} 26 ${luf[3]}`;
   }
-  // "14/03/26 18:03"
-  const dm = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})\s*(\d{2}:\d{2})?/);
-  if (dm) {
+
+  // DD MON YY HH:MM or DD MON YYYY HH:MM
+  const ddmon = raw.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,4})(?:\s+(\d{2}:\d{2}))?/i);
+  if (ddmon) {
+    const d = ddmon[1].padStart(2, '0');
+    const m = ddmon[2];
+    const y = ddmon[3].length === 4 ? ddmon[3].slice(2) : ddmon[3];
+    const t = ddmon[4] ?? "";
+    return t ? `${d} ${m} ${y} ${t}` : `${d} ${m} ${y}`;
+  }
+
+  // DD/MM/YY HH:MM
+  const ddmmyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})\s*(\d{2}:\d{2})?/);
+  if (ddmmyy) {
     const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return `${dm[1]} ${months[parseInt(dm[2])]} ${dm[3]}` + (dm[4] ? ` ${dm[4]}` : "");
+    return `${ddmmyy[1]} ${months[parseInt(ddmmyy[2])]} ${ddmmyy[3]}` + (ddmmyy[4] ? ` ${ddmmyy[4]}` : "");
   }
+
   return raw.length > 20 ? raw.slice(0, 20) : raw;
 }
 
@@ -186,7 +197,7 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
      
      // Find relevant events for this leg
      const lDep = chronoEvs.find(e => e.status_code === 'DEP' && e.location === pFrom);
-     const lArr = chronoEvs.find(e => ['ARR','DLV'].includes(e.status_code || '') && e.location === pTo);
+     const lArr = chronoEvs.find(e => ['ARR','DLV','RCT'].includes(e.status_code || '') && e.location === pTo);
      
      legs.push({
          from: pFrom,
@@ -244,7 +255,7 @@ function MilestoneDatePair({ actual, estimated }: { actual?: string | null, esti
   }
   
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, whiteSpace: "nowrap" }}>
        <span style={{ fontFamily: "monospace", fontSize: "0.6rem", color: C.amber, opacity: 0.9 }}>
          {fmtDate(estimated)}
        </span>
@@ -358,7 +369,9 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
   // 1. Origin: Ground services received
   const originFromCodes = ["BKD", "RCS", "FOH", "DIS", "130"]; 
   const originDone = originFromCodes.some(c => presentCodes.has(c));
-  const originEv = events.find(e => originFromCodes.includes(e.status_code ?? ""));
+  // Prioritize events with a date, as some airlines emit "ghost" scans with no date first
+  const originEv = events.find(e => originFromCodes.includes(e.status_code ?? "") && (e.date || e.departure_date)) 
+                || events.find(e => originFromCodes.includes(e.status_code ?? ""));
   
   elements.push(
     <MilestoneNode 
@@ -380,9 +393,9 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
     const legCodes = new Set(legEvents.map(e => e.status_code ?? ""));
 
     const takeOffDone = legCodes.has("DEP") || legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("ARR") || presentCodes.has("DLV");
-    const depEv = legEvents.find(e => e.status_code === "DEP");
+    const depEv = legEvents.find(e => e.status_code === "DEP") || legEvents.find(e => ["BKD", "RCS", "MAN"].includes(e.status_code ?? ""));
     const landingDone = legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("DLV");
-    const arrEv = legEvents.find(e => e.status_code === "ARR" || e.status_code === "DLV");
+    const arrEv = legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? ""));
 
     // Take off
     elements.push(<Arrow key={`arr-dep-${i}`} done={takeOffDone} />);
@@ -410,7 +423,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
 
     // If it's not the last leg, insert an intermediate "Ground service"
     if (i < legs.length - 1) {
-       const transitCodes = ["RCF", "NFD", "RCS"];
+       const transitCodes = ["RCF", "NFD", "RCS", "RCT", "ARR"];
        const transitEvs = events.filter(e => e.location === leg.to);
        const tCodes = new Set(transitEvs.map(e => e.status_code ?? ""));
        // Done if we have a transit scanner code, or if the next flight has departed!
@@ -534,54 +547,45 @@ export default function MilestonePlan({ data }: Props) {
     }}>
       {/* ── Header ── */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.6rem",
         padding: "1rem 1.5rem",
         borderBottom: `1px solid ${C.border}`,
         background: C.bgCard,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
-            {origin}
-          </span>
-          <span style={{ color: C.accent, fontSize: "1.3rem" }}>→</span>
-          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
-            {destination}
-          </span>
-          <span style={{ fontSize: "0.7rem", color: C.dim2, marginLeft: 6 }}>
-            {legs.length} leg{legs.length !== 1 ? "s" : ""}
-          </span>
-          
+        <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+          {origin}
+        </span>
+        <span style={{ color: C.accent, fontSize: "1.3rem" }}>→</span>
+        <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+          {destination}
+        </span>
+        <span style={{ fontSize: "0.7rem", color: C.dim2 }}>
+          {legs.length} leg{legs.length !== 1 ? "s" : ""}
+        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           {data.airline && (
             <span style={{
-              marginLeft: "0.8rem",
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              backgroundColor: "rgba(59, 130, 246, 0.15)",
-              color: C.accent,
-              padding: "3px 8px",
-              borderRadius: "6px",
-              letterSpacing: "0.02em"
+              fontSize: "0.7rem", fontWeight: 700,
+              backgroundColor: "rgba(59, 130, 246, 0.15)", color: C.accent,
+              padding: "3px 8px", borderRadius: "6px", letterSpacing: "0.02em"
             }}>
               {data.airline.toUpperCase()}
             </span>
           )}
-          
+
           {groundNames && (
             <span style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              backgroundColor: "rgba(240, 180, 41, 0.15)",
-              color: C.amber,
-              padding: "3px 8px",
-              borderRadius: "6px",
-              letterSpacing: "0.02em"
+              fontSize: "0.7rem", fontWeight: 700,
+              backgroundColor: "rgba(240, 180, 41, 0.15)", color: C.amber,
+              padding: "3px 8px", borderRadius: "6px", letterSpacing: "0.02em"
             }}>
               {groundNames.toUpperCase()}
             </span>
           )}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.4rem" }}>
           {isDlv
             ? <CheckCircle size={15} color={C.green} />
             : <Clock size={15} color={C.accent} />}

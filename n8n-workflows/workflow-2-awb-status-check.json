@@ -7,7 +7,10 @@
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "notes": "Run every minute. Get AWBs due for check from backend, then call backend track API for each."
     },
     {
@@ -19,7 +22,10 @@
       "name": "Get AWBs due for check",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "notes": "Backend endpoint to return list of AWBs where next_status_check_at is due (to be implemented)."
     },
     {
@@ -31,21 +37,41 @@
       "name": "Call track API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "notes": "Backend proxies to AWBTrackers. Then POST result to backend to update history and latest status."
     }
   ],
   "connections": {
     "Schedule Trigger": {
-      "main": [[{ "node": "Get AWBs due for check", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get AWBs due for check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get AWBs due for check": {
-      "main": [[{ "node": "Call track API", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Call track API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {},
   "staticData": null,
   "meta": {
     "templateCredsSetupCompleted": false
-  }
+  },
+  "id": "ae1a4a44356f4852"
 }
