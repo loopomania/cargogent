@@ -128,59 +128,100 @@ class AirCanadaTracker(AirlineTracker):
 
         return self._finalize_response(awb_fmt, events, trace, message, blocked)
 
+    def _build_event(self, current_date, status_text, time_text, loc_text, pcs, wt, desc) -> TrackingEvent:
+        status_code = "UNKN"
+        sl = status_text.lower()
+        if "deliver" in sl: status_code = "DLV"
+        elif "depart" in sl: status_code = "DEP"
+        elif "arriv" in sl: status_code = "ARR"
+        elif "accept" in sl or "received" in sl or "dropped off" in sl: status_code = "RCS"
+        elif "book" in sl: status_code = "BKD"
+        elif "notif" in sl: status_code = "NFD"
+        elif "manifest" in sl or "consol" in sl: status_code = "MAN"
+        elif "transferred" in sl: status_code = "TRV"
+
+        flight = None
+        fm = re.search(r'([A-Z]{2,3}\s*\d{3,4})', desc)
+        if fm:
+            flight = fm.group(1).replace(" ", "")
+            if status_code == "UNKN":
+                if "depart" in desc.lower(): status_code = "DEP"
+                elif "arriv" in desc.lower(): status_code = "ARR"
+
+        event_date = f"{current_date} {time_text}" if current_date else time_text
+
+        # Clean location to remove parentheses like (ARR) or (DEP)
+        loc_clean = re.sub(r'\s*\([^)]*\)', '', loc_text).strip() if loc_text else ""
+
+        return TrackingEvent(
+            status_code=status_code,
+            status=status_text,
+            location=loc_clean,
+            date=event_date,
+            pieces=pcs,
+            weight=wt,
+            remarks=desc or status_text,
+            flight=flight
+        )
+
     def _parse_text_to_events(self, text: str) -> List[TrackingEvent]:
         events: List[TrackingEvent] = []
         current_date = ""
 
-        for line in text.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
+        # Check if tab-delimited
+        if '\t' in text:
+            for line in text.split('\n'):
+                line = line.strip()
+                if not line: continue
+                # Accept months up to 9 chars e.g. "April"
+                if re.match(r'^[A-Z][a-z]{2,8}\s\d{1,2},\s\d{4}$', line):
+                    current_date = line
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 3 and "Status" not in line and "Time" not in line:
+                    st = parts[0].strip()
+                    tm = parts[1].strip()
+                    loc = parts[2].strip()
+                    pc = parts[3].strip() if len(parts) > 3 else ""
+                    wt = parts[4].strip() if len(parts) > 4 else ""
+                    desc = parts[5].strip() if len(parts) > 5 else ""
+                    events.append(self._build_event(current_date, st, tm, loc, pc, wt, desc))
+            return events
 
-            # Detect date separator (e.g. "Mar 27, 2026")
-            if re.match(r'^[A-Z][a-z]{2}\s\d{1,2},\s\d{4}$', line):
+        # Otherwise parse vertical newline-delimited layout
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        for i in range(len(lines)):
+            line = lines[i]
+            if re.match(r'^[A-Z][a-z]{2,8}\s\d{1,2},\s\d{4}$', line):
                 current_date = line
-                continue
-
-            parts = line.split('\t')
-            if len(parts) >= 3 and "Status" not in line and "Time" not in line:
-                status_text = parts[0].strip()
-                time_text = parts[1].strip()
-                loc_text = parts[2].strip()
-                pcs = parts[3].strip() if len(parts) > 3 else ""
-                wt = parts[4].strip() if len(parts) > 4 else ""
-                desc = parts[5].strip() if len(parts) > 5 else ""
-
-                status_code = "UNKN"
-                sl = status_text.lower()
-                if "deliver" in sl: status_code = "DLV"
-                elif "depart" in sl: status_code = "DEP"
-                elif "arriv" in sl: status_code = "ARR"
-                elif "accept" in sl or "received" in sl: status_code = "RCS"
-                elif "book" in sl: status_code = "BKD"
-                elif "notif" in sl: status_code = "NFD"
-                elif "manifest" in sl or "consol" in sl: status_code = "MAN"
-                elif "transferred" in sl: status_code = "TRV"
-
-                flight = None
-                fm = re.search(r'([A-Z]{2,3}\s*\d{3,4})', desc)
-                if fm:
-                    flight = fm.group(1).replace(" ", "")
-                    if status_code == "UNKN":
-                        if "depart" in desc.lower(): status_code = "DEP"
-                        elif "arriv" in desc.lower(): status_code = "ARR"
-
-                event_date = f"{current_date} {time_text}" if current_date else time_text
-
-                events.append(TrackingEvent(
-                    status_code=status_code,
-                    location=loc_text,
-                    date=event_date,
-                    pieces=pcs,
-                    weight=wt,
-                    remarks=desc or status_text,
-                    flight=flight
-                ))
+            elif re.match(r'^\d{2}:\d{2}$', line) and i > 0:
+                status_text = lines[i-1]
+                time_text = line
+                loc_text = lines[i+1] if i+1 < len(lines) else ""
+                
+                # Collect pieces, weight, description
+                pc, wt, desc = "", "", ""
+                j = i + 2
+                chunk = []
+                while j < len(lines):
+                    if re.match(r'^[A-Z][a-z]{2,8}\s\d{1,2},\s\d{4}$', lines[j]): break
+                    if lines[j] == "View shipping status on": break
+                    if j + 1 < len(lines) and re.match(r'^\d{2}:\d{2}$', lines[j+1]): break
+                    if lines[j] in ["Status", "Time", "Location", "Pieces", "Weight", "Description"]: break
+                    chunk.append(lines[j])
+                    j += 1
+                
+                if len(chunk) >= 1:
+                    desc = chunk[-1]
+                    if len(chunk) >= 3:
+                        pc = chunk[0]
+                        wt = chunk[1]
+                    elif len(chunk) == 2:
+                        if "pc" in chunk[0].lower(): pc = chunk[0]
+                        else: wt = chunk[0]
+                        
+                if "Status" not in status_text and "Time" not in status_text:
+                    events.append(self._build_event(current_date, status_text, time_text, loc_text, pc, wt, desc))
 
         return events
 
