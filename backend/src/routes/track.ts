@@ -30,7 +30,6 @@ async function getActualTenantId(user: any, awb: string, hawb?: string): Promise
 
 /** Helper to append excel dates to the tracking payload before returning to client */
 async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb: string, hawb: string | undefined, data: any) {
-  if (!tenantId) return data;
   const p = getPool();
   if (!p) return data;
   
@@ -38,9 +37,21 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
     const mawbClean = mawb.replace(/-/g, "");
     const isHawbSpecific = hawb && hawb !== mawbClean;
     
+    const isGlobalAdmin = !tenantId || tenantId === '00000000-0000-0000-0000-000000000000';
+    
     // Find the shipment_id first, then fetch its legs.
-    // Strategy: try MAWB + HAWB first; if no match (house_ref was blank in the import), fall back to MAWB-only.
-    const byMawbHawb = `
+    const byMawbHawb = isGlobalAdmin ? `
+       WITH target_shipment AS (
+          SELECT shipment_id 
+          FROM excel_transport_lines 
+          WHERE master_awb = $1 AND house_ref = $2
+          LIMIT 1
+       )
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       FROM excel_transport_lines 
+       WHERE shipment_id = (SELECT shipment_id FROM target_shipment)
+       ORDER BY leg_sequence ASC
+    ` : `
        WITH target_shipment AS (
           SELECT shipment_id 
           FROM excel_transport_lines 
@@ -52,7 +63,20 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
        WHERE tenant_id = $1 AND shipment_id = (SELECT shipment_id FROM target_shipment)
        ORDER BY leg_sequence ASC
     `;
-    const byMawbOnly = `
+    
+    const byMawbOnly = isGlobalAdmin ? `
+       WITH target_shipment AS (
+          SELECT shipment_id 
+          FROM excel_transport_lines 
+          WHERE master_awb = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+       )
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       FROM excel_transport_lines 
+       WHERE shipment_id = (SELECT shipment_id FROM target_shipment)
+       ORDER BY leg_sequence ASC
+    ` : `
        WITH target_shipment AS (
           SELECT shipment_id 
           FROM excel_transport_lines 
@@ -69,12 +93,13 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
     let resExcel = { rows: [] as any[] };
 
     if (isHawbSpecific) {
-      // 1st try: exact HAWB match
-      resExcel = await p.query(byMawbHawb, [tenantId, mawbClean, hawb]);
+      const args = isGlobalAdmin ? [mawbClean, hawb] : [tenantId, mawbClean, hawb];
+      resExcel = await p.query(byMawbHawb, args);
     }
-    // Fallback (or non-HAWB request): MAWB only
+    
     if (resExcel.rows.length === 0) {
-      resExcel = await p.query(byMawbOnly, [tenantId, mawbClean]);
+      const args = isGlobalAdmin ? [mawbClean] : [tenantId, mawbClean];
+      resExcel = await p.query(byMawbOnly, args);
     }
 
     if (resExcel.rows.length > 0) {
