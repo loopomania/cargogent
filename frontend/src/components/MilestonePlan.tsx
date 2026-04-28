@@ -433,15 +433,6 @@ function MilestoneNode({
         <MilestoneDatePair actual={actual} estimated={estimated} code={code} />
       </div>
 
-      {/* 6. Pieces (Bottom Anchor) */}
-      <div style={{ height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {event?.pieces && (
-          <span style={{ fontSize: "0.6rem", color: C.dim, fontWeight: 500 }}>
-            {event.pieces} pcs
-          </span>
-        )}
-      </div>
-
       {/* 7. Excel Dates (New Bottom Anchor) */}
       {hasExcelSlot && (
          <div style={{ height: 30, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", marginTop: "auto" }}>
@@ -719,20 +710,31 @@ export default function MilestonePlan({ data }: Props) {
     }}>
       {/* ── Header ── */}
       <div style={{
-        display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.6rem",
+        display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.8rem",
         padding: "1rem 1.5rem",
         borderBottom: `1px solid ${C.border}`,
         backgroundColor: C.bgCard
       }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: "0.4rem",
-          fontWeight: 600, fontSize: "0.85rem", color: C.dim,
-          padding: "0.2rem 0.6rem", borderRadius: 6,
-          backgroundColor: "rgba(255,255,255,0.04)"
-        }}>
-          <Plane size={14} />
-          {overallStatus}
+        {/* Title: Origin -> Destination */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginRight: "0.5rem" }}>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {origin}
+          </span>
+          <span style={{ color: C.accent, fontSize: "1.3rem", marginTop: "-2px" }}>→</span>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {destination}
+          </span>
         </div>
+
+        {/* Overall Status (Timer/Check icon) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+          {isDlv ? <CheckCircle size={15} color={C.green} /> : <Clock size={15} color={C.accent} />}
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
+            {overallStatus}
+          </span>
+        </div>
+
+        {/* Ground Handler Badge */}
         {groundNames && (
           <div style={{
             display: "flex", alignItems: "center", gap: "0.4rem",
@@ -744,18 +746,12 @@ export default function MilestonePlan({ data }: Props) {
             {groundNames}
           </div>
         )}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <span style={{ fontSize: "0.7rem", color: C.dim2 }}>
+
+        {/* Flow Paths Count */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+          <span style={{ fontSize: "0.75rem", color: C.dim2, fontWeight: 600 }}>
             {flows.length} path{flows.length !== 1 ? "s" : ""}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.4rem" }}>
-            {isDlv
-              ? <CheckCircle size={15} color={C.green} />
-              : <Clock size={15} color={C.accent} />}
-            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
-              {overallStatus}
-            </span>
-          </div>
         </div>
       </div>
 
