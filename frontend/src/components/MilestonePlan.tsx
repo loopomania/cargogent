@@ -1,5 +1,5 @@
 
-import { Plane, CheckCircle, Clock, Bookmark, Archive, Package } from "lucide-react";
+import { Plane, CheckCircle, Clock, Bookmark, Archive, Package, Truck } from "lucide-react";
 import type { TrackingEvent, TrackingResponse } from "../lib/api";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -470,9 +470,41 @@ function Arrow({ done }: { done: boolean }) {
   );
 }
 
+function buildFlows(legs: Leg[], origin: string): Leg[][] {
+  if (legs.length === 0) return [];
+  
+  const starts = legs.filter(l => cleanCity(l.from) === cleanCity(origin));
+  if (starts.length === 0) {
+    const allTos = new Set(legs.map(l => cleanCity(l.to)));
+    const noPreds = legs.filter(l => !allTos.has(cleanCity(l.from)));
+    starts.push(...(noPreds.length > 0 ? noPreds : [legs[0]]));
+  }
+
+  const flows: Leg[][] = [];
+
+  function traverse(currentPath: Leg[]) {
+    const lastLeg = currentPath[currentPath.length - 1];
+    const nextLegs = legs.filter(l => cleanCity(l.from) === cleanCity(lastLeg.to) && !currentPath.includes(l));
+    
+    if (nextLegs.length === 0) {
+      flows.push(currentPath);
+    } else {
+      for (const next of nextLegs) {
+        traverse([...currentPath, next]);
+      }
+    }
+  }
+
+  for (const start of starts) {
+    traverse([start]);
+  }
+
+  return flows;
+}
+
 // ─── Unified Timeline Engine ────────────────────────────────────────────────────────
 
-function UnifiedTimeline({ legs, events, origin, destination, excelLegs }: { legs: Leg[], events: TrackingEvent[], origin: string, destination: string, excelLegs: any[] }) {
+function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: { legs: Leg[], events: TrackingEvent[], origin: string, destination: string, excelLegs: any[] }) {
   const elements = [];
   const presentCodes = new Set(events.map(e => e.status_code ?? ""));
   
@@ -589,21 +621,8 @@ function UnifiedTimeline({ legs, events, origin, destination, excelLegs }: { leg
   }
   
   return (
-    <div style={{
-      padding: "3rem 1.5rem",
-      backgroundColor: C.bgCard,
-      overflowX: "auto",
-      width: "100%",
-    }}>
-      {legs.length > 0 ? (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: "max-content", margin: "0 auto" }}>
-           {elements}
-        </div>
-      ) : (
-        <div style={{ textAlign: "center", color: C.dim }}>
-          Awaiting airline updates...
-        </div>
-      )}
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: "max-content", margin: "0 auto" }}>
+       {elements}
     </div>
   );
 }
@@ -671,6 +690,7 @@ export default function MilestonePlan({ data }: Props) {
   const airlineEvents = events.filter(e => !groundEvents.includes(e));
 
   const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination, excelLegs);
+  const flows = buildFlows(legs, origin);
 
   const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
   const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
@@ -702,53 +722,60 @@ export default function MilestonePlan({ data }: Props) {
         display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.6rem",
         padding: "1rem 1.5rem",
         borderBottom: `1px solid ${C.border}`,
-        background: C.bgCard,
+        backgroundColor: C.bgCard
       }}>
-        <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
-          {origin}
-        </span>
-        <span style={{ color: C.accent, fontSize: "1.3rem" }}>→</span>
-        <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
-          {destination}
-        </span>
-        <span style={{ fontSize: "0.7rem", color: C.dim2 }}>
-          {legs.length} leg{legs.length !== 1 ? "s" : ""}
-        </span>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          {data.airline && (
-            <span style={{
-              fontSize: "0.7rem", fontWeight: 700,
-              backgroundColor: "rgba(59, 130, 246, 0.15)", color: C.accent,
-              padding: "3px 8px", borderRadius: "6px", letterSpacing: "0.02em"
-            }}>
-              {data.airline.toUpperCase()}
-            </span>
-          )}
-
-          {groundNames && (
-            <span style={{
-              fontSize: "0.7rem", fontWeight: 700,
-              backgroundColor: "rgba(240, 180, 41, 0.15)", color: C.amber,
-              padding: "3px 8px", borderRadius: "6px", letterSpacing: "0.02em"
-            }}>
-              {groundNames.toUpperCase()}
-            </span>
-          )}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "0.4rem",
+          fontWeight: 600, fontSize: "0.85rem", color: C.dim,
+          padding: "0.2rem 0.6rem", borderRadius: 6,
+          backgroundColor: "rgba(255,255,255,0.04)"
+        }}>
+          <Plane size={14} />
+          {overallStatus}
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.4rem" }}>
-          {isDlv
-            ? <CheckCircle size={15} color={C.green} />
-            : <Clock size={15} color={C.accent} />}
-          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
-            {overallStatus}
+        {groundNames && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            fontWeight: 600, fontSize: "0.85rem", color: C.dim,
+            padding: "0.2rem 0.6rem", borderRadius: 6,
+            backgroundColor: "rgba(255,255,255,0.04)"
+          }}>
+            <Truck size={14} />
+            {groundNames}
+          </div>
+        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <span style={{ fontSize: "0.7rem", color: C.dim2 }}>
+            {flows.length} path{flows.length !== 1 ? "s" : ""}
           </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.4rem" }}>
+            {isDlv
+              ? <CheckCircle size={15} color={C.green} />
+              : <Clock size={15} color={C.accent} />}
+            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
+              {overallStatus}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* ── Main body: Unified Timeline Flow ── */}
-      <UnifiedTimeline legs={legs} events={events} origin={origin} destination={destination} excelLegs={excelLegs} />
+      <div style={{
+        padding: "3rem 1.5rem",
+        backgroundColor: C.bgCard,
+        overflowX: "auto",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: "4rem"
+      }}>
+        {flows.length > 0 ? flows.map((flow, idx) => (
+          <UnifiedTimelineFlow key={idx} legs={flow} events={events} origin={origin} destination={destination} excelLegs={excelLegs} />
+        )) : (
+          <div style={{ textAlign: "center", color: C.dim }}>
+            Awaiting airline updates...
+          </div>
+        )}
+      </div>
       
       {/* ── Legend ── */}
       <div style={{
