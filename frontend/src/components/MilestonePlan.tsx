@@ -58,6 +58,11 @@ function fmtDate(raw?: string | null): string {
 
 // ─── Milestone definitions ──────────────────────────────────────────────────────
 
+const safeTime = (e?: TrackingEvent | null) => {
+  const d = e?.date || e?.estimated_date;
+  return d ? new Date(d).getTime() || 0 : 0;
+};
+
 // @ts-ignore
 const MILESTONES: { code: string; label: string; desc: string; group: "pre"|"dep"|"arr"|"dlv" }[] = [
   { code: "BKD", label: "Booked",      desc: "Booking Confirmed", group: "pre" },
@@ -132,7 +137,7 @@ interface Leg {
   events: TrackingEvent[];
 }
 
-function buildLegs(allEvents: TrackingEvent[], origin: string, destination: string): Leg[] {
+function buildLegs(allEvents: TrackingEvent[], origin: string, destination: string, excelLegs: any[] = []): Leg[] {
   // Only true ARR events create legs — RCF is a scan/receipt code, not a segment arrival
   // (El Al uses FOH/DIS/RCF/NFD/DLV; including RCF here causes phantom legs from ghost scans)
   const depEvs = allEvents.filter(e => e.status_code === "DEP");
@@ -172,19 +177,36 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
   }
 
   // Robust path reconstruction (handles missing/noisy scans dynamically)
-  const safeTime = (d?: string | null) => d ? new Date(d).getTime() || 0 : 0;
-  const chronoEvs = [...allEvents].sort((a, b) => safeTime(a.date) - safeTime(b.date));
+  const chronoEvs = [...allEvents].sort((a, b) => safeTime(a) - safeTime(b));
   
   const path: string[] = [origin];
   for (const e of chronoEvs) {
-     if (e.status_code === 'DEP' && e.location && e.location !== path[path.length - 1]) {
-         path.push(e.location);
+     const loc = cleanCity(e.location);
+     if (e.status_code === 'DEP' && loc && loc !== path[path.length - 1]) {
+         path.push(loc);
      }
   }
   // If the last arrival/delivery isn't the destination, add the destination.
   // Actually, always ensure the final node is the destination.
   if (path[path.length - 1] !== destination) {
        path.push(destination);
+  }
+
+  // Merge Excel segments into the path if they add new information
+  for (const xl of excelLegs) {
+      const xFrom = cleanCity(xl.from);
+      const xTo = cleanCity(xl.to);
+      if (xFrom && !path.includes(xFrom)) {
+          // Find where to insert: usually before the destination
+          const destIdx = path.indexOf(destination);
+          if (destIdx !== -1) path.splice(destIdx, 0, xFrom);
+          else path.push(xFrom);
+      }
+      if (xTo && !path.includes(xTo)) {
+          const destIdx = path.indexOf(destination);
+          if (destIdx !== -1) path.splice(destIdx, 0, xTo);
+          else path.push(xTo);
+      }
   }
 
   // De-duplicate any consecutive identical locations
@@ -196,8 +218,8 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
      const pTo = purePath[i+1];
      
      // Find relevant events for this leg
-     const lDep = chronoEvs.find(e => e.status_code === 'DEP' && e.location === pFrom);
-     const lArr = chronoEvs.find(e => ['ARR','DLV','RCT'].includes(e.status_code || '') && e.location === pTo);
+     const lDep = chronoEvs.find(e => e.status_code === 'DEP' && cleanCity(e.location) === pFrom);
+     const lArr = chronoEvs.find(e => ['ARR','DLV','RCT'].includes(e.status_code || '') && cleanCity(e.location) === pTo);
      
      legs.push({
          from: pFrom,
@@ -228,38 +250,49 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
 
 // ─── Milestone node card ────────────────────────────────────────────────────────
 
-function MilestoneDatePair({ actual, estimated }: { actual?: string | null, estimated?: string | null }) {
-  if (!actual && !estimated) return null;
-  
+function MilestoneDatePair({ actual, estimated, code }: { actual?: string | null, estimated?: string | null, code: string }) {
   const hasAct = !!actual;
   const hasEst = !!estimated;
   
+  if (!hasAct && !hasEst) return null;
+
   // Normalize for comparison
   const norm = (s?: string | null) => (s ?? "").trim().toLowerCase();
   const same = hasAct && hasEst && norm(actual) === norm(estimated);
-  
+
+  const aLbl = code === "DEP" ? "ATD" : code === "ARR" ? "ATA" : "ACT";
+  const eLbl = code === "DEP" ? "ETD" : code === "ARR" ? "ETA" : "EST";
+
   if (same || (hasAct && !hasEst)) {
      return (
-       <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.green, textAlign: "center", lineHeight: 1.4, fontWeight: 600 }}>
-         {fmtDate(actual)}
-       </span>
+       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
+         <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.green, textAlign: "center", lineHeight: 1.2, fontWeight: 600 }}>
+           <span style={{ color: C.dim, fontSize: "0.55rem", marginRight: 4 }}>{aLbl}</span>
+           {fmtDate(actual)}
+         </span>
+       </div>
      );
   }
   
   if (!hasAct && hasEst) {
      return (
-       <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.amber, textAlign: "center", lineHeight: 1.4 }}>
-         {fmtDate(estimated)}
-       </span>
+       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
+         <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.amber, textAlign: "center", lineHeight: 1.2 }}>
+           <span style={{ color: C.dim, fontSize: "0.55rem", marginRight: 4 }}>{eLbl}</span>
+           {fmtDate(estimated)}
+         </span>
+       </div>
      );
   }
   
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, whiteSpace: "nowrap" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
        <span style={{ fontFamily: "monospace", fontSize: "0.6rem", color: C.amber, opacity: 0.9 }}>
+         <span style={{ color: C.dim, fontSize: "0.55rem", marginRight: 4 }}>{eLbl}</span>
          {fmtDate(estimated)}
        </span>
        <span style={{ fontFamily: "monospace", fontSize: "0.63rem", color: C.green, fontWeight: 600 }}>
+         <span style={{ color: C.dim, fontSize: "0.55rem", marginRight: 4 }}>{aLbl}</span>
          {fmtDate(actual)}
        </span>
     </div>
@@ -267,10 +300,12 @@ function MilestoneDatePair({ actual, estimated }: { actual?: string | null, esti
 }
 
 function MilestoneNode({
-  code, label, desc, done, active, event,
+  code, label, desc, done, active, event, excelEtd, excelEta
 }: {
   code: string; label: string; desc: string; done: boolean; active: boolean;
   event?: TrackingEvent | null;
+  excelEtd?: string | null;
+  excelEta?: string | null;
 }) {
   let actual = event?.date;
   let estimated = event?.estimated_date;
@@ -278,10 +313,32 @@ function MilestoneNode({
   if (code === "DEP" && !estimated) estimated = event?.departure_date;
   if (code === "ARR" && !estimated) estimated = event?.arrival_date;
 
+  // If we are a DEP node but the event is a pre-departure event like RCS or MAN, its date is NOT an actual departure time
+  if (code === "DEP" && event && ["RCS", "MAN", "BKD", "FOH", "DIS"].includes(event.status_code ?? "")) {
+    actual = undefined;
+    if (event.status_code === "BKD" && !estimated) {
+      estimated = event.date || event.estimated_date;
+    }
+  }
+
+  const trackerFinalDate = actual || estimated;
+  
+  const getDiffColor = (xlsDate?: string | null, trkDate?: string | null) => {
+     if (!xlsDate) return C.dim2; 
+     if (!trkDate) return C.dim; 
+     const diff = Math.abs(new Date(xlsDate).getTime() - new Date(trkDate).getTime());
+     return (diff > 3600000) ? C.red : C.green;
+  };
+
+  const hasExcelSlot = excelEtd !== undefined || excelEta !== undefined;
+  const xlType = excelEtd !== undefined ? "EDT" : "ETA";
+  const xlDate = excelEtd !== undefined ? excelEtd : excelEta;
+  const xlColor = getDiffColor(xlDate, trackerFinalDate);
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      minWidth: 100, maxWidth: 110, height: 230, // Fixed height container
+      minWidth: 100, maxWidth: 110, height: hasExcelSlot ? 260 : 230, // Increased height
     }}>
       {/* 1. Location / Station */}
       <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -290,7 +347,7 @@ function MilestoneNode({
           color: done ? C.green : active ? C.amber : C.dim,
           letterSpacing: "0.05em",
         }}>
-          {event?.location ?? "—"}
+          {(event?.location ? cleanCity(event.location) : null) ?? "—"}
         </span>
       </div>
 
@@ -328,7 +385,7 @@ function MilestoneNode({
 
       {/* 5. Date (Anchor) */}
       <div style={{ height: 38, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <MilestoneDatePair actual={actual} estimated={estimated} />
+        <MilestoneDatePair actual={actual} estimated={estimated} code={code} />
       </div>
 
       {/* 6. Pieces (Bottom Anchor) */}
@@ -339,6 +396,14 @@ function MilestoneNode({
           </span>
         )}
       </div>
+
+      {/* 7. Excel Dates (New Bottom Anchor) */}
+      {hasExcelSlot && (
+         <div style={{ height: 30, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", marginTop: "auto" }}>
+            <span style={{ fontSize: "0.55rem", color: C.dim }}>Excel {xlType}</span>
+            <span style={{ fontSize: "0.6rem", color: xlDate ? xlColor : C.dim2, fontWeight: 600 }}>{xlDate ? fmtDate(xlDate) : "---"}</span>
+         </div>
+      )}
     </div>
   );
 }
@@ -362,7 +427,7 @@ function Arrow({ done }: { done: boolean }) {
 
 // ─── Unified Timeline Engine ────────────────────────────────────────────────────────
 
-function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], events: TrackingEvent[], origin: string, destination: string }) {
+function UnifiedTimeline({ legs, events, origin, destination, excelLegs }: { legs: Leg[], events: TrackingEvent[], origin: string, destination: string, excelLegs: any[] }) {
   const elements = [];
   const presentCodes = new Set(events.map(e => e.status_code ?? ""));
   
@@ -385,17 +450,23 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
   
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
+    const xlLeg = excelLegs.find(xl => xl.from === leg.from && xl.to === leg.to) || excelLegs[i];
+    const xlEtd = xlLeg?.etd;
+    const xlEta = xlLeg?.eta;
+
     const legEvents = leg.events.filter(e => {
-      const locMatch = !e.location || e.location === leg.from || e.location === leg.to;
+      const cLoc = cleanCity(e.location);
+      const locMatch = !cLoc || cLoc === leg.from || cLoc === leg.to;
       const flightMatch = !e.flight || !leg.flightNo || e.flight === leg.flightNo;
       return locMatch && flightMatch;
     });
-    const legCodes = new Set(legEvents.map(e => e.status_code ?? ""));
 
-    const takeOffDone = legCodes.has("DEP") || legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("ARR") || presentCodes.has("DLV");
-    const depEv = legEvents.find(e => e.status_code === "DEP") || legEvents.find(e => ["BKD", "RCS", "MAN"].includes(e.status_code ?? ""));
-    const landingDone = legCodes.has("ARR") || legCodes.has("DLV") || presentCodes.has("DLV");
-    const arrEv = legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? ""));
+    const takeOffDone = legEvents.some(e => e.status_code === "DEP" && e.date) || legEvents.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date) || events.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date);
+    const landingDone = legEvents.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date) || events.some(e => e.status_code === "DLV" && e.date);
+    
+    // depEv prefers an actual DEP event, else any DEP, else BKD/RCS/MAN
+    const depEv = legEvents.find(e => e.status_code === "DEP" && e.date) || legEvents.find(e => e.status_code === "DEP") || legEvents.find(e => e.status_code === "BKD") || legEvents.find(e => ["MAN", "RCS"].includes(e.status_code ?? ""));
+    const arrEv = legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? "") && e.date) || legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? ""));
 
     // Take off
     elements.push(<Arrow key={`arr-dep-${i}`} done={takeOffDone} />);
@@ -405,7 +476,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
         code="DEP" label="Take off" desc={leg.flightNo ? `Flight ${leg.flightNo}` : "Flight"}
         done={takeOffDone} active={takeOffDone && !landingDone}
         event={depEv ? { ...depEv, location: leg.from } as any : { location: leg.from, date: leg.atd || leg.etd } as any}
-        
+        excelEtd={xlEtd}
       />
     );
     
@@ -417,7 +488,7 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
         code="ARR" label="Landing" desc={`Arrived at ${leg.to}`}
         done={landingDone} active={landingDone && !presentCodes.has("DLV") && !presentCodes.has("AWD") && !(i < legs.length - 1)}
         event={arrEv ? { ...arrEv, location: leg.to } as any : { location: leg.to } as any}
-        
+        excelEta={xlEta}
       />
     );
 
@@ -485,24 +556,46 @@ function UnifiedTimeline({ legs, events, origin, destination }: { legs: Leg[], e
 
 interface Props { data: TrackingResponse }
 
+function cleanCity(loc?: string | null): string | null {
+  if (!loc || loc === "???") return null;
+  let clean = loc.replace(/\s*\([^)]*\)/g, "").trim().toUpperCase();
+  if (clean.length === 5 && !clean.includes(" ")) {
+    clean = clean.substring(2);
+  }
+  return clean;
+}
+
 export default function MilestonePlan({ data }: Props) {
   const events = data.events ?? [];
   
-  function cleanCity(loc?: string | null): string | null {
-    if (!loc || loc === "???") return null;
-    return loc.replace(/\s*\(MAMAN\)/i, "").replace(/\s*\(Swissport\)/i, "").trim().toUpperCase();
-  }
-
   let origin = cleanCity(data.origin);
   let destination = cleanCity(data.destination);
 
+  // Fallback 1: Prefer Excel data if available and tracker data is missing
+  const excelLegs = (data.raw_meta?.excel_legs as any[]) || [];
+  if (!origin && excelLegs.length > 0) {
+    origin = cleanCity(excelLegs[0].from);
+  }
+  if (!destination && excelLegs.length > 0) {
+    destination = cleanCity(excelLegs[excelLegs.length - 1].to);
+  }
+
+  // Fallback 2: Last resort — scan events
   if (!origin) {
-    const firstWithLoc = [...events].sort((a,b) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime()).find(e => cleanCity(e.location));
+    const firstWithLoc = [...events].sort((a,b) => safeTime(a) - safeTime(b)).find(e => cleanCity(e.location));
     origin = firstWithLoc ? cleanCity(firstWithLoc.location) : "???";
   }
 
   if (!destination) {
-    const lastWithLoc = [...events].sort((a,b) => new Date(b.date||0).getTime() - new Date(a.date||0).getTime()).find(e => cleanCity(e.location));
+    const lastWithLoc = [...events]
+      .sort((a,b) => safeTime(b) - safeTime(a))
+      .find(e => {
+        const loc = cleanCity(e.location);
+        if (!loc) return false;
+        // Don't pick the origin as destination if it's just a departure scan
+        if (origin && loc === origin && (e.status_code === 'DEP' || e.status_code === 'RCS')) return false;
+        return true;
+      });
     destination = lastWithLoc ? cleanCity(lastWithLoc.location) : "???";
   }
   
@@ -518,7 +611,7 @@ export default function MilestonePlan({ data }: Props) {
   // Airline events
   const airlineEvents = events.filter(e => !groundEvents.includes(e));
 
-  const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination);
+  const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination, excelLegs);
 
   const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
   const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
@@ -596,8 +689,25 @@ export default function MilestonePlan({ data }: Props) {
       </div>
 
       {/* ── Main body: Unified Timeline Flow ── */}
-      <UnifiedTimeline legs={legs} events={events} origin={origin} destination={destination} />
+      <UnifiedTimeline legs={legs} events={events} origin={origin} destination={destination} excelLegs={excelLegs} />
       
+      {/* ── Legend ── */}
+      <div style={{
+        display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: "1rem",
+        padding: "0.8rem 1.5rem", borderTop: `1px solid ${C.border}`,
+        backgroundColor: C.bgCard, fontSize: "0.75rem", fontFamily: "monospace"
+      }}>
+        <div style={{ display: "flex", gap: "1.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: C.amber }} />
+            <span style={{ color: C.dim }}>Estimated</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: C.green }} />
+            <span style={{ color: C.dim }}>Actual</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
