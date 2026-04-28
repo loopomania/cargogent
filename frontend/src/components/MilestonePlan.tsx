@@ -455,8 +455,19 @@ function UnifiedTimeline({ legs, events, origin, destination, excelLegs }: { leg
     const xlEta = xlLeg?.eta;
 
     const legEvents = leg.events.filter(e => {
-      const cLoc = cleanCity(e.location);
-      const locMatch = !cLoc || cLoc === leg.from || cLoc === leg.to;
+      const isMatch = (target: string) => {
+        if (!target) return true;
+        const upperLoc = (e.location || "").toUpperCase();
+        const upperTarget = target.toUpperCase();
+        if (!upperLoc) return true;
+        if (cleanCity(e.location) === upperTarget) return true;
+        if (upperLoc.startsWith(upperTarget)) return true;
+        const regex = new RegExp(`\\b${upperTarget}\\b`);
+        if (regex.test(upperLoc)) return true;
+        return false;
+      };
+      
+      const locMatch = isMatch(leg.from) || isMatch(leg.to);
       const flightMatch = !e.flight || !leg.flightNo || e.flight === leg.flightNo;
       return locMatch && flightMatch;
     });
