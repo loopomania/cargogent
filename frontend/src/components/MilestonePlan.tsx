@@ -518,9 +518,12 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
   
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
-    const xlLeg = excelLegs.find(xl => cleanCity(xl.from) === leg.from && cleanCity(xl.to) === leg.to) || excelLegs[i];
-    const xlEtd = xlLeg?.etd;
-    const xlEta = xlLeg?.eta;
+    
+    const etdMatch = excelLegs.find(xl => cleanCity(xl.from) === leg.from && xl.etd);
+    const xlEtd = etdMatch ? etdMatch.etd : undefined;
+
+    const etaMatch = excelLegs.find(xl => cleanCity(xl.to) === leg.to && xl.eta);
+    const xlEta = etaMatch ? etaMatch.eta : undefined;
 
     const legEvents = leg.events.filter(e => {
       const isMatch = (target: string) => {
