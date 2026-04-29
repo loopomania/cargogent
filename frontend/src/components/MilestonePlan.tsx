@@ -137,6 +137,12 @@ interface Leg {
   events: TrackingEvent[];
 }
 
+function normalizeFlight(f?: string | null) {
+  if (!f) return null;
+  const m = f.replace(/\s+/g, '').toUpperCase().match(/^([A-Z]{2,3})0*(\d{1,4})$/);
+  return m ? `${m[1]}${m[2]}` : f.replace(/\s+/g, '').toUpperCase();
+}
+
 function buildLegs(allEvents: TrackingEvent[], origin: string, destination: string, excelLegs: any[] = []): Leg[] {
   // Only true ARR events create legs — RCF is a scan/receipt code, not a segment arrival
   // (El Al uses FOH/DIS/RCF/NFD/DLV; including RCF here causes phantom legs from ghost scans)
@@ -179,57 +185,90 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
   // Robust flight-based path reconstruction (supports split shipments)
   const chronoEvs = [...allEvents].sort((a, b) => safeTime(a) - safeTime(b));
   
-  // Find all distinct flights mentioned in DEP or ARR events
-  const flightNumbers = Array.from(new Set(
-    chronoEvs
-      .filter(e => ['DEP', 'ARR', 'DLV'].includes(e.status_code || '') && e.flight)
-      .map(e => e.flight!)
-  ));
-
   const legs: Leg[] = [];
+  const uniqueNormFlights = Array.from(new Set(chronoEvs.filter(e => e.flight).map(e => normalizeFlight(e.flight))));
+  
+  const cycleOrder: Record<string, number> = { "BKD": 1, "RCS": 2, "FOH": 2, "DIS": 2, "MAN": 3, "DEP": 4, "ARR": 5, "RCF": 6, "NFD": 7, "AWD": 8, "DLV": 9 };
 
-  if (flightNumbers.length > 0) {
-    // For each distinct flight, build its specific route
-    for (const flt of flightNumbers) {
-      const fltEvs = chronoEvs.filter(e => e.flight === flt);
-      const fltPath: string[] = [];
+  for (const norm of uniqueNormFlights) {
+      if (!norm) continue;
+      const evs = chronoEvs.filter(e => normalizeFlight(e.flight) === norm);
       
-      const firstDepLoc = cleanCity(fltEvs.find(e => e.status_code === 'DEP')?.location);
-      if (firstDepLoc) {
-        fltPath.push(firstDepLoc);
-      } else if (cleanCity(origin)) {
-        fltPath.push(cleanCity(origin)!);
+      const flightInstances: TrackingEvent[][] = [];
+      let currentInstance: TrackingEvent[] = [];
+      let maxCycleSoFar = -1;
+      
+      for (const e of evs) {
+          const idx = cycleOrder[e.status_code || ""] || 0;
+          if (idx > 0 && maxCycleSoFar >= 5 && idx <= 4) {
+              flightInstances.push(currentInstance);
+              currentInstance = [];
+              maxCycleSoFar = -1;
+          }
+          currentInstance.push(e);
+          if (idx > maxCycleSoFar) maxCycleSoFar = idx;
       }
+      if (currentInstance.length > 0) flightInstances.push(currentInstance);
 
-      for (const e of fltEvs) {
-        const loc = cleanCity(e.location);
-        if (loc && loc !== fltPath[fltPath.length - 1] && (e.status_code === 'DEP' || e.status_code === 'ARR')) {
-          fltPath.push(loc);
-        }
+      for (let instIdx = 0; instIdx < flightInstances.length; instIdx++) {
+          const fltEvs = flightInstances[instIdx];
+          const fltStr = fltEvs.find(e => e.flight)?.flight || norm;
+          const fltPath: string[] = [];
+          
+          const firstDepLoc = cleanCity(fltEvs.find(e => e.status_code === 'DEP')?.location);
+          if (firstDepLoc) {
+            fltPath.push(firstDepLoc);
+          } else if (cleanCity(origin)) {
+            fltPath.push(cleanCity(origin)!);
+          }
+
+          for (const e of fltEvs) {
+            const loc = cleanCity(e.location);
+            if (loc && loc !== fltPath[fltPath.length - 1] && (e.status_code === 'DEP' || e.status_code === 'ARR')) {
+              fltPath.push(loc);
+            }
+          }
+
+          const pureFltPath = fltPath.filter((loc, i, arr) => i === 0 || loc !== arr[i-1]);
+
+          if (pureFltPath.length === 1) {
+             const lastLoc = cleanCity([...fltEvs].reverse().find(e => cleanCity(e.location) && cleanCity(e.location) !== pureFltPath[0])?.location);
+             if (lastLoc) {
+                 pureFltPath.push(lastLoc);
+             } else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
+                 pureFltPath.push(cleanCity(destination)!);
+             }
+          }
+
+          for (let i = 0; i < pureFltPath.length - 1; i++) {
+            legs.push({
+               from: pureFltPath[i],
+               to: pureFltPath[i+1],
+               service: "FLIGHT",
+               flightNo: fltStr,
+               atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
+               // Scope events strictly to this instance so MilestoneRow doesn't pull events from other splits
+               events: fltEvs
+            });
+          }
       }
+  }
 
-      const pureFltPath = fltPath.filter((loc, i, arr) => i === 0 || loc !== arr[i-1]);
-
-      if (pureFltPath.length === 1 && cleanCity(destination)) {
-         if (pureFltPath[0] !== cleanCity(destination)) {
-             pureFltPath.push(cleanCity(destination)!);
-         }
+  // Merge Excel segments into the path if they add new information
+  for (const xl of excelLegs) {
+      const xFrom = cleanCity(xl.from);
+      const xTo = cleanCity(xl.to);
+      const exists = legs.some(l => l.from === xFrom && l.to === xTo);
+      if (!exists && xFrom && xTo) {
+         legs.push({
+             from: xFrom,
+             to: xTo,
+             service: "FLIGHT",
+             flightNo: xl.flight || null,
+             atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
+             events: allEvents
+         });
       }
-
-      for (let i = 0; i < pureFltPath.length - 1; i++) {
-        const pFrom = pureFltPath[i];
-        const pTo = pureFltPath[i+1];
-        
-        legs.push({
-           from: pFrom,
-           to: pTo,
-           service: "FLIGHT",
-           flightNo: flt,
-           atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
-           events: allEvents
-        });
-      }
-    }
   }
 
   // If no flight numbers found, or no legs generated, fallback to the old linear chronological path
@@ -251,23 +290,6 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
              to: purePath[i+1],
              service: "FLIGHT",
              flightNo: null,
-             atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
-             events: allEvents
-         });
-      }
-  }
-
-  // Merge Excel segments into the path if they add new information
-  for (const xl of excelLegs) {
-      const xFrom = cleanCity(xl.from);
-      const xTo = cleanCity(xl.to);
-      const exists = legs.some(l => l.from === xFrom && l.to === xTo);
-      if (!exists && xFrom && xTo) {
-         legs.push({
-             from: xFrom,
-             to: xTo,
-             service: "FLIGHT",
-             flightNo: xl.flight || null,
              atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
              events: allEvents
          });
@@ -410,9 +432,9 @@ function MilestoneNode({
         }}>{label}</span>
       </div>
 
-      {/* 4. Description & Flight number (Variable Middle) */}
+      {/* 4. Description & Flight number & Pieces (Variable Middle) */}
       <div style={{ 
-        flexGrow: 1, maxHeight: 50, // This section swallows the variability
+        flexGrow: 1, maxHeight: 65, // Increased height to accommodate pieces
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         gap: "0.2rem", padding: "0 4px", overflow: "hidden"
       }}>
@@ -425,6 +447,12 @@ function MilestoneNode({
             color: C.accent, background: "rgba(59,130,246,0.12)",
             borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap"
           }}>{event.flight}</span>
+        )}
+        {event?.pieces && (
+          <span style={{
+             fontFamily: "monospace", fontSize: "0.6rem", fontWeight: 600,
+             color: C.green, marginTop: "1px"
+          }}>{event.pieces} pcs</span>
         )}
       </div>
 
@@ -490,7 +518,33 @@ function buildFlows(legs: Leg[], origin: string): Leg[][] {
     traverse([start]);
   }
 
-  return flows;
+  // PRUNE INVALID MULTIPATHS (Remove cyclical tracking loops & duplicate fallback paths)
+  // The only valid reason to have multiple paths is if a shipment splits at the origin 
+  // onto more than one departure flight or different destinations.
+  const seenFirstLegs = new Set<string>();
+  const filteredFlows: Leg[][] = [];
+  
+  // Sort flows by length descending to prefer the longest path when de-duplicating
+  flows.sort((a, b) => b.length - a.length);
+
+  for (const flow of flows) {
+     const startLeg = flow[0];
+     
+     // To avoid pruning valid split shipments on the same flight number, include the date of its first event
+     const repDateStr = startLeg.events && startLeg.events.length > 0 
+           ? new Date(startLeg.events[0].date || 0).getDate() 
+           : 'NODATE';
+           
+     // A split is defined by a different destination, a different flight number, OR a different flight day
+     const legKey = `${startLeg.to}-${startLeg.flightNo || 'NOFLIGHT'}-${repDateStr}`;
+     
+     if (!seenFirstLegs.has(legKey)) {
+         seenFirstLegs.add(legKey);
+         filteredFlows.push(flow);
+     }
+  }
+
+  return filteredFlows;
 }
 
 // ─── Unified Timeline Engine ────────────────────────────────────────────────────────
@@ -519,11 +573,35 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
     
-    const etdMatch = excelLegs.find(xl => cleanCity(xl.from) === leg.from && xl.etd);
-    const xlEtd = etdMatch ? etdMatch.etd : undefined;
+    const repEv = leg.events.find(e => e.status_code === 'DEP' && e.date) || leg.events.find(e => ['ARR','RCF'].includes(e.status_code||'') && e.date) || leg.events[0];
+    const repTime = safeTime(repEv);
 
-    const etaMatch = excelLegs.find(xl => cleanCity(xl.to) === leg.to && xl.eta);
-    const xlEta = etaMatch ? etaMatch.eta : undefined;
+    let bestXl: any = null;
+    let minDiff = Infinity;
+
+    for (const xl of excelLegs) {
+       if (cleanCity(xl.from) === leg.from && cleanCity(xl.to) === leg.to) {
+           const xlFlt = normalizeFlight(xl.flight);
+           const trkFlt = normalizeFlight(leg.flightNo);
+           if (!xlFlt || !trkFlt || xlFlt === trkFlt) {
+               const xlTime = new Date(xl.etd || xl.atd || xl.eta || xl.ata || 0).getTime();
+               if (xlTime > 0 && repTime > 0) {
+                   const diff = Math.abs(xlTime - repTime);
+                   if (diff < minDiff) {
+                       minDiff = diff;
+                       bestXl = xl;
+                   }
+               } else if (!bestXl) {
+                   bestXl = xl;
+               }
+           }
+       }
+    }
+
+    const xlEtd = bestXl?.etd;
+    const xlEta = bestXl?.eta;
+    const xlPieces = bestXl?.pieces?.toString();
+    const xlWeight = bestXl?.weight?.toString();
 
     const legEvents = leg.events.filter(e => {
       const isMatch = (target: string) => {
@@ -557,7 +635,7 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
         key={`takeoff-${i}`}
         code="DEP" label="Take off" desc={leg.flightNo ? `Flight ${leg.flightNo}` : "Flight"}
         done={takeOffDone} active={takeOffDone && !landingDone}
-        event={depEv ? { ...depEv, location: leg.from } as any : { location: leg.from, date: leg.atd || leg.etd } as any}
+        event={depEv ? { ...depEv, location: leg.from, pieces: xlPieces || depEv.pieces, weight: xlWeight || depEv.weight } as any : { location: leg.from, date: leg.atd || leg.etd, pieces: xlPieces, weight: xlWeight } as any}
         excelEtd={xlEtd}
       />
     );
@@ -569,7 +647,7 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
         key={`landing-${i}`}
         code="ARR" label="Landing" desc={`Arrived at ${leg.to}`}
         done={landingDone} active={landingDone && !presentCodes.has("DLV") && !presentCodes.has("AWD") && !(i < legs.length - 1)}
-        event={arrEv ? { ...arrEv, location: leg.to } as any : { location: leg.to } as any}
+        event={arrEv ? { ...arrEv, location: leg.to, pieces: xlPieces || arrEv.pieces, weight: xlWeight || arrEv.weight } as any : { location: leg.to, pieces: xlPieces, weight: xlWeight } as any}
         excelEta={xlEta}
       />
     );
@@ -749,6 +827,22 @@ export default function MilestonePlan({ data }: Props) {
             {groundNames}
           </div>
         )}
+
+        {/* Pieces Count */}
+        {(() => {
+          const maxPcs = Math.max(0, ...events.map(e => parseInt(String(e.pieces).replace(/[^0-9]/g, "")) || 0));
+          if (maxPcs > 0) {
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+                <Package size={15} color={C.dim} />
+                <span style={{ fontSize: "0.82rem", color: C.dim, fontWeight: 600 }}>
+                  {maxPcs} pcs
+                </span>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Flow Paths Count */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
