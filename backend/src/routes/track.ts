@@ -81,7 +81,6 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
           SELECT shipment_id 
           FROM excel_transport_lines 
           WHERE tenant_id = $1 AND master_awb = $2
-          ORDER BY created_at DESC
           LIMIT 1
        )
        SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
@@ -129,10 +128,53 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
   }
   return data;
 }
+export function normalizeEventDate(rawStr: string | null | undefined): string | null {
+  const raw = (rawStr || "").trim();
+  if (!raw) return null;
+
+  // 1. ISO or YYYY-MM-DD (e.g., United, Maman)
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d{3}Z)?)?/);
+  if (isoMatch && raw.includes('Z')) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  } else if (isoMatch) {
+    const [, y, m, d, hh = "00", mi = "00", ss = "00"] = isoMatch;
+    const parsed = new Date(`${y}-${m}-${d}T${hh}:${mi}:${ss}`);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+
+  // 2. DD/MM/YY HH:MM (Delta, Lufthansa, etc.)
+  const ddmmyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+  if (ddmmyy) {
+    const [, dd, mm, yy, hh = "00", mi = "00"] = ddmmyy;
+    const parsed = new Date(`20${yy}-${mm}-${dd}T${hh}:${mi}:00`);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+
+  // 3. DD MON HH:MM
+  const ddmon = raw.match(/^(\d{1,2})\s+([A-Z]{3})(?:\s+(\d{2}:\d{2}))?/i);
+  if (ddmon) {
+    const months: Record<string, string> = {
+      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
+    };
+    const m = months[ddmon[2].toUpperCase()] ?? "01";
+    const time = ddmon[3] ?? "00:00";
+    const year = new Date().getFullYear();
+    const parsed = new Date(`${year}-${m}-${ddmon[1].padStart(2, "0")}T${time}:00`);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+
+  // 4. Last resort: Standard JS Date
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString();
+
+  return raw;
+}
 
 
 /** Shared helper: persist a tracking result into query_schedule + leg_status_summary + query_events */
-async function saveTrackingResult(
+export async function saveTrackingResult(
   tenantId: string,
   awb: string,
   hawb: string | undefined,
@@ -153,15 +195,43 @@ async function saveTrackingResult(
 
   let events = data.events || [];
   
-  // If Python returned ground_only, it skipped the airline tracker. We MUST restore existing airline events from DB.
-  if (data.raw_meta?.ground_only) {
+  // If Python returned ground_only, or if the primary airline tracker failed (Error/Circuit Breaker),
+  // we MUST restore existing airline events from DB to prevent a destructive wipe.
+  const hasAirlineError = data.status === "Error" || data.status?.toLowerCase().includes("circuit breaker");
+  
+  if (data.raw_meta?.ground_only || hasAirlineError) {
     const existingAirlineEvents = await p.query(
       `SELECT payload FROM query_events WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3 AND source = 'airline'`,
       [tenantId, mawb, hawbKey]
     );
-    const airlineEvs = existingAirlineEvents.rows.map(r => JSON.parse(r.payload));
+    const airlineEvs = existingAirlineEvents.rows.map(r => typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload);
     events = [...events, ...airlineEvs];
+    
+    // If we restored airline events, ensure the status doesn't revert to "Error"
+    if (hasAirlineError && airlineEvs.length > 0) {
+      data.status = airlineEvs[airlineEvs.length - 1].status || data.status;
+    }
   }
+
+  // NORMALIZATION & DEDUPLICATION
+  const uniqueEventsMap = new Map<string, any>();
+  for (const ev of events) {
+    ev.date = normalizeEventDate(ev.date) || ev.date;
+    if (ev.departure_date) ev.departure_date = normalizeEventDate(ev.departure_date) || ev.departure_date;
+    if (ev.arrival_date) ev.arrival_date = normalizeEventDate(ev.arrival_date) || ev.arrival_date;
+
+    const code = ev.status_code || "UNKN";
+    const loc = (ev.location || "").trim().toUpperCase();
+    const dt = ev.date || "";
+    const pcs = ev.pieces || ev.actual_pieces || "0";
+    const key = `${code}|${loc}|${dt}|${pcs}`;
+    
+    // Prefer the first encountered if collision
+    if (!uniqueEventsMap.has(key)) {
+      uniqueEventsMap.set(key, ev);
+    }
+  }
+  events = Array.from(uniqueEventsMap.values());
 
   const sorted = [...events].sort(
     (a: any, b: any) =>
@@ -246,10 +316,45 @@ async function saveTrackingResult(
     }
   }
 
+  const ataEventObj = sorted.find(
+    (e: any) => e.status_code === "ARR" || e.status_code === "RCF" || e.status_code === "DLV"
+  );
+  const ataEvent = ataEventObj?.date;
+  const etaEvent = sorted.find(
+    (e: any) => e.status_code === "ARR" || e.status_code === "RCF"
+  )?.estimated_date ?? data.eta;
+
   const isAirborne = derivedStatus === "Departed" || derivedStatus === "DEP";
   const groundHours = Math.floor(Math.random() * (9 - 6 + 1)) + 6; // 6 to 9
   const airHours = Math.floor(Math.random() * (15 - 10 + 1)) + 10; // 10 to 15
-  const intervalStr = isAirborne ? `${airHours} hours` : `${groundHours} hours`;
+  let intervalStr = isAirborne ? `${airHours} hours` : `${groundHours} hours`;
+
+  const isExportGlobal = data.origin === "TLV" || data.origin === "TEL AVIV" || (!!data.raw_meta?.ground_query_method && hawbKey.startsWith("ISR"));
+  if (isExportGlobal && ataEventObj && ataEvent) {
+    const destLoc = data.destination;
+    const ataLoc = ataEventObj.location;
+    let isFinalDest = false;
+    
+    if (ataLoc && destLoc && ataLoc.toUpperCase().includes(destLoc.toUpperCase())) {
+      isFinalDest = true;
+    } else if (!destLoc && ataLoc) {
+       const excel_legs = data.raw_meta?.excel_legs || [];
+       const finalExcelDest = excel_legs.length > 0 ? excel_legs[excel_legs.length - 1].to : null;
+       if (finalExcelDest && ataLoc.toUpperCase().includes(finalExcelDest.toUpperCase())) {
+         isFinalDest = true;
+       }
+    }
+
+    if (isFinalDest) {
+      const daysSinceAta = (Date.now() - new Date(ataEvent).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceAta >= 3) {
+        isFullyDelivered = true;
+        data.message = (data.message ? data.message + " | " : "") + "Stopped tracking";
+      } else {
+        intervalStr = '24 hours';
+      }
+    }
+  }
 
   // 1. Upsert into query_schedule so it shows up in Tracked List
   if (domainName) {
@@ -276,12 +381,6 @@ async function saveTrackingResult(
       [tenantId, mawb, hawbKey, groundOnly]
     );
   }
-  const ataEvent = sorted.find(
-    (e: any) => e.status_code === "ARR" || e.status_code === "RCF" || e.status_code === "DLV"
-  )?.date;
-  const etaEvent = sorted.find(
-    (e: any) => e.status_code === "ARR" || e.status_code === "RCF"
-  )?.estimated_date ?? data.eta;
   
   const etdEvent = sorted.find(
     (e: any) => e.status_code === "DEP"
@@ -692,18 +791,26 @@ router.post("/run-scheduled", async (req, res) => {
           [row.tenant_id, row.mawb, row.hawb, JSON.stringify({ message: "No change detected in the past 24 hours" })]
         );
         await p.query(
-          `UPDATE query_schedule SET stale_alert_sent = true, is_halted = true WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3`,
+          `UPDATE query_schedule SET stale_alert_sent = true WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3`,
           [row.tenant_id, row.mawb, row.hawb]
         );
       }
     }
 
-    // Fetch up to 100 pending tracking jobs
+    // 1. Global concurrency lock: don't fetch new jobs if we are already saturated
+    if (activeWorkerTotal >= 5) {
+      res.json({ message: "Worker busy", count: 0 });
+      return;
+    }
+
+    // Fetch up to 100 pending tracking jobs, excluding those already Delivered
     const pendingQuery = await p.query(
-      `SELECT tenant_id, mawb, hawb, ground_only FROM query_schedule 
-       WHERE next_status_check_at <= now() 
-         AND is_halted = false 
-         AND stale_alert_sent = false 
+      `SELECT q.tenant_id, q.mawb, q.hawb, q.ground_only 
+       FROM query_schedule q
+       LEFT JOIN leg_status_summary l ON l.tenant_id = q.tenant_id AND l.shipment_id = COALESCE(q.hawb, q.mawb) AND l.leg_sequence = 1
+       WHERE q.next_status_check_at <= now() 
+         AND q.is_halted = false 
+         AND COALESCE(l.aggregated_status, '') NOT IN ('Status DLV', 'Delivered')
        LIMIT 100`
     );
     
@@ -726,14 +833,14 @@ router.post("/run-scheduled", async (req, res) => {
       let localActiveTotal = 0;
       const activeAirlines: Record<string, number> = {};
 
-      const pump = () => {
-        if (queue.length === 0 && localActiveTotal === 0) return;
+        const pump = () => {
+          if (queue.length === 0 && localActiveTotal === 0) return;
 
-        while (localActiveTotal < 20 && queue.length > 0) {
-          const idx = queue.findIndex(r => {
-            const prefix = r.mawb.substring(0, 3);
-            return (activeAirlines[prefix] || 0) < 2;
-          });
+          while (activeWorkerTotal < 5 && queue.length > 0) {
+            const idx = queue.findIndex(r => {
+              const prefix = r.mawb.substring(0, 3);
+              return (activeAirlines[prefix] || 0) < 2;
+            });
 
           if (idx === -1) break;
 
@@ -830,10 +937,7 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
       logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
-    // Persist to DB so it appears in Tracked List
-    const tenantId = await getActualTenantId(user, awb, hawb as string | undefined);
-    await appendExcelDatesToTrackingData(tenantId, awb, hawb as string | undefined, data);
-    await saveTrackingResult(user?.tenant_id, awb, hawb as string | undefined, data, user?.username);
+    // Return data without persisting to DB for ad-hoc queries
     res.status(status).json(data);
   } catch (err) {
     console.error("trackByAirline error:", err);
@@ -871,10 +975,7 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
       logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
-    // Persist to DB so it appears in Tracked List
-    const tenantId = await getActualTenantId(user, awb, hawb as string | undefined);
-    await appendExcelDatesToTrackingData(tenantId, awb, hawb as string | undefined, data);
-    await saveTrackingResult(user?.tenant_id, awb, hawb as string | undefined, data, user?.username);
+    // Return data without persisting to DB for ad-hoc queries
     res.status(status).json(data);
   } catch (err) {
     console.error("trackByAwb error:", err);
