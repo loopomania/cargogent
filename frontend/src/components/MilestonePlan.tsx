@@ -847,7 +847,7 @@ export default function MilestonePlan({ data }: Props) {
         {/* Flow Paths Count */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
           <span style={{ fontSize: "0.75rem", color: C.dim2, fontWeight: 600 }}>
-            {flowsToRender.length} path{flowsToRender.length !== 1 ? "s" : ""}
+            {flows.length} path{flows.length !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
