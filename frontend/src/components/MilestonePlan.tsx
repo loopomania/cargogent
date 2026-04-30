@@ -769,8 +769,21 @@ export default function MilestonePlan({ data }: Props) {
   const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination, excelLegs);
   const rawFlows = buildFlows(legs, origin);
   
-  const flows = rawFlows.filter(flow => !flow.some(leg => leg.events && leg.events.length > 0 && leg.events.every(e => e.pieces === "0")));
-  const failedFlows = rawFlows.filter(flow => flow.some(leg => leg.events && leg.events.length > 0 && leg.events.every(e => e.pieces === "0")));
+  const shipmentHasTransit = events.some(e => ['DEP', 'ARR', 'MAN', 'RCF'].includes(e.status_code || ''));
+
+  const flows = rawFlows.filter(flow => {
+      const isUnloaded = flow.some(leg => leg.events && leg.events.length > 0 && leg.events.every(e => Number(e.pieces) === 0));
+      if (isUnloaded) return false;
+
+      if (shipmentHasTransit) {
+          const flowHasTransit = flow.some(leg => leg.events && leg.events.some(e => ['DEP', 'ARR', 'MAN', 'RCF'].includes(e.status_code || '')));
+          if (!flowHasTransit) return false;
+      }
+      
+      return true;
+  });
+
+  const failedFlows = rawFlows.filter(flow => !flows.includes(flow));
 
   const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
   const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
@@ -882,22 +895,26 @@ export default function MilestonePlan({ data }: Props) {
         <div style={{
           margin: "0 1.5rem 1.5rem 1.5rem",
           padding: "1rem",
-          backgroundColor: "rgba(183, 28, 28, 0.05)",
-          border: `1px solid rgba(183, 28, 28, 0.2)`,
+          backgroundColor: "rgba(251, 192, 45, 0.05)",
+          border: `1px solid rgba(251, 192, 45, 0.2)`,
           borderRadius: 8,
           display: "flex",
           flexDirection: "column",
           gap: "0.5rem"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#b71c1c", fontWeight: 600, fontSize: "0.85rem" }}>
-            <span style={{ fontSize: "1rem" }}>⚠️</span> Unloaded / Failed Routes
-          </div>
-          <div style={{ color: C.dim, fontSize: "0.8rem", lineHeight: 1.5 }}>
-            The following planned routes were skipped or failed to load cargo (0 pieces recorded):
+          <div style={{ color: "#fbc02d", fontSize: "0.85rem" }}>
+            Unloaded / Failed Routes:
             <ul style={{ margin: "0.5rem 0 0 1.5rem", padding: 0 }}>
-              {failedFlows.map((f, i) => (
-                <li key={i}>{f.map(l => `${l.from} ➔ ${l.to} (${l.flightNo || 'Unknown'})`).join(' , ')}</li>
-              ))}
+              {failedFlows.map((f, i) => {
+                 const firstLeg = f[0];
+                 const firstEv = firstLeg.events?.[0];
+                 const depTime = firstEv?.date ? new Date(firstEv.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown';
+                 return (
+                   <li key={i} style={{ color: C.dim }}>
+                     {f.map(l => `${l.from} ➔ ${l.to}`).join(' , ')} | Flight: {firstLeg.flightNo || 'Unknown'} | Planned: {depTime}
+                   </li>
+                 );
+              })}
             </ul>
           </div>
         </div>
