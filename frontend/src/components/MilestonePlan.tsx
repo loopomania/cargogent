@@ -235,8 +235,13 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
              const lastLoc = cleanCity([...fltEvs].reverse().find(e => cleanCity(e.location) && cleanCity(e.location) !== pureFltPath[0])?.location);
              if (lastLoc) {
                  pureFltPath.push(lastLoc);
-             } else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
-                 pureFltPath.push(cleanCity(destination)!);
+             } else {
+                 const matchingXl = excelLegs.find(xl => cleanCity(xl.from) === pureFltPath[0]);
+                 if (matchingXl && cleanCity(matchingXl.to)) {
+                     pureFltPath.push(cleanCity(matchingXl.to)!);
+                 } else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
+                     pureFltPath.push(cleanCity(destination)!);
+                 }
              }
           }
 
