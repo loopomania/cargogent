@@ -52,49 +52,65 @@ class ElAlTracker(AirlineTracker):
             trace.append("init_playwright_cdp")
             try:
                 with sync_playwright() as p:
-                    # Expecting self.proxy to be a wss:// endpoint specifically for Scraping Browser
-                    trace.append("connecting_ws")
-                    browser = p.chromium.connect_over_cdp(self.proxy)
-                    page = browser.new_page()
-                    
-                    # === AKAMAI MITIGATION (TELEMETRY FARMING) ===
-                    trace.append("farming_akamai_telemetry_pw")
-                    
-                    page.goto(legacy_url, timeout=60000)
-                    time.sleep(random.uniform(2.5, 4.0)) # bm_sz pacing
-        
-                    # Generate generic physical telemetry (Mouse / Scrolling)
-                    try:
-                        page.mouse.move(random.randint(100, 500), random.randint(100, 500))
-                        for _ in range(3):
-                            page.mouse.move(random.randint(50, 400), random.randint(50, 400))
-                            time.sleep(random.uniform(0.3, 1.2))
-                        
-                        page.mouse.wheel(delta_x=0, delta_y=random.randint(100, 400))
-                        time.sleep(random.uniform(1.0, 2.0))
-                    except Exception as act_e:
-                        trace.append(f"telemetry_fail:{str(act_e)[:20]}")
-        
-                    # Allow Akamai to process our telemetry payload. If the _abck cookie was blocked (-1),
-                    # this reload forces the server to inspect our telemetry and issue a validated token.
-                    page.reload(timeout=60000)
-                    trace.append("akamai_cookies_upgraded_pw")
-                    time.sleep(random.uniform(2.5, 4.0)) # Let the new cookies settle
-                    
-                    # Fetching the formatted innerText directly off the DOM
-                    legacy_text = page.evaluate("document.body.innerText")
-                    if legacy_text:
-                        trace.append(f"legacy_text_len:{len(legacy_text)}")
-                    
-                    browser.close()
+                    for attempt in range(2):
+                        trace.append(f"attempt_{attempt+1}")
+                        try:
+                            # Expecting self.proxy to be a wss:// endpoint specifically for Scraping Browser
+                            trace.append("connecting_ws")
+                            browser = p.chromium.connect_over_cdp(self.proxy)
+                            page = browser.new_page()
+                            
+                            # === AKAMAI MITIGATION (TELEMETRY FARMING) ===
+                            trace.append("farming_akamai_telemetry_pw")
+                            
+                            page.goto(legacy_url, timeout=60000)
+                            time.sleep(random.uniform(2.5, 4.0)) # bm_sz pacing
+                
+                            # Generate generic physical telemetry (Mouse / Scrolling)
+                            try:
+                                page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                                for _ in range(3):
+                                    page.mouse.move(random.randint(50, 400), random.randint(50, 400))
+                                    time.sleep(random.uniform(0.3, 1.2))
+                                
+                                page.mouse.wheel(delta_x=0, delta_y=random.randint(100, 400))
+                                time.sleep(random.uniform(1.0, 2.0))
+                            except Exception as act_e:
+                                trace.append(f"telemetry_fail:{str(act_e)[:20]}")
+                
+                            # Allow Akamai to process our telemetry payload. If the _abck cookie was blocked (-1),
+                            # this reload forces the server to inspect our telemetry and issue a validated token.
+                            page.reload(timeout=60000)
+                            trace.append("akamai_cookies_upgraded_pw")
+                            time.sleep(random.uniform(2.5, 4.0)) # Let the new cookies settle
+                            
+                            # Fetching the formatted innerText directly off the DOM
+                            legacy_text = page.evaluate("document.body.innerText")
+                            
+                            browser.close()
+                            
+                            # Validate text
+                            if not legacy_text or "Access Denied" in legacy_text or "Access denied" in legacy_text:
+                                trace.append("akamai_blocked_legacy")
+                                time.sleep(2) # Give proxy pool a breath before retry
+                                continue # Try again
+                            
+                            trace.append(f"legacy_text_len:{len(legacy_text)}")
+                            break # Success, exit retry loop
+                            
+                        except Exception as inner_e:
+                            trace.append(f"driver_error_attempt_{attempt+1}:{str(inner_e)[:40]}")
+                            time.sleep(2)
+                            continue
+
             except Exception as e:
                 trace.append(f"driver_error:{str(e)[:40]}")
                 message = f"Driver Error: {str(e)[:40]}"
         
         # STRATEGY 1: Legacy Text URL Parsing
         if legacy_text:
-            if "Access Denied" in legacy_text:
-                trace.append("akamai_blocked_legacy")
+            if "Access Denied" in legacy_text or "Access denied" in legacy_text:
+                trace.append("akamai_blocked_legacy_final")
                 blocked = True
                 message = "Akamai / bot protection blocked the request."
             else:
@@ -118,10 +134,32 @@ class ElAlTracker(AirlineTracker):
             def parse_dt(e):
                 try:
                     return datetime.strptime(e.date, "%d %b %y %H:%M")
-                except:
-                    return datetime.min
+                except ValueError:
+                    try:
+                        return datetime.strptime(e.date, "%d-%b-%y %H:%M")
+                    except ValueError:
+                        pass
+                return datetime.min
 
-            events.sort(key=parse_dt)
+            # Deduplicate events (same status, date, location)
+            unique_events = []
+            seen = set()
+            for e in events:
+                # Normalize date string to avoid mismatch based on format
+                dt = parse_dt(e)
+                if dt != datetime.min:
+                    e.date = dt.strftime("%Y-%m-%d %H:%M")
+                
+                key = (e.status_code, e.location, e.date)
+                if key not in seen:
+                    seen.add(key)
+                    unique_events.append(e)
+
+            events = unique_events
+            
+            # Sort by the parsed datetime
+            events.sort(key=lambda e: e.date)
+            
             dep_events = [e for e in events if e.status_code == "DEP"]
             arr_events = [e for e in events if e.status_code == "ARR"]
             
@@ -188,7 +226,43 @@ class ElAlTracker(AirlineTracker):
 
     def _parse_legacy_text(self, text: str) -> List[TrackingEvent]:
         events: List[TrackingEvent] = []
+        failed_flights = set()
         
+        # 1. Parse flight legs (Table 2) first to identify failed/unloaded flights
+        pattern2 = r"([A-Z0-9]{2}\s+\d+)\s*[|\t ]+\s*[^|\t\n]+[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*(\d+)\s*[|\t ]+\s*([\d.]+)(?:\s*[|\t ]+\s*(\d+)\s*[|\t ]+\s*([\d.]+))?"
+        for m in re.finditer(pattern2, text):
+            g = m.groups()
+            flight_num = g[0].strip()
+            loaded_pcs = g[9]
+            
+            if loaded_pcs == '0':
+                failed_flights.add(flight_num)
+                # Normalize flight string to remove extra spaces just in case
+                failed_flights.add(re.sub(r'\s+', ' ', flight_num))
+                continue
+                
+            events.append(TrackingEvent(
+                flight=flight_num,
+                date=g[2].strip(), 
+                location=g[5].strip(), 
+                status_code="DEP",
+                pieces=g[7].strip(),
+                weight=g[8].strip(),
+                status=f"Departed {flight_num} from {g[5].strip()}",
+                remarks=f"Flight {flight_num} to {g[6].strip()}"
+            ))
+            events.append(TrackingEvent(
+                flight=flight_num,
+                date=g[4].strip(),
+                location=g[6].strip(),
+                status_code="ARR",
+                pieces=g[7].strip(),
+                weight=g[8].strip(),
+                status=f"Arrived {flight_num} at {g[6].strip()}",
+                remarks=f"Flight {flight_num} from {g[5].strip()}"
+            ))
+            
+        # 2. Parse status history (Table 1)
         event_pattern = r"^([A-Z]{3})\s+([A-Z]{3})\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2})\s+(\d{2}:\d{2})\s+(\d+)\s+([\d.]+)(.*)$"
         
         for line in text.split('\n'):
@@ -207,8 +281,16 @@ class ElAlTracker(AirlineTracker):
                 remarks = None
                 
                 if trailing:
-                    if re.match(r"^([A-Z]{2,3})\s*(\d{3,4})$", trailing):
-                        flight = trailing
+                    flight_match = re.search(r"([A-Z]{2,3})\s*(\d{1,4})", trailing, re.IGNORECASE)
+                    if flight_match:
+                        flight_val = f"{flight_match.group(1)} {flight_match.group(2)}"
+                        # Strip flight if it's a known failed flight
+                        norm_flight = re.sub(r'\s+', ' ', flight_val)
+                        if norm_flight in failed_flights or flight_val in failed_flights:
+                            flight = None
+                            remarks = trailing
+                        else:
+                            flight = flight_val
                     else:
                         remarks = trailing
                         
@@ -221,31 +303,6 @@ class ElAlTracker(AirlineTracker):
                     status=f"Status {status_code}",
                     flight=flight,
                     remarks=remarks
-                ))
-        
-        if not events:
-            pattern2 = r"(LY\s+\d+)\s*[|\t ]+\s*[^|\t\n]+[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z])\s*[|\t ]+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{2}:\d{2})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*([A-Z]{3})\s*[|\t ]+\s*(\d+)\s*[|\t ]+\s*([\d.]+)"
-            for m in re.finditer(pattern2, text):
-                g = m.groups()
-                events.append(TrackingEvent(
-                    flight=g[0],
-                    date=g[2].strip(), 
-                    location=g[5].strip(), 
-                    status_code="DEP" if g[1] == "E" else g[1],
-                    pieces=g[7].strip(),
-                    weight=g[8].strip(),
-                    status=f"Departed {g[0]} from {g[5]}",
-                    remarks=f"Flight {g[0]} to {g[6]}"
-                ))
-                events.append(TrackingEvent(
-                    flight=g[0],
-                    date=g[4].strip(),
-                    location=g[6].strip(),
-                    status_code="ARR" if g[3] == "A" else g[3],
-                    pieces=g[7].strip(),
-                    weight=g[8].strip(),
-                    status=f"Arrived {g[0]} at {g[6]}",
-                    remarks=f"Flight {g[0]} from {g[5]}"
                 ))
                 
         return events
