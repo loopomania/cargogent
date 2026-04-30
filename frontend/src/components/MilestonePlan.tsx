@@ -767,7 +767,10 @@ export default function MilestonePlan({ data }: Props) {
   const airlineEvents = events.filter(e => !groundEvents.includes(e));
 
   const legs = buildLegs(airlineEvents.length > 0 ? airlineEvents : events, origin, destination, excelLegs);
-  const flows = buildFlows(legs, origin);
+  const rawFlows = buildFlows(legs, origin);
+  
+  const flows = rawFlows.filter(flow => !flow.some(leg => leg.events && leg.events.length > 0 && leg.events.every(e => e.pieces === "0")));
+  const failedFlows = rawFlows.filter(flow => flow.some(leg => leg.events && leg.events.length > 0 && leg.events.every(e => e.pieces === "0")));
 
   const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
   const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
@@ -874,6 +877,31 @@ export default function MilestonePlan({ data }: Props) {
           </div>
         )}
       </div>
+      
+      {failedFlows.length > 0 && (
+        <div style={{
+          margin: "0 1.5rem 1.5rem 1.5rem",
+          padding: "1rem",
+          backgroundColor: "rgba(183, 28, 28, 0.05)",
+          border: `1px solid rgba(183, 28, 28, 0.2)`,
+          borderRadius: 8,
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#b71c1c", fontWeight: 600, fontSize: "0.85rem" }}>
+            <span style={{ fontSize: "1rem" }}>⚠️</span> Unloaded / Failed Routes
+          </div>
+          <div style={{ color: C.dim, fontSize: "0.8rem", lineHeight: 1.5 }}>
+            The following planned routes were skipped or failed to load cargo (0 pieces recorded):
+            <ul style={{ margin: "0.5rem 0 0 1.5rem", padding: 0 }}>
+              {failedFlows.map((f, i) => (
+                <li key={i}>{f.map(l => `${l.from} ➔ ${l.to} (${l.flightNo || 'Unknown'})`).join(' , ')}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
       
       {/* ── Legend ── */}
       <div style={{
