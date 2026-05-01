@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchStoredTracking, trackByAwb, type TrackingResponse } from "../lib/api";
+import { canonicalShipmentPieceCount, parsePiecesCount } from "../lib/shipmentPiecesDisplay";
 import MilestonePlan from "./MilestonePlan";
 import EventTimelineTable from "./EventTimelineTable";
 
@@ -128,6 +129,11 @@ export default function AwbDetailPanel({
     }
   };
 
+  const detailHeaderPieces =
+    details?.milestone_projection != null
+      ? canonicalShipmentPieceCount(details.milestone_projection, details.raw_meta?.pieces)
+      : parsePiecesCount(details?.raw_meta?.pieces);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <style>{`@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
@@ -170,11 +176,11 @@ export default function AwbDetailPanel({
                   </span>
                 </>
               )}
-              {Boolean(details?.raw_meta?.pieces) && (
+              {detailHeaderPieces > 0 && (
                 <>
                   <span style={{ color: "var(--text-muted)" }}>·</span>
                   <span style={{ fontSize: "0.85rem", color: "var(--text)", fontWeight: 500 }}>
-                    {String(details?.raw_meta?.pieces)} Pcs
+                    {detailHeaderPieces} Pcs
                   </span>
                 </>
               )}

@@ -1,6 +1,7 @@
 
 import { Plane, CheckCircle, Clock, Bookmark, Archive, Package, Truck } from "lucide-react";
 import type { TrackingEvent, TrackingResponse, MilestoneProjectionStep } from "../lib/api";
+import { canonicalShipmentPieceCount } from "../lib/shipmentPiecesDisplay";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -741,6 +742,7 @@ function CanonicalMilestonePlan({ data }: Props) {
   const proj = data.milestone_projection!;
   const meta = proj.meta;
   const statusColor = meta.is_dlv ? C.green : meta.is_err ? C.amber : C.accent;
+  const headerPieces = canonicalShipmentPieceCount(proj, data.raw_meta?.pieces);
 
   return (
     <div style={{
@@ -782,11 +784,11 @@ function CanonicalMilestonePlan({ data }: Props) {
             {meta.ground_handlers_label}
           </div>
         )}
-        {meta.max_pieces > 0 && (
+        {headerPieces > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
             <Package size={15} color={C.dim} />
             <span style={{ fontSize: "0.82rem", color: C.dim, fontWeight: 600 }}>
-              {meta.max_pieces} pcs
+              {headerPieces} pcs
             </span>
           </div>
         )}
