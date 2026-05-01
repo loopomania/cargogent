@@ -203,12 +203,89 @@ function testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs() {
     ],
     excelPiecesHint: 1,
   });
+  assert.equal(p.meta.paths_count, 1, "LY then TG excel must not fan out duplicate TLV→BKK edges");
   assert.equal(p.meta.max_pieces, 4);
   assert.match(p.meta.overall_status, /Received from Flight/i);
   const flow0 = p.flows_steps[0].filter(s => s.kind === "node") as { code: string; pieces?: string | null; flight?: string | null }[];
   const lyDep = flow0.find(n => n.code === "DEP" && n.flight === "LY0081");
   assert.ok(lyDep, "LY0081 DEP node");
   assert.equal(lyDep?.pieces, "4");
+}
+
+/** TG0325 with only bookings at hub must use excel BKK→BLR (not TLV→BKK from shipment origin). */
+function testBkOnlyConnectingFlightUsesExcelEndpoints() {
+  const p = computeMilestoneProjection({
+    events: [
+      {
+        status_code: "BKD",
+        status: "Booking Confirmed",
+        location: "TLV",
+        date: "2026-04-29T07:32:00.000Z",
+        flight: "LY0081",
+        pieces: "4",
+        source: "airline",
+      },
+      {
+        status_code: "RCS",
+        status: "Received from Shipper",
+        location: "TLV",
+        date: "2026-04-30T07:31:00.000Z",
+        pieces: "4",
+        source: "airline",
+      },
+      {
+        status_code: "DEP",
+        status: "Departed",
+        location: "TLV",
+        date: "2026-04-30T19:55:00.000Z",
+        flight: "LY0081",
+        pieces: "4",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        status: "Arrived",
+        location: "BKK",
+        date: "2026-05-01T08:17:00.000Z",
+        flight: "LY0081",
+        pieces: "4",
+        source: "airline",
+      },
+      {
+        status_code: "RCF",
+        status: "Received from Flight",
+        location: "BKK",
+        date: "2026-05-01T08:18:00.000Z",
+        flight: "LY0081",
+        pieces: "2",
+        source: "airline",
+      },
+      {
+        status_code: "BKD",
+        status: "Booking Confirmed",
+        location: "BKK",
+        date: "2026-05-01T16:48:00.000Z",
+        flight: "TG0325",
+        pieces: "4",
+        source: "airline",
+      },
+    ],
+    origin: "TLV",
+    destination: "BLR",
+    status: null,
+    excelLegs: [
+      { from: "TLV", to: "BKK", flight: "LY0081" },
+      { from: "BKK", to: "BLR", flight: "TG0325" },
+    ],
+    excelPiecesHint: 1,
+  });
+  assert.equal(p.meta.paths_count, 1);
+  const nodeFlights = p.flows_steps[0]
+    .filter(s => s.kind === "node")
+    .map(s => (s.kind === "node" ? s.flight : undefined))
+    .filter((f): f is string => !!f);
+  assert.ok(nodeFlights.includes("LY0081"), "expect LY leg");
+  assert.ok(nodeFlights.includes("TG0325"), "expect TG planned leg");
 }
 
 function testZeroPiecesWithoutUnloadSignalKeepsPath() {
@@ -255,6 +332,7 @@ try {
   testSinglePieceHintCollapsesMultiPath();
   testExcelOneHintDoesNotCollapseWhenAirlineShowsFourPcs();
   testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs();
+  testBkOnlyConnectingFlightUsesExcelEndpoints();
   testFingerPrintStableAcrossTwoCalls();
   testZeroPiecesWithoutUnloadSignalKeepsPath();
   console.log("[milestoneEngine.contract.test] OK");

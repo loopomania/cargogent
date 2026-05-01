@@ -410,18 +410,33 @@ function buildLegs(
 
       const pureFltPath = fltPath.filter((loc, i, arr) => i === 0 || loc !== arr[i - 1]);
 
+      const hasDepOrArrMovement = fltEvs.some(
+        e => e.status_code === "DEP" || e.status_code === "ARR" || e.status_code === "DLV",
+      );
+
       if (pureFltPath.length === 1) {
-        const lastLoc = cleanCity([...fltEvs].reverse().find(e => {
-          const lc = cleanCity(e.location);
-          return lc && lc !== pureFltPath[0] && lc;
-        })?.location);
-        if (lastLoc) {
-          pureFltPath.push(lastLoc);
+        const xlSeg = excelRouteForNormalizedFlight(norm, excelLegs);
+        // Connect flight with only bookings (BKD/MAN/RCS at hub) — do not stitch from shipment origin?
+        // Wrong: TLV + BKD@BKK produced a phantom TLV→BKK for the *next* carrier's flight number.
+        if (xlSeg && !hasDepOrArrMovement) {
+          pureFltPath.length = 0;
+          pureFltPath.push(xlSeg.from, xlSeg.to);
         } else {
-          const matchingXl = excelLegs.find(xl => cleanCity(String(xl.from)) === pureFltPath[0]);
-          if (matchingXl && cleanCity(String(matchingXl.to))) pureFltPath.push(cleanCity(String(matchingXl.to))!);
-          else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
-            pureFltPath.push(cleanCity(destination)!);
+          const lastLoc = cleanCity(
+            [...fltEvs].reverse().find(e => {
+              const lc = cleanCity(e.location);
+              return lc && lc !== pureFltPath[0] && lc;
+            })?.location,
+          );
+          if (lastLoc) {
+            pureFltPath.push(lastLoc);
+          } else {
+            const matchingXl = excelLegs.find(xl => cleanCity(String(xl.from)) === pureFltPath[0]);
+            if (matchingXl && cleanCity(String(matchingXl.to)))
+              pureFltPath.push(cleanCity(String(matchingXl.to))!);
+            else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
+              pureFltPath.push(cleanCity(destination)!);
+            }
           }
         }
       }
@@ -569,6 +584,20 @@ function buildFlows(legs: Leg[], origin: string): Leg[][] {
 
 function excelLegArray(excelLegs: ExcelLegInput[]): ExcelLegInput[] {
   return Array.isArray(excelLegs) ? excelLegs : [];
+}
+
+/** Match importer / planned routing for this flight — critical when only BKD/MAN scans exist */
+function excelRouteForNormalizedFlight(norm: string, excelLegsRaw: ExcelLegInput[]): SegmentInfo | null {
+  const legs = excelLegArray(excelLegsRaw);
+  for (const xl of legs) {
+    const xf = normalizeFlight(xl.flight || undefined);
+    if (!xf || xf !== norm) continue;
+    const from = cleanCity(String(xl.from ?? ""));
+    const to = cleanCity(String(xl.to ?? ""));
+    if (!from || !to) continue;
+    return { from, to, service: "FLIGHT", departureStr: null };
+  }
+  return null;
 }
 
 function parseNullablePiecesCount(val?: string | null): number | null {
