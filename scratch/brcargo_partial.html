@@ -1,0 +1,951 @@
+
+<style>
+    .red {
+        color: #ff0000;
+    }
+</style>
+<link href="/NEC_WEB/Content/EVA_Custom.css" rel="stylesheet" />
+
+<div id="QUTR00QuickTrackingArea" class="wrap_container">
+    <!-- 頁面標題 -->
+    <div class="wrap_title">
+        <div class="container">
+            Tracking
+        </div>
+    </div>
+    <!-- /頁面標題 -->
+    <!-- 查詢表單區 -->
+    <div class="wrap_search">
+        <div class="container">
+            <!-- 手機表單收合鈕 -->
+            <button type="button" class="form-switch d-lg-none" data-toggle="collapse" data-target="#QUTR00SearchCriteria" aria-expanded="true">SEARCH CRITERIA</button>
+            <!-- 表單 -->
+            <form class="collapse show d-lg-block" id="QUTR00SearchCriteria">
+                <div class="form-row mb-0">
+                    <div class="col-12">
+                        <label class="required">MAWB No.</label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="col-3 col-lg-2">
+                        <input id="QUTR00Prefix" type="text" class="form-control bg-white" placeholder="MAWB No" value="695" verifytype="Intger" maxlength="3">
+                        <span id="QUTR00PrefixError" class="error_tip" style="display:none">MAWB No. must be inputted</span>
+                    </div>
+                    <div class="col-9 col-lg-3">
+                        <input id="QUTR00AWBNo" type="text" class="form-control bg-white" placeholder="MAWB No" verifytype="Intger" maxlength="8" autofocus>
+                        <span id="QUTR00AWBNoError" class="error_tip" style="display:none">MAWB No. must be inputted</span>
+                    </div>
+                    <div class="col-9 col-lg-4" id="divReCaptcha" style="display:none">
+                        <label>Verification Code</label>
+
+                        <input type="hidden" id="QUTR00Verification_id" name="_verification_id" value="8a40e615-b9db-400f-a35d-04bd4f4038fd" />
+                        <img id="QUTR00VerificationImg" style="vertical-align: text-bottom;" />
+                        
+                        <img id="QUTR00VerificationBtnChange" src="/NEC_WEB/Content/images/refresh.png" style="width:20px;height:25px;cursor:pointer;vertical-align:text-bottom;" title=Get New Verificaction Code />
+                        <input type="text" id="QUTR00Verification_code" class="autoCaseUpper" name="_verification_code" style="width: 105px; vertical-align: text-bottom;" maxlength="4" />
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <button id="QUTR00btnSearch" type="button" class="iBtn md orange" onclick="QUTR00QuickTrackingSearch()">Search</button>
+                    </div>
+                </div>
+            </form>
+            <!-- /表單 -->
+
+        </div>
+    </div>
+    <!-- /查詢表單區 -->
+    <!-- 中央內容區 -->
+    <div class="wrap_content">
+        <div class="container">
+            <div id="QUTR00SearchResult" style="display:none">
+                <!-- 資料標題 -->
+                <div class="tableHead text-center w-lg-50">
+                    <div class="row">
+                        <div class="col-4 text-right">
+                            <div class="d-inline-block text-center">
+                                <p id="QUTR00From" class="font-larger font-lg-huger text-green font-bold"></p>
+                                <p id="QUTR00FromName" class="text-gray font-small mb-2"></p>
+                            </div>
+                        </div>
+                        <div class="col-4 px-0">
+                            <div class="height_full d-flex align-items-center text-center">
+                                <img src="/NEC_WEB/Content/images/icon_aircraft.svg">
+                            </div>
+                        </div>
+                        <div class="col-4 text-left">
+                            <div class="d-inline-block text-center">
+                                <p id="QUTR00To" class="font-larger font-lg-huger text-green font-bold"></p>
+                                <p id="QUTR00ToName" class="text-gray font-small mb-2"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- /資料標題 -->
+                <!-- 資料表單 -->
+                <div class="formCard mb-5">
+                    <div class="card_body">
+
+                        <!-- 列 -->
+                        <div class="card_row">
+                            <div class="flt">
+                                <label class="data_label">MAWB No. :</label>
+                                <div class="data_text" id="QUTR00MAWBNo"></div>
+                            </div>
+                            <div class="frt">
+                                <label class="data_label">From / To :</label>
+                                <div class="data_text" id="QUTR00FromTo"></div>
+                            </div>
+                        </div>
+                        <!-- /列 -->
+                        <!-- 列 -->
+                        <div class="card_row">
+                            <div class="flt">
+                                <label class="data_label">Total Pieces / Weight :</label>
+                                <div class="data_text" id="QUTR00TotalPiecesWeight"></div>
+                            </div>
+                            <div class="frt">
+                                <label class="data_label">EDI Message Received Time ( Note 1 ) :</label>
+                                <div class="data_text" id="QUTR00eAWBTime"></div>
+                            </div>
+                        </div>
+                        <!-- /列 -->
+                        <!-- 列 -->
+                        <div class="card_row column_inline">
+                            <label class="data_label">Current Status :</label>
+                            <div class="data_text" id="QUTR00CurrentStatus"></div>
+                        </div>
+                        <!-- /列 -->
+                        <!-- 按鈕 -->
+                        <div class="form-buttons pt-5">
+                            <button type="button" class="iBtn md" onclick="QUTR00QuickTrackingEmail()">E-Mail</button>
+                            <button type="button" class="iBtn md" onclick="QUTR00QuickTrackingDetail()">More Detail</button>
+
+                        </div>
+                        <!-- /按鈕 -->
+
+                    </div>
+                </div>
+                <!-- /資料表單 -->
+                <!-- 資料表格 -->
+                <div class="tablePanel mb-5">
+                    <table id="QUTR00FlightTable" class="tableBlock tableStriped">
+                        <thead>
+                            <tr>
+                                <th>Flight No.</th>
+                                <th>Departure Date</th>
+                                <th>Departure Time <small class="d-lg-block">( Local )</small></th>
+                                <th>Arrival Time <small class="d-lg-block">( Local )</small></th>
+                                <th>Departure / Arrival</th>
+                                <th>Pieces</th>
+                                <th>Weight <small class="d-lg-block">( kg )</small></th>
+                                <th>Vehicle <small class="d-lg-block">( Note 2 )</small></th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+
+                <!-- 收合鈕 -->
+                <div class="d-flex flex-column flex-lg-row justify-content-lg-end mt-1 mb-5 form-buttons">
+                    <button class="iBtn md orange mb-3 mb-lg-0 collapsed" data-toggle="collapse" aria-expanded="false" href="#QUTR00ActAsset">
+                        ACT / ULD Status <i class="fa fa-angle-up pl-3"></i>
+                    </button>
+                    <button class="iBtn md orange mb-0 collapsed" data-toggle="collapse" aria-expanded="false" href="#QUTR00edi_custom_status">
+                        EDI / Custom Status <i class="fa fa-angle-up pl-3"></i>
+                    </button>
+                </div>
+
+                <!-- 收合區 -->
+                <div class="collapse active" id="QUTR00edi_custom_status">
+
+                    <!-- 表格 -->
+                    <div class="tablePanel mb-5">
+                        <table id="QUTR00EDICustomStatusTable" class="tableBlock tableStriped">
+                            <thead>
+                                <tr>
+                                    <th>Flight No.</th>
+                                    <th>Departure Date</th>
+                                    <th>AMS Date <small class="d-lg-block">( For USA Only )</small></th>
+                                    <th>Pieces</th>
+                                    <th>Customs Response <small class="d-lg-block">( Note 3 )</small></th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <!-- /表格 -->
+                    <!-- 表格 -->
+                    <div class="tablePanel mb-5">
+                        <table id="QUTR00EDICustomStatusHAWBTable" class="tableBlock tableStriped">
+                            <thead>
+                                <tr>
+                                    <th>HAWB No.</th>
+                                    <th>Flight No.</th>
+                                    <th>Departure Date</th>
+                                    <th>AMS Date <small class="d-lg-block">( For USA Only )</small></th>
+                                    <th>Pieces</th>
+                                    <th>e-AWB Message Received Time <small class="d-lg-block">( FHL ) ( Note 1 )</small></th>
+                                    <th>Customs Response <small class="d-lg-block">( Note 3 )</small></th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <!-- /表格 -->
+                </div>
+                <!-- /收合區 -->
+                <!-- 收合區 -->
+                <div class="collapse active" id="QUTR00ActAsset">
+                    <!-- ACT 說明 -->
+                    <div class="container mb-4">
+                        <p>*If the equipment was not rented by EVA Airways, its status will not be displayed.</p>
+                    </div>
+                    <!-- 表格 -->
+                    <div class="tablePanel mb-5">
+                        <table id="QUTR00ACTAssetTable" class="tableBlock tableStriped">
+                            <thead>
+                                <tr>
+                                    <th>ULD Number</th>
+                                    <th>Asset Type</th>
+                                    <th>Temperature Control</th>
+                                    <th>Temperature</th>
+                                    <th>Battery Level</th>
+                                    <th>Location</th>
+                                    <th>Freight Status</th>
+                                    <th>Last Update Time ( UTC )</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <!-- /表格 -->
+                </div>
+                <!-- /收合區 -->
+            </div>
+
+            <!-- 沒資料 -->
+            <div id="QUTR00NoData" class="text-center">
+                <p></p>
+            </div>
+
+            <div class="card_row column_inline text-right">
+                <button id="QUTR00BtnBack" type="button" class="iBtn lg dark" onclick="QUTR00Back()">Exit</button>
+            </div>
+            <!-- 備註 -->
+            <div class="remarkList">
+                <p class="title">Note :</p>
+                <ol>
+                    <li>EDI ( Electronic Data Interchange message ) received time shows local time basing on BR / B7 flight departure time. If received time is later than two hours prior to flight departure, it will be highlighted in red.</li>
+                    <li>When vehicle is a truck, the flight code is supplied by EVA Air. For reference only.</li>
+                    <li>Customs Response for AMS / ACI only.</li>
+                    <li>AMS US Customs response time is New York local time. ACI Canadian Customs response time is Toronto local time.</li>
+                    <li>For data within 3 months only.</li>
+                </ol>
+            </div>
+            <!-- /備註 -->
+
+        </div>
+    </div>
+    <!-- /中央內容區 -->
+</div>
+<!-- 訊息Dialog -->
+<div class="modal fade comfirm" id="QUTR00MSGModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="text-center" id="QUTR00msg">
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="iBtn md orange" data-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 訊息提示視窗 -->
+<div class="modal fade comfirm" id="QUTR00ExitDialogModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="text-center" id="QUTR00Exit">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="iBtn white" data-dismiss="modal">No</button>
+                <button type="button" class="iBtn orange">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /訊息提示視窗 -->
+<div id="QUTR00QuickTrackingDetailArea" style="display:none"></div>
+<div id="QUTR00QuickTrackingEmailArea" style="display:none"></div>
+<script src="/NEC_WEB/Scripts/NEC.Common.js"></script>
+<script src="/NEC_WEB/Scripts/NEC.ControlHandler.js"></script>
+<script src="/NEC_WEB/Scripts/Microsoft.Common.js"></script>
+
+<script>
+    var urlReCaptchaPassed = "/NEC_WEB/Home/ReCaptchaPassed";
+    var QUTR00isRobot = false;
+    var QUTR00reCaptchaSwitch = "Y" == "Y" ? true : false;
+    grecaptcha.ready(function ()
+    {
+        if (QUTR00reCaptchaSwitch)
+        {
+            grecaptcha.execute(reCaptchaSiteKey, { action: 'homepage' }).then(function (token)
+            {
+                $.ajax({
+                    url: urlReCaptchaPassed,
+                    data: { token: token },
+                    type: "post",
+                    async: false
+                }).done(function (data)
+                {
+                    QUTR00isRobot = !data;
+                    if (QUTR00isRobot)
+                    {
+                        $('#divReCaptcha').show();
+                    }
+                }).fail(function (jqXHR, textStatus, errorThrown)
+                {
+                    console.log(errorThrown);
+                });
+            });
+        }
+    });
+</script>
+<script>
+    var QUTR00UrlQuickTrackingGet = "/NEC_WEB/Tracking/QuickTracking/QuickTrackingGet";
+    var QUTR00UrlMyCargoAdd = "/NEC_WEB/Tracking/MyCargo/MyCargoAdd";
+    var QUTR00UrlQuickTrackingDetail = "/NEC_WEB/Tracking/QuickTracking/QuickTrackingDetail";
+    var QUTR00UrlQuickTrackingEmail = "/NEC_WEB/Tracking/QuickTracking/QuickTrackingEmail";
+    var QUTR00MSG008 = "Data not found";
+    var QUTR00MSG_MAWB_NO_ERROR = "Invalid MAWB No.";
+    var QUTR00Prefix = "695";
+    var QUTR00AWBNo = "59552286";
+    var QUTR00isEAWB = "False" == "True";
+    var msgExit = "Are you sure you want to exit ?";
+    $(function ()
+    {
+        //搬到body層才不會被遮罩覆蓋
+        $('#QUTR00MSGModal').appendTo("body").modal({ show: false });
+        $('#QUTR00ExitDialogModal').appendTo("body").modal({ show: false });
+        $("#QUTR00AWBNo").on("change", function () {
+            if (this.value) {
+                //提單號碼補0
+                var AWBNo = CommonPad("L", this.value, 8, "0");
+                $(this).val(AWBNo);
+            }
+        })
+
+        QUTR00InitGrid();
+
+        CommonFun.Validate.TextboxValidation('[VerifyType=Intger]');
+
+        enterButtonClick("QUTR00btnSearch", "QUTR00SearchCriteria");
+
+        /* 更改圖形驗證碼 */
+        $("#QUTR00VerificationBtnChange").click(function ()
+        {
+            $("#QUTR00VerificationImg").attr("src", "/NEC_WEB/Account/GenerateImage?key=8a40e615-b9db-400f-a35d-04bd4f4038fd&_=" + new Date().getTime());
+        }).click();
+
+        //自動搜尋
+        if (QUTR00Prefix && QUTR00AWBNo != 0)
+        {
+            $("#QUTR00Prefix").val(QUTR00Prefix);
+            $("#QUTR00AWBNo").val(QUTR00AWBNo).trigger("change");
+            QUTR00QuickTrackingSearch();
+        }
+    })
+
+    function QUTR00InitGrid()
+    {
+        //啟用自動分頁表格(手機版僅顯示首欄)
+        $('#QUTR00FlightTable')
+            .dataTable({
+                "pageLength": 10, //每頁筆數
+                "searching": false, //顯示字串搜尋欄位
+                "lengthChange": false, //顯示每頁筆數切換
+                "ordering": false, //啟用排序
+                "order": [[1, "asc"]],
+                "info": false, //顯示當前頁數與總頁數文字
+                "paging": false, //顯示頁次
+                "autoWidth": false, //啟用寬度運算(px)
+                "oLanguage": {
+                    "oPaginate": {
+                        "sFirst": "<<",
+                        "sPrevious": "<",
+                        "sNext": ">",
+                        "sLast": ">>"
+                    }
+                },
+                "responsive": false,
+                //    "responsive": {
+                //        "details": {
+                //            "renderer": $.fn.dataTable.Responsive.renderer.tableAll(), //所有欄位以TD植入子列
+                //        },
+                //        "breakpoints": [
+                //            //至少要設2個斷點給套件運算rwd的區間
+                //{ name: 'desktop', width: 1024 },
+                //{ name: 'tablet', width: 1023 },
+                //        ]
+                //    },
+                "aoColumns": [
+                     {
+                         "sWidth": "10%",
+                         "render": function (data, type, row, meta)
+                         {
+
+                             return "<label>Flight No.</label>" + (row.Vehicle == "Air" ? row.FlightNo : "BR / " + row.FlightNo);
+                         }
+                     },
+                      {
+                          "sWidth": "10%",
+                          "render": function (data, type, row, meta)
+                          {
+
+                              return "<label>Departure Date</label>" + row.DepartureDate;
+                          }
+                      },
+                       {
+                           "sWidth": "10%",
+                           "render": function (data, type, row, meta)
+                           {
+                               return "<label>Departure Time <small class='d-lg-block'>( Local )</small></label>" + row.DepartureTime;
+                           }
+                       },
+                        {
+                            "sWidth": "10%",
+                            "render": function (data, type, row, meta)
+                            {
+                                return "<label>Arrival Time <small class='d-lg-block'>( Local )</small></label>" + row.ArrivalTime;
+                            }
+                        },
+                        {
+                            "sWidth": "10%",
+                            "render": function (data, type, row, meta)
+                            {
+                                var DEPClass = "";
+                                if (row.DepartureTime.indexOf("Actual") > -1)
+                                {
+                                    DEPClass = row.Vehicle == "Air" ? "icon_departure_true" : "icon_departure_true_car";
+                                }
+                                else
+                                {
+                                    DEPClass = row.Vehicle == "Air" ? "icon_departure_false" : "icon_departure_false_car";
+                                }
+
+                                var ARRClass = "";
+                                if (row.DepartureTime.indexOf("Actual") > -1)
+                                {
+                                    ARRClass = row.Vehicle == "Air" ? "icon_arrival_true" : "icon_arrival_true_car";
+                                }
+                                else
+                                {
+                                    ARRClass = row.Vehicle == "Air" ? "icon_arrival_false" : "icon_arrival_false_car";
+                                }
+
+                                var data = '<div class="departure_to_arrival mobile-align-left"><label>Departure / Arrival</label></div>' +
+                                           '<div class="departure_to_arrival mobile-align-left">' +
+                                           '<span class="' + DEPClass + '">' + row.Departure + '</span>' +
+                                           '<span class="time"><sub>' + row.FlightTime + '</sub></span>' +
+                                           '<span class="' + ARRClass + '">' + row.Arrival + '</span></div>';
+
+                                return data;
+                            }
+                        },
+                        {
+                            "sWidth": "10%", "sClass": "gridTxtRt",
+                            "render": function (data, type, row, meta)
+                            {
+                                return "<label>Pieces</label>" + AddCommas(row.Pieces);
+                            }
+                        },
+                        {
+                            "sWidth": "10%", "sClass": "gridTxtRt",
+                            "render": function (data, type, row, meta)
+                            {
+                                return "<label>Weight <small class='d-lg-block'>( kg )</small></label>" + AddCommas(row.Weight.toFixed(1));
+                            }
+                        },
+                        {
+                            "sWidth": "10%",
+                            "render": function (data, type, row, meta)
+                            {
+                                return "<label>Vehicle <small class='d-lg-block'>( Note 2 )</small></label>" + row.Vehicle;
+                            }
+                        },
+                ],
+                "fnDrawCallback": function (oSettings)
+                {
+                    $(".gridTxtRt").closest("th").removeClass("gridTxtRt");
+                },
+            });
+
+        $('#QUTR00EDICustomStatusTable')
+            .dataTable({
+                "pageLength": 10, //每頁筆數
+                "searching": false, //顯示字串搜尋欄位
+                "lengthChange": false, //顯示每頁筆數切換
+                "ordering": false, //啟用排序
+                "order": [[1, "asc"]],
+                "info": false, //顯示當前頁數與總頁數文字
+                "paging": false, //顯示頁次
+                "autoWidth": false, //啟用寬度運算(px)
+                "oLanguage": {
+                    "oPaginate": {
+                        "sFirst": "<<",
+                        "sPrevious": "<",
+                        "sNext": ">",
+                        "sLast": ">>"
+                    }
+                },
+                "responsive": false,
+                //    "responsive": {
+                //        "details": {
+                //            "renderer": $.fn.dataTable.Responsive.renderer.tableAll(), //所有欄位以TD植入子列
+                //        },
+                //        "breakpoints": [
+                //            //至少要設2個斷點給套件運算rwd的區間
+                //{ name: 'desktop', width: 1024 },
+                //{ name: 'tablet', width: 1023 },
+                //        ]
+                //    },
+                "aoColumns": [
+                     {
+                         "sWidth": "20%", "render": function (data, type, row, meta)
+                         {
+                             return "<label>Flight No.</label>" + row.FlightNo;
+                         }
+                     },
+                      {
+                          "sWidth": "20%",
+                          "render": function (data, type, row, meta)
+                          {
+                              return "<label>Departure Date</label>" + row.DepartureDate;
+                          }
+                      },
+                       {
+                           "sWidth": "20%",
+                           "render": function (data, type, row, meta)
+                           {
+                               if (row.CustomsClearanceDate == null)
+                               {
+                                   return "";
+                               }
+                               else
+                               {
+                                   return "<label>AMS Date <small class='d-lg-block'>( For USA Only )</small></label>" + row.CustomsClearanceDate;
+                               }
+                           }
+                       },
+                        {
+                            "sWidth": "20%",
+                            "render": function (data, type, row, meta)
+                            {
+                                if (row.Pieces == row.TotalPieces)
+                                {
+                                    return "<label>Pieces</label>" + AddCommas(row.Pieces) + " CTN";
+                                }
+                                else
+                                {
+                                    return "<label>Pieces</label>" + AddCommas(row.Pieces) + " CTN / " + AddCommas(row.TotalPieces) + " CTN";
+                                }
+                            }
+                        },
+                        {
+                            "sWidth": "20%", "sClass": "gridTxtLf",
+                            "render": function (data, type, row, meta)
+                            {
+                                if (row.CustomsRemark == null)
+                                {
+                                    return "";
+                                }
+                                else
+                                {
+                                    return "<label>Customs Response <small class='d-lg-block'>( Note 3 )</small></label>" + row.CustomsRemark;
+                                }
+                            }
+                        },
+                ],
+                "fnDrawCallback": function (oSettings)
+                {
+                    $(".gridTxtLf").closest("th").removeClass("gridTxtLf");
+                }
+            });
+
+        $('#QUTR00EDICustomStatusHAWBTable')
+            .dataTable({
+                "pageLength": 10, //每頁筆數
+                "searching": false, //顯示字串搜尋欄位
+                "lengthChange": false, //顯示每頁筆數切換
+                "ordering": false, //啟用排序
+                "order": [[1, "asc"]],
+                "info": false, //顯示當前頁數與總頁數文字
+                "paging": false, //顯示頁次
+                "autoWidth": false, //啟用寬度運算(px)
+                "oLanguage": {
+                    "oPaginate": {
+                        "sFirst": "<<",
+                        "sPrevious": "<",
+                        "sNext": ">",
+                        "sLast": ">>"
+                    }
+                },
+                "responsive": false,
+                //    "responsive": {
+                //        "details": {
+                //            "renderer": $.fn.dataTable.Responsive.renderer.tableAll(), //所有欄位以TD植入子列
+                //        },
+                //        "breakpoints": [
+                //            //至少要設2個斷點給套件運算rwd的區間
+                //{ name: 'desktop', width: 1024 },
+                //{ name: 'tablet', width: 1023 },
+                //        ]
+                //    },
+                "aoColumns": [
+                    {
+                        "sWidth": "10%", "render": function (data, type, row, meta)
+                        {
+                            return "<label>HAWB No.</label>" + row.HAWBNo;
+                        }
+                    },
+                     {
+                         "sWidth": "10%", "render": function (data, type, row, meta)
+                         {
+                             return "<label>Flight No.</label>" + row.FlightNo;
+                         }
+                     },
+                      {
+                          "sWidth": "10%",
+                          "render": function (data, type, row, meta)
+                          {
+                              return "<label>Departure Date</label>" + row.DepartureDate;
+                          }
+                      },
+                       {
+                           "sWidth": "10%",
+                           "render": function (data, type, row, meta)
+                           {
+                               if (row.CustomsClearanceDate == null)
+                               {
+                                   return "";
+                               }
+                               else
+                               {
+                                   return "<label>AMS Date <small class='d-lg-block'>( For USA Only )</small></label>" + row.CustomsClearanceDate;
+                               }
+                           }
+                       },
+                        {
+                            "sWidth": "10%",
+                            "render": function (data, type, row, meta)
+                            {
+                                return "<label>Pieces</label>" + AddCommas(row.Pieces) + " CTN";
+                            }
+                        },
+                        {
+                            "sWidth": "10%",
+                            "render": function (data, type, row, meta)
+                            {
+                                if (row.eAWBDateFlag == "Y")
+                                {
+                                    return "<label>e-AWB Message Received Time <small class='d-lg-block'>( FHL ) ( Note 1 )</small></label><span class='red'>" + row.eAWBDate + "</span>";
+                                }
+                                else
+                                {
+                                    return "<label>e-AWB Message Received Time <small class='d-lg-block'>( FHL ) ( Note 1 )</small></label>" + row.eAWBDate;
+                                }
+                            }
+                        },
+                        {
+                            "sWidth": "20%", "sClass": "gridTxtLf",
+                            "render": function (data, type, row, meta)
+                            {
+                                if (row.CustomsRemark == null)
+                                {
+                                    return "";
+                                }
+                                else
+                                {
+                                    return "<label>Customs Response <small class='d-lg-block'>( Note 3 )</small></label>" + row.CustomsRemark;
+                                }
+                            }
+                        },
+                ],
+                "fnDrawCallback": function (oSettings)
+                {
+                    $(".gridTxtLf").closest("th").removeClass("gridTxtLf");
+                }
+            });
+
+        //ACT Asset Table
+        $('#QUTR00ACTAssetTable')
+            .dataTable({
+                "pageLength": 10, //每頁筆數
+                "searching": false, //顯示字串搜尋欄位
+                "lengthChange": false, //顯示每頁筆數切換
+                "ordering": false, //啟用排序
+                "order": [[1, "asc"]],
+                "info": false, //顯示當前頁數與總頁數文字
+                "paging": false, //顯示頁次
+                "autoWidth": false, //啟用寬度運算(px)
+                "oLanguage": {
+                    "oPaginate": {
+                        "sFirst": "<<",
+                        "sPrevious": "<",
+                        "sNext": ">",
+                        "sLast": ">>"
+                    }
+                },
+                "responsive": false,
+                "aoColumns": [
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>ULD Number</label>" + row.ULDNo;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Asset Type</label>" + row.AssetType;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Temperature Control</label>" + row.TemperatureControl;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Temperature</label>" + row.Temperature;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Battery Level</label>" + row.BatteryLevel;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Location</label>" + row.FLIGHT_STATION;
+                        }
+                    },
+                    {
+                        "sWidth": "12%", "render": function (data, type, row, meta) {
+                            return "<label>Freight Status</label>" + row.FLIGHT_STATUS_CODE;
+                        }
+                    },
+                    {
+                        "sWidth": "16%", "render": function (data, type, row, meta) {
+                            return "<label>Last Update Time ( UTC )</label>" + row.LastUpdateTimeUTC;
+                        }
+                    },
+                ],
+                "fnDrawCallback": function (oSettings) {
+                    $(".gridTxtLf").closest("th").removeClass("gridTxtLf");
+                }
+            });
+    }
+
+    function QUTR00QuickTrackingSearchCheck()
+    {
+        var checkFlag = true;
+        $("#QUTR00Prefix,#QUTR00AWBNo").removeClass("error");
+        $("#QUTR00PrefixError,#QUTR00AWBNoError").hide();
+
+        if (!$("#QUTR00Prefix").val())
+        {
+            $("#QUTR00Prefix").addClass("error");
+            $("#QUTR00PrefixError").show();
+            checkFlag = false;
+        }
+        if (!$("#QUTR00AWBNo").val())
+        {
+            $("#QUTR00AWBNo").addClass("error");
+            $("#QUTR00AWBNoError").show();
+            checkFlag = false;
+        }
+
+        $("#QUTR00AWBNo").trigger("change");
+
+        if (checkFlag)
+        {
+            //提單號碼檢核前七碼MOD7須等於第八碼
+            var AWBNo = $("#QUTR00AWBNo").val();
+            if (parseInt(AWBNo.substr(0, 7)) % 7 != parseInt(AWBNo.substr(7, 1)))
+            {
+                checkFlag = false;
+                QUTR00MSGDialogOpen(QUTR00MSG_MAWB_NO_ERROR);
+            }
+        }
+
+        return checkFlag;
+    }
+
+    function QUTR00QuickTrackingSearch()
+    {
+        if (!QUTR00QuickTrackingSearchCheck())
+        {
+            return false;
+        }
+
+        $.LoadingShow();
+        $.ajax({
+            url: QUTR00UrlQuickTrackingGet,
+            data: {
+                prefix: $("#QUTR00Prefix").val(),
+                AWBNo: $("#QUTR00AWBNo").val(),
+                _isRobot: QUTR00isRobot ? "Y" : "N",
+                _verification_code: $("#QUTR00Verification_code").val(),
+                _verification_id: $("#QUTR00Verification_id").val(),
+            },
+            type: "post"
+        }).done(function (result)
+        {
+            $.LoadingHide();
+            if (result.RETURN_FLAG != undefined && result.RETURN_FLAG == false)
+            {
+                QUTR00MSGDialogOpen(result.DESCRIPTION);
+            } else if (result.AWBNo)
+            {
+                $("#QUTR00From").html(result.From);
+                $("#QUTR00FromName").html(result.FromName);
+                $("#QUTR00To").html(result.To);
+                $("#QUTR00ToName").html(result.ToName);
+                $("#QUTR00MAWBNo").html(result.AWBNo);
+                $("#QUTR00FromTo").html(result.FromName + " (" + result.From + ") / " + result.ToName + " (" + result.To + ")");
+                $("#QUTR00TotalPiecesWeight").html(AddCommas(result.TotalPieces) + " pcs / " + AddCommas(result.TotalWeight.toFixed(1)) + " kg");
+                $("#QUTR00eAWBTime").html(result.eAWB_MessageReceivedTime);
+                $("#QUTR00CurrentStatus").html(result.CurrentStatus);
+
+                //若收到時間晚於該航班預定出發時間前二小時，以紅色顯示
+                $("#QUTR00eAWBTime").removeClass("red");
+                if (result.eAWB_MessageReceivedFlag == "Y")
+                {
+                    $("#QUTR00eAWBTime").addClass("red");
+                }
+
+                $('#QUTR00FlightTable').DataTable().clear().rows.add(result.FlightInfoList).draw();
+                $('#QUTR00EDICustomStatusTable').DataTable().clear().rows.add(result.CustomStatusList).draw();
+                $('#QUTR00EDICustomStatusHAWBTable').DataTable().clear().rows.add(result.CustomStatusHAWBList).draw();
+                $('#QUTR00ACTAssetTable').DataTable().clear().rows.add(result.ACTAssetList).draw();
+
+                $("#QUTR00SearchResult").show();
+                $("#QUTR00NoData").hide();
+                $("#QUTR00VerificationBtnChange").click();
+            }
+            else
+            {
+                $("#QUTR00SearchResult").hide();
+                $("#QUTR00NoData").show();
+                $("#QUTR00VerificationBtnChange").click();
+                QUTR00MSGDialogOpen(QUTR00MSG008);
+            }
+        }).fail(function (jqXHR, textStatus, errorThrown)
+        {
+            console.log(errorThrown);
+            $.LoadingHide();
+        });
+    }
+
+    function QUTR00MyCargoAdd()
+    {
+        var MAWBNo = $("#QUTR00MAWBNo").html();
+
+        $.LoadingShow();
+        $.ajax({
+            url: QUTR00UrlMyCargoAdd,
+            data: {
+                prefix: MAWBNo.split('-')[0],
+                awbNo: MAWBNo.split('-')[1]
+            },
+            type: "post"
+        }).done(function (result)
+        {
+            $.LoadingHide();
+            QUTR00MSGDialogOpen(result.DESCRIPTION);
+        }).fail(function (jqXHR, textStatus, errorThrown)
+        {
+            console.log(errorThrown);
+            $.LoadingHide();
+        });
+    }
+
+    function QUTR00QuickTrackingDetail()
+    {
+        $.LoadingShow();
+        var MAWBNo = $("#QUTR00MAWBNo").html();
+        $("#QUTR00QuickTrackingDetailArea").load(QUTR00UrlQuickTrackingDetail, {
+            prefix: MAWBNo.split('-')[0],
+            AWBNo: MAWBNo.split('-')[1]
+        }, function ()
+        {
+            $.LoadingHide();
+            $("#QUTR00QuickTrackingArea").hide();
+            $("#QUTR00QuickTrackingDetailArea").show();
+            window.scrollTo(0, 0);
+        });
+    }
+
+    function QUTR00QuickTrackingEmail()
+    {
+        $.LoadingShow();
+        $("#QUTR00QuickTrackingEmailArea").load(QUTR00UrlQuickTrackingEmail, function ()
+        {
+            $.LoadingHide();
+            $("#QUTR00QuickTrackingArea").hide();
+            $("#QUTR00QuickTrackingEmailArea").show();
+            window.scrollTo(0, 0);
+        });
+    }
+
+    function QUTR00CancelMsgSetting()
+    {
+        $("#QUTR00ExitDialogModal .modal-footer").html('');
+        $("#QUTR00ExitDialogModal .modal-footer").html("<button type='button' class='iBtn md white' id='btnNo' onClick='QUTR00ExitDialog(false);'>No</button><button type='button' class='iBtn md orange' id='btnYes' onClick='QUTR00ExitDialog(true);'>Yes</button>");
+        $('#QUTR00ExitDialogModal').modal({ show: true });
+        $("#QUTR00Exit").html(msgExit);
+    }
+
+    function QUTR00ExitDialog(closeModal)
+    {
+        $("#QUTR00ExitDialogModal").modal("hide");
+        if (closeModal === true)
+        {
+            if (QUTR00isEAWB)
+            {
+                CallAfterQuickTrackingBack();
+            }
+            else
+            {
+                QUTR00CallAfterQuickTrackingDetailBack();
+            }
+
+        }
+    }
+
+    function QUTR00Back()
+    {
+        QUTR00CancelMsgSetting();
+    }
+
+    function QUTR00CallAfterQuickTrackingDetailBack()
+    {
+        //返回特定期間查詢
+        $("#SpecificPeriodSearchForm").show();
+        $("#QUTR00QuickTrackingArea").empty();
+        $("#QUTR00QuickTrackingArea").hide();
+        window.scrollTo(0, 0);
+    }
+
+    function QUTR00CallAfterQuickTrackingEmailBack()
+    {
+        $("#QUTR00QuickTrackingArea").show();
+        $("#QUTR00QuickTrackingEmailArea").hide();
+        window.scrollTo(0, 0);
+    }
+
+    function QUTR00MSGDialogOpen(description)
+    {
+        $('#QUTR00MSGModal').modal({ show: true });
+        $("#QUTR00msg").html(description);
+    }
+</script>

@@ -9,13 +9,14 @@ import {
   type TrackingResponse,
 } from "../lib/api";
 import MilestonePlan from "../components/MilestonePlan";
+import EventTimelineTable from "../components/EventTimelineTable";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status?: string | null }) {
   if (!status) return <span style={{ color: "var(--text-muted)" }}>—</span>;
-  const good = /delivered|dlv|cleared/i.test(status);
-  const bad = /error|blocked|fail/i.test(status);
   const warn = /partial|ground/i.test(status);
+  const good = !warn && /delivered|dlv|cleared/i.test(status);
+  const bad = /error|blocked|fail/i.test(status);
   const bg = good
     ? "rgba(46,125,50,0.15)"
     : bad
@@ -357,6 +358,8 @@ function DetailPanel({
           <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
             {details.message}
           </p>
+
+          <EventTimelineTable events={details.events} airline={details.airline} />
         </div>
       )}
     </div>
@@ -400,8 +403,8 @@ export default function TrackedAwbsList() {
     const key = `${item.mawb}|${item.hawb}`;
     setRemoving(r => ({ ...r, [key]: true }));
     try {
-      await removeTrackedAwb(item.mawb, item.hawb);
-      setItems(prev => prev.filter(i => !(i.mawb === item.mawb && i.hawb === item.hawb)));
+      await removeTrackedAwb(item.mawb, item.hawb, item.tenant_id);
+      setItems(prev => prev.filter(i => !(i.mawb === item.mawb && i.hawb === item.hawb && i.tenant_id === item.tenant_id)));
     } catch (err: any) {
       setError(err.message || "Failed to remove shipment");
     } finally {
@@ -424,8 +427,8 @@ export default function TrackedAwbsList() {
     const key = `${item.mawb}|${item.hawb}`;
     setMarkingDelivered(prev => ({ ...prev, [key]: true }));
     try {
-      await markDeliveredTrackedAwb(item.mawb, item.hawb);
-      setItems(prev => prev.filter(i => !(i.mawb === item.mawb && i.hawb === item.hawb)));
+      await markDeliveredTrackedAwb(item.mawb, item.hawb, item.tenant_id);
+      setItems(prev => prev.filter(i => !(i.mawb === item.mawb && i.hawb === item.hawb && i.tenant_id === item.tenant_id)));
       if (selected?.mawb === item.mawb && selected?.hawb === item.hawb) {
         setSelected(null);
       }
@@ -516,6 +519,7 @@ export default function TrackedAwbsList() {
                   color: "var(--text-muted)",
                 }}
               >
+                <th style={{ padding: "0.9rem 1rem" }}>Customer</th>
                 <th style={{ padding: "0.9rem 1rem" }}>MAWB</th>
                 <th style={{ padding: "0.9rem 1rem" }}>HAWB</th>
                 <th style={{ padding: "0.9rem 1rem" }}>Status</th>
@@ -538,6 +542,9 @@ export default function TrackedAwbsList() {
                     background: "transparent",
                   }}
                 >
+                  <td style={{ padding: "0.85rem 1rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                    {it.domain_name || "—"}
+                  </td>
                   <td style={{ padding: "0.85rem 1rem", fontWeight: 600, fontFamily: "monospace" }}>
                     {it.mawb || "—"}
                   </td>
@@ -550,7 +557,7 @@ export default function TrackedAwbsList() {
                   <td style={{ padding: "0.85rem 1rem" }}>{it.origin || "—"}</td>
                   <td style={{ padding: "0.85rem 1rem" }}>{it.destination || "—"}</td>
                   <td style={{ padding: "0.85rem 1rem", fontFamily: "monospace", fontSize: "0.82rem" }}>
-                    {it.ata || "—"}
+                    {it.ata ? new Date(it.ata).toLocaleString() : "—"}
                   </td>
                   <td style={{ padding: "0.85rem 1rem", color: "var(--accent)", fontFamily: "monospace", fontSize: "0.82rem" }}>
                     {it.last_query_date ? new Date(it.last_query_date).toLocaleString() : "—"}

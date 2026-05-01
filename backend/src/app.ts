@@ -8,6 +8,8 @@ import logsRoutes from "./routes/logs.js";
 import meRoutes from "./routes/me.js";
 import alertsRoutes from "./routes/alerts.js";
 import ingestRoutes from "./routes/ingest.js";
+import notificationsRoutes from "./routes/notifications.js";
+import servicesRoutes from "./routes/services.js";
 import { config } from "./config/index.js";
 import { ping as dbPing } from "./services/db.js";
 
@@ -49,6 +51,8 @@ app.use("/api/track", trackRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/alerts", alertsRoutes);
 app.use("/api/ingest", ingestRoutes);
+app.use("/api/notifications", notificationsRoutes);
 app.use("/api/me", meRoutes);
+app.use("/api/services", servicesRoutes);
 
 export default app;

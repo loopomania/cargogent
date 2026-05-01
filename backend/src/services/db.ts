@@ -43,15 +43,16 @@ export async function logQueryRequest(
   hawb: string | undefined | null,
   airlineCode: string,
   status: string,
-  durationMs: number
+  durationMs: number,
+  errorMessage?: string
 ): Promise<void> {
   const p = getPool();
   if (!p) return;
   
   try {
     const query = `
-      INSERT INTO query_logs (user_id, tenant_id, awb, hawb, airline_code, status, duration_ms)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO query_logs (user_id, tenant_id, awb, hawb, airline_code, status, duration_ms, error_message)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `;
     const values = [
       userId || null,
@@ -61,6 +62,7 @@ export async function logQueryRequest(
       airlineCode,
       status,
       durationMs,
+      errorMessage || null,
     ];
     await p.query(query, values);
   } catch (err) {

@@ -1,0 +1,121 @@
+{
+  "name": "AWB Notification Alerts Boilerplate",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://backend:3000/api/notifications/pending",
+        "sendBody": false,
+        "options": {}
+      },
+      "name": "Get Pending Changes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@cargogent.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=CargoGent Alert: {{ $json.event_type }} for {{ $json.mawb }}",
+        "emailType": "text",
+        "message": "=Hello,\n\nAn alert was generated for your shipment.\n\nType: {{ $json.event_type }}\nMAWB: {{ $json.mawb }}\nHAWB: {{ $json.hawb }}\nDetails: {{ JSON.stringify($json.payload) }}\n\nPlease check the CargoGent dashboard for more information.\n\nThank you.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "QF6LvYDoe1D3Q3ju",
+          "name": "CargoGent SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:3000/api/notifications/mark-processed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"change_ids\": [\"{{ $json.change_id }}\"] }",
+        "options": {}
+      },
+      "name": "Mark Processed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        600,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Changes": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "c4d25b88-75cc-48a5-abdd-9bba972bbff9",
+  "id": "workflow-awb-alerts"
+}

@@ -45,18 +45,30 @@ export default function Layout({
               <Link to="/admin/tracked" style={navItemStyle}>
                 AWB Tracked List
               </Link>
+              <Link to="/admin/active-queries" style={navItemStyle}>
+                Active Queries
+              </Link>
               <Link to="/admin/users" style={navItemStyle}>
                 User Management
               </Link>
               <Link to="/admin/logs" style={navItemStyle}>
                 Query Logs
               </Link>
+              <Link to="/admin/ingested-emails" style={navItemStyle}>
+                Emails Handled
+              </Link>
+              <Link to="/admin/services" style={navItemStyle}>
+                Services Status
+              </Link>
             </>
           )}
           {role === "customer" && (
             <>
               <Link to="/customer" style={navItemStyle}>
-                AWBs
+                Active Shipments
+              </Link>
+              <Link to="/customer/archived" style={navItemStyle}>
+                Archived Shipments
               </Link>
               <Link to="/customer/settings" style={navItemStyle}>
                 Settings

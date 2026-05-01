@@ -1,6 +1,6 @@
 # CargoGent reverse proxy
 {
-	default_sni 168.119.228.149
+	default_sni cargogent.com
 }
 
 (security_headers) {
@@ -58,7 +58,7 @@ cargogent.com, www.cargogent.com {
 }
 
 # Production Explicit IP Fallback (HTTP only)
-http://168.119.228.149 {
+http://cargogent.com {
 	import routes
 }
 

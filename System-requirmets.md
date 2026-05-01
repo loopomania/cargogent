@@ -27,8 +27,8 @@ Track **AWBs (Air Waybills)** worldwide using scheduled workflows (e.g. **n8n**)
 | Mechanism | Interval / rule |
 |-----------|------------------|
 | **AWB status check scheduler** | **Every 30 minutes** |
-| **Next check when shipment is on ground** | **Now + 2 hours** |
-| **Next check when shipment is in air** | **Scheduled landing (ETA) + 1 hour**; if ETA is unknown → **Now + 2 hours** (same cadence as ground default bucket) |
+| **Next check when shipment is on ground** | **Now + random 6-9 hours** |
+| **Next check when shipment is in air** | **Scheduled landing (ETA) + 1 hour**; if ETA is unknown → **Now + random 10-15 hours** (same cadence as ground default bucket) |
 | **Email notification job** | **Every 60 minutes** (or aligned to user schedules for digest Excel) |
 | **Email retrieval (IMAP)** | Frequent enough to meet product latency (e.g. **every 1–5 minutes**); exact n8n cron is implementation detail |
 | **24h stale MAWB warning** | Evaluated **inside the same scheduled AWB status check run** (i.e. every **30 minutes** together with due checks) |

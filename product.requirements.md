@@ -35,7 +35,7 @@ CargoGent monitors **MAWB** and **HAWB** shipments and keeps the database aligne
 | Rule | Value |
 |------|--------|
 | **Tracking scheduler** | Runs **every 30 minutes** |
-| **On ground** | Next check **+2 hours** |
+| **On ground** | Next check **+random 6-9 hours** |
 | **In air** | Next check **1 hour after scheduled landing** (ETA + 1h); if ETA unknown, fallback defined in technical doc |
 | **Concurrency** | Up to **20** parallel AWB tracking queries |
 | **Completed shipment** | Removed from active tracking queue; **history retained** for analysis/reporting |

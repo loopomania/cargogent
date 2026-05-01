@@ -101,6 +101,22 @@ services:
       timeout: 5s
       retries: 5
 
+  newrelic-infra:
+    image: newrelic/infrastructure:latest
+    container_name: newrelic-infra
+    cap_add:
+      - SYS_PTRACE
+    network_mode: host
+    pid: host
+    privileged: true
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    env_file:
+      - .env-dev
+    environment:
+      NRIA_DISPLAY_NAME: "CargoGent-Local-Host"
+
 volumes:
   postgres_data:
   n8n_data:

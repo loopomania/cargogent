@@ -11,7 +11,7 @@ Any update in the database will trigger an update to the user
 User gets a full excel file with all the shipments and the latest information from the airline or ground services once a day And can also get email with changes since that last email for changes only
 Once a shipment is completed, it will be removed from MAWB tracking system.
 All AWBs and theire event is kept for analysis and reporting.
-A AWB on the ground is query for changes every 6 hours
+A AWB on the ground is query for changes every 6-9 hours
 A AWB in the air the next query should be in 1 hour after the plane is scheduled to land 
 
 
