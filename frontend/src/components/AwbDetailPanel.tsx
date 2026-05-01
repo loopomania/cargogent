@@ -100,14 +100,29 @@ export default function AwbDetailPanel({
   const syncNow = async () => {
     setSyncing(true);
     setError("");
+    const previous = details;
     try {
       const hawbArg = hawb !== mawb ? hawb : undefined;
       const res = await trackByAwb(mawb, hawbArg || undefined);
-      setDetails(res);
-      setSource("live");
-      setLastSynced(new Date().toLocaleString());
+
+      const hasProjection = Boolean(
+        res.milestone_projection?.flows_steps?.some((flow) => flow.length > 0),
+      );
+      const prevHadProjection = Boolean(
+        previous?.milestone_projection?.flows_steps?.some((flow) => flow.length > 0),
+      );
+      const hasTimeline = Boolean(res.events && res.events.length > 0);
+      if (!hasTimeline && !hasProjection && previous && ((previous.events?.length ?? 0) > 0 || prevHadProjection)) {
+        setError("Live tracker returned no usable events; showing your last cached view.");
+        setSource("db");
+      } else {
+        setDetails(res);
+        setSource("live");
+        setLastSynced(new Date().toLocaleString());
+      }
     } catch (err: any) {
       setError(err.message || "Live query failed");
+      if (previous) setDetails(previous);
     } finally {
       setSyncing(false);
     }
@@ -236,7 +251,8 @@ export default function AwbDetailPanel({
 
       {details && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1 }}>
-          {details.events?.length > 0 ? (
+          {details.events?.length ||
+          details.milestone_projection?.flows_steps?.some((flow) => flow.length > 0) ? (
             <MilestonePlan data={details} />
           ) : (
             <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: 12 }}>

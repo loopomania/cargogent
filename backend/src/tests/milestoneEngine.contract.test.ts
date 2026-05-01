@@ -67,6 +67,31 @@ function testSimpleDepArrDlvPath() {
   assert.equal(MILESTONE_PROJECTION_VERSION, p.milestone_projection_version);
 }
 
+function testSinglePieceHintCollapsesMultiPath() {
+  const p = computeMilestoneProjection({
+    events: [
+      { status_code: "BKD", flight: "LY323", location: "(TLV)", date: "2026-04-30T08:00:00.000Z", source: "air", pieces: "1" },
+      { status_code: "BKD", flight: "TP4000F", location: "PAR", date: "2026-05-01T10:00:00.000Z", source: "air", pieces: "1" },
+      { status_code: "BKD", flight: "TP780", location: "LIS", date: "2026-05-03T08:00:00.000Z", source: "air", pieces: "1" },
+    ],
+    origin: "TLV",
+    destination: "ARN",
+    status: null,
+    excelLegs: [
+      { from: "TLV", to: "CDG", flight: "LY323" },
+      { from: "CDG", to: "LIS", flight: "TP4000F" },
+      { from: "LIS", to: "ARN", flight: "TP780" },
+      { from: "TLV", to: "ORY", flight: "XX123" },
+    ],
+    excelPiecesHint: 1,
+  });
+  assert.equal(p.meta.paths_count, 1, "single piece must not show parallel phantom paths");
+  assert.ok(
+    p.interpretation_trace.some(t => t.startsWith("collapse:single_piece_")),
+    "trace should record single-piece collapse",
+  );
+}
+
 function testFingerPrintStableAcrossTwoCalls() {
   const input = {
     events: [{ status_code: "RCS", location: "(TLV)", date: "2026-03-01T08:00:00.000Z", source: "airline" }],
@@ -83,6 +108,7 @@ function testFingerPrintStableAcrossTwoCalls() {
 try {
   testEmptyLikeRoute();
   testSimpleDepArrDlvPath();
+  testSinglePieceHintCollapsesMultiPath();
   testFingerPrintStableAcrossTwoCalls();
   console.log("[milestoneEngine.contract.test] OK");
   process.exit(0);

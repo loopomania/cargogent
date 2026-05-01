@@ -10,9 +10,10 @@ This document is the canonical product-facing contract for how air cargo trackin
 ## Precedence and inputs
 
 1. Events are normalized to ISO timestamps by `normalizeEventDate()` before projection (same as ingestion).
-2. **Ground vs airline**: Ground handlers are detected by `source in ('maman','swissport')` or location substring `MAMAN` / `Swissport`; those events are excluded from **airline-only** leg building when airline events exist, matching prior UI behavior.
-3. Excel legs (`raw_meta.excel_legs`): merged when they add `(from,to)` pairs not inferred from tracker; used for ETA/ETD overlays and phantom-leg repair (single-hop legs extended using Excel corridor).
-4. **Flow pruning**:
+2. **Single-piece cargoes** (`raw_meta.pieces` hint is 1, or all events imply max 1 pcs when no hint): if the leg graph yields multiple alternative paths, retain exactly one path — best match to declared destination + longest chain + chronological alignment of flight numbers vs booking events. Alternate graph paths are **not** shown as “failed routes”.
+3. **Ground vs airline**: Ground handlers are detected by `source in ('maman','swissport')` or location substring `MAMAN` / `Swissport`; those events are excluded from **airline-only** leg building when airline events exist, matching prior UI behavior.
+4. Excel legs (`raw_meta.excel_legs`): merged when they add `(from,to)` pairs not inferred from tracker; used for ETA/ETD overlays and phantom-leg repair (single-hop legs extended using Excel corridor).
+5. **Flow pruning**:
    - Drop flows where every event on each leg carries `pieces` parsed as numeric `0` (unloaded / no cargo paths).
    - If the shipment has any transit-like codes globally (`DEP|ARR|MAN|RCF`), drop flows that have no transit-like code on any leg event (suppress “ground-only phantom” alternate paths).
 

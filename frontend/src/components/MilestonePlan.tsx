@@ -389,7 +389,7 @@ function MilestoneNode({
   if (code === "DEP" && event && ["RCS", "MAN", "BKD", "FOH", "DIS"].includes(event.status_code ?? "")) {
     actual = undefined;
     if (event.status_code === "BKD" && !estimated) {
-      estimated = event.date || event.estimated_date;
+      estimated = event.departure_date || event.estimated_date || event.date;
     }
   }
 

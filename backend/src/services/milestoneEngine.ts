@@ -109,8 +109,102 @@ const cycleOrder: Record<string, number> = {
   BKD: 1, RCS: 2, FOH: 2, DIS: 2, MAN: 3, DEP: 4, ARR: 5, RCF: 6, NFD: 7, AWD: 8, DLV: 9,
 };
 
+/** First integer in carrier piece strings ("1 pcs", "1 / 46") */
+function extractPiecesCount(val?: string | null): number {
+  if (val == null || val === "") return 0;
+  const m = String(val).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+export function parseExcelPiecesHint(raw: unknown): number | null {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "number" && raw > 0 && Number.isFinite(raw)) return Math.floor(raw);
+  const n = extractPiecesCount(String(raw));
+  return n > 0 ? n : null;
+}
+
+/** When tracker + excel build a DAG, identical edges collapse to one leg (keep more flight-specific events). */
+function dedupeLegGraphEdges(legs: Leg[]): Leg[] {
+  const byKey = new Map<string, Leg>();
+  for (const leg of legs) {
+    const fk = normalizeFlight(leg.flightNo) || "_";
+    const key = `${leg.from}|${leg.to}|${fk}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, leg);
+      continue;
+    }
+    const a = prev.events?.length ?? 9999;
+    const b = leg.events?.length ?? 9999;
+    byKey.set(key, a <= b ? prev : leg);
+  }
+  return Array.from(byKey.values());
+}
+
+function chronoFlightOrderScore(flow: Leg[], airlineEvents: MilestoneEvent[]): number {
+  const want = [...airlineEvents]
+    .filter(e => !!normalizeFlight(e.flight))
+    .sort((a, b) => safeTime(a) - safeTime(b))
+    .map(e => normalizeFlight(e.flight) as string);
+  const have = flow.map(l => normalizeFlight(l.flightNo)).filter(Boolean) as string[];
+  let hj = 0;
+  let score = 0;
+  for (const w of want) {
+    while (hj < have.length && have[hj] !== w) hj++;
+    if (hj < have.length && have[hj] === w) {
+      score += 6;
+      hj++;
+    }
+  }
+  return score;
+}
+
+function rankFlow(flow: Leg[], destination: string, airlineEvents: MilestoneEvent[]): number {
+  const dc = cleanCity(destination);
+  const lastTo = cleanCity(flow[flow.length - 1]?.to ?? "");
+  let points = flow.length * 10;
+  if (dc && lastTo === dc) points += 1000;
+  const flights = flow.map(l => normalizeFlight(l.flightNo)).filter(Boolean);
+  points += new Set(flights).size * 8;
+  points += chronoFlightOrderScore(flow, airlineEvents);
+
+  let firstEvt = Infinity;
+  for (const ln of flow) {
+    for (const e of ln.events) {
+      const t = safeTime(e);
+      if (t > 0 && t < firstEvt) firstEvt = t;
+    }
+  }
+  if (firstEvt !== Infinity) points += 1 / (1 + firstEvt / 1e12);
+
+  return points;
+}
+
+/** Single physical shipment piece cannot follow divergent itineraries — retain best graph path. */
+function collapseToSinglePieceFlow(
+  flows: Leg[][],
+  destination: string,
+  airlineEvents: MilestoneEvent[],
+): Leg[][] {
+  if (flows.length <= 1) return flows;
+  let best = flows[0];
+  let bestRank = rankFlow(best, destination, airlineEvents);
+  const tieKey = (f: Leg[]) =>
+    f
+      .map(l => `${l.from}->${l.to}:${normalizeFlight(l.flightNo) || ""}`)
+      .join("|");
+  for (let i = 1; i < flows.length; i++) {
+    const r = rankFlow(flows[i], destination, airlineEvents);
+    if (r > bestRank || (r === bestRank && tieKey(flows[i]) < tieKey(best))) {
+      best = flows[i];
+      bestRank = r;
+    }
+  }
+  return [best];
+}
+
 function safeTime(e?: MilestoneEvent | null): number {
-  const d = e?.date || e?.estimated_date;
+  const d = e?.date || e?.departure_date || e?.estimated_date;
   if (!d) return 0;
   const t = new Date(d).getTime();
   return isNaN(t) ? 0 : t;
@@ -153,6 +247,7 @@ function normalizeEventFields(ev: MilestoneEvent): MilestoneEvent {
   if (e.date) e.date = normalizeEventDate(e.date) || e.date;
   if (e.departure_date) e.departure_date = normalizeEventDate(e.departure_date) || e.departure_date;
   if (e.arrival_date) e.arrival_date = normalizeEventDate(e.arrival_date) || e.arrival_date;
+  if (e.estimated_date) e.estimated_date = normalizeEventDate(e.estimated_date) || e.estimated_date;
   return e;
 }
 
@@ -208,7 +303,7 @@ function buildLegs(
   }
 
   const chronoEvs = [...allEvents].sort((a, b) => safeTime(a) - safeTime(b));
-  const legs: Leg[] = [];
+  let legs: Leg[] = [];
   const uniqueNormFlights = Array.from(
     new Set(chronoEvs.filter(e => e.flight).map(e => normalizeFlight(e.flight))),
   );
@@ -330,6 +425,8 @@ function buildLegs(
       });
     }
   }
+
+  legs = dedupeLegGraphEdges(legs);
 
   legs.sort((a, b) => {
     const aEv = allEvents.find(
@@ -679,6 +776,8 @@ export function computeMilestoneProjection(payload: {
   destination?: string | null;
   status?: string | null;
   excelLegs?: ExcelLegInput[] | null;
+  /** From import / raw_meta.pieces — when 1, phantom multi-path graphs collapse to one itinerary. */
+  excelPiecesHint?: string | number | null;
 }): MilestoneProjection {
   const events = payload.events.map(normalizeEventFields);
   const excelLegs = excelLegArray((payload.excelLegs ?? []) as ExcelLegInput[]);
@@ -703,7 +802,7 @@ export function computeMilestoneProjection(payload: {
 
   const shipmentHasTransit = events.some(e => ["DEP", "ARR", "MAN", "RCF"].includes(e.status_code || ""));
 
-  const flows = rawFlows.filter(flow => {
+  const keepFlowAfterUnload = (flow: Leg[]): boolean => {
     const isUnloaded = flow.some(
       ln => ln.events && ln.events.length > 0 && ln.events.every(e => Number(e.pieces) === 0),
     );
@@ -715,9 +814,23 @@ export function computeMilestoneProjection(payload: {
       if (!flowHasTransit) return false;
     }
     return true;
-  });
+  };
 
-  const failedFlows = rawFlows.filter(f => !flows.includes(f));
+  let flows = rawFlows.filter(keepFlowAfterUnload);
+  const failedUnloadFlows = rawFlows.filter(f => !keepFlowAfterUnload(f));
+
+  const excelHint = parseExcelPiecesHint(payload.excelPiecesHint);
+  const maxPcsEvt = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
+  const treatAsSinglePiece = excelHint === 1 || (excelHint == null && maxPcsEvt === 1);
+
+  let collapseSingleTrace: string | null = null;
+  if (treatAsSinglePiece && flows.length > 1) {
+    const nBefore = flows.length;
+    flows = collapseToSinglePieceFlow(flows, destDisp, airlineEvents.length > 0 ? airlineEvents : events);
+    collapseSingleTrace = `collapse:single_piece_${nBefore}_to_1`;
+  }
+
+  const failedFlows = failedUnloadFlows;
 
   const isDlv = events.some(e => e.status_code === "DLV") || payload.status === "Delivered";
   const isErr = payload.status === "Partial/Ground Error" || payload.status === "Error";
@@ -725,13 +838,7 @@ export function computeMilestoneProjection(payload: {
     ? "Delivered"
     : events.find(e => e.status_code === "DEP")?.status ?? payload.status ?? "In progress";
 
-  const maxPcs = Math.max(
-    0,
-    ...events.map(e => {
-      const s = String(e.pieces ?? "").replace(/[^0-9]/g, "");
-      return s ? parseInt(s, 10) : 0;
-    }),
-  );
+  const maxPcs = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
 
   const hasMaman = groundEvents.some(e => e.location?.includes("MAMAN") || e.source === "maman");
   const hasSwissport = groundEvents.some(e => e.location?.includes("Swissport") || e.source === "swissport");
@@ -759,8 +866,9 @@ export function computeMilestoneProjection(payload: {
     `events:${events.length}`,
     ...(airlineEvents.length > 0 ? ["prefer:airline_leg_builder"] : ["prefer:full_event_leg_builder"]),
     `flows_kept:${flows.length}`,
-    `flows_failed:${failedFlows.length}`,
-    ...(flows.length !== rawFlows.length ? ["pruned:unload_or_no_transit"] : []),
+    `flows_failed_unload:${failedFlows.length}`,
+    ...(collapseSingleTrace ? [collapseSingleTrace] : []),
+    ...(failedUnloadFlows.length > 0 ? ["pruned:unload_or_no_transit"] : []),
   ];
 
   try {
@@ -822,6 +930,7 @@ export function enrichTrackingPayloadWithMilestone(payload: Record<string, any>)
     destination: payload.destination ?? null,
     status: payload.status ?? null,
     excelLegs,
+    excelPiecesHint: payload.raw_meta?.pieces as string | number | undefined,
   });
 
   void import("newrelic")
