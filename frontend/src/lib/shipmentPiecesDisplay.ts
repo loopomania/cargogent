@@ -29,6 +29,9 @@ export function canonicalShipmentPieceCount(
   }
   if (flightMax > 0) return flightMax;
 
+  const metaMax = proj.meta?.max_pieces ?? 0;
+  if (metaMax > 0) return metaMax;
+
   let anyMax = 0;
   for (const steps of proj.flows_steps) {
     for (const step of steps) {
@@ -42,5 +45,5 @@ export function canonicalShipmentPieceCount(
   const imp = parsePiecesCount(importPiecesHint);
   if (imp > 0) return imp;
 
-  return proj.meta?.max_pieces ?? 0;
+  return 0;
 }

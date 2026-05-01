@@ -116,6 +116,70 @@ function extractPiecesCount(val?: string | null): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+/** Max declared pcs on this leg's endpoints for the same flight (handles split RCF vs full ARR). */
+function maxAirlinePiecesForLeg(leg: Leg, pool: MilestoneEvent[]): number {
+  const want = normalizeFlight(leg.flightNo);
+  let m = 0;
+  for (const e of pool) {
+    if (want && normalizeFlight(e.flight) !== want) continue;
+    const loc = cleanCity(e.location);
+    if (loc !== leg.from && loc !== leg.to) continue;
+    m = Math.max(m, extractPiecesCount(e.pieces ?? e.actual_pieces));
+  }
+  return m;
+}
+
+const STATUS_TIER: Record<string, number> = {
+  DLV: 100,
+  AWD: 92,
+  NFD: 88,
+  RCF: 78,
+  ARR: 72,
+  DEP: 65,
+  MAN: 48,
+  RCS: 42,
+  FOH: 42,
+  DIS: 42,
+  BKD: 12,
+};
+
+function isGroundHandlerTimelineNoise(e: MilestoneEvent): boolean {
+  return (
+    e.source === "maman" ||
+    e.source === "swissport" ||
+    /\bmaman\b/i.test(e.location ?? "") ||
+    /\bswissport\b/i.test(e.location ?? "")
+  );
+}
+
+/** Latest meaningful airline scan for header text — avoids stale schedule status when events advanced. */
+function deriveOverallStatus(
+  events: MilestoneEvent[],
+  payloadStatus: string | null | undefined,
+  isDlv: boolean,
+): string {
+  if (isDlv) return "Delivered";
+  const airlinePool = events.filter(e => !isGroundHandlerTimelineNoise(e) && safeTime(e) > 0);
+  let best: MilestoneEvent | null = null;
+  for (const e of airlinePool) {
+    const code = e.status_code ?? "";
+    const tier = STATUS_TIER[code] ?? 0;
+    const t = safeTime(e);
+    if (!best) {
+      best = e;
+      continue;
+    }
+    const bCode = best.status_code ?? "";
+    const bTier = STATUS_TIER[bCode] ?? 0;
+    const bt = safeTime(best);
+    if (tier > bTier || (tier === bTier && t > bt)) best = e;
+  }
+  if (best?.status) return best.status;
+  const depEarly = events.find(e => e.status_code === "DEP")?.status;
+  if (depEarly) return depEarly;
+  return payloadStatus ?? "In progress";
+}
+
 export function parseExcelPiecesHint(raw: unknown): number | null {
   if (raw == null || raw === "") return null;
   if (typeof raw === "number" && raw > 0 && Number.isFinite(raw)) return Math.floor(raw);
@@ -507,6 +571,17 @@ function excelLegArray(excelLegs: ExcelLegInput[]): ExcelLegInput[] {
   return Array.isArray(excelLegs) ? excelLegs : [];
 }
 
+function parseNullablePiecesCount(val?: string | null): number | null {
+  if (val == null || val === "") return null;
+  const m = String(val).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function hasUnloadSignal(ev: MilestoneEvent): boolean {
+  const hay = `${ev.status_code ?? ""} ${ev.status ?? ""} ${ev.remarks ?? ""}`.toLowerCase();
+  return /\bunload|offload|offloaded|short.?shipped|shipment removed|cargo removed\b/.test(hay);
+}
+
 function mergeEventOverrides(base: MilestoneEvent | undefined, overrides: Partial<MilestoneEvent>): MilestoneEvent {
   const b = base ?? {};
   return {
@@ -625,7 +700,14 @@ function buildStepsForFlow(
 
     steps.push({ kind: "arrow", done: takeOffDone });
 
+    const legPcsFloor = maxAirlinePiecesForLeg(leg, events);
     const depMerged = depEv ? mergeEventOverrides(depEv, { location: leg.from, pieces: xlPieces || depEv.pieces }) : undefined;
+    const depPiecesNum = Math.max(
+      extractPiecesCount(xlPieces),
+      extractPiecesCount(depMerged?.pieces),
+      legPcsFloor,
+    );
+    const depPiecesOut = depPiecesNum > 0 ? String(depPiecesNum) : undefined;
     steps.push({
       kind: "node",
       code: "DEP",
@@ -636,7 +718,7 @@ function buildStepsForFlow(
       location: leg.from,
       status_code: depMerged?.status_code,
       flight: depMerged?.flight,
-      pieces: xlPieces ?? depMerged?.pieces ?? undefined,
+      pieces: depPiecesOut,
       weight: xlWeight ?? depMerged?.weight ?? undefined,
       date: depMerged?.date ?? leg.atd ?? leg.etd ?? undefined,
       estimated_date: depMerged?.estimated_date ?? undefined,
@@ -648,6 +730,12 @@ function buildStepsForFlow(
     steps.push({ kind: "arrow", done: landingDone });
 
     const arrMerged = arrEv ? mergeEventOverrides(arrEv, { location: leg.to, pieces: xlPieces || arrEv.pieces }) : undefined;
+    const arrPiecesNum = Math.max(
+      extractPiecesCount(xlPieces),
+      extractPiecesCount(arrMerged?.pieces),
+      legPcsFloor,
+    );
+    const arrPiecesOut = arrPiecesNum > 0 ? String(arrPiecesNum) : undefined;
 
     steps.push({
       kind: "node",
@@ -659,7 +747,7 @@ function buildStepsForFlow(
       location: leg.to,
       status_code: arrMerged?.status_code,
       flight: arrMerged?.flight,
-      pieces: xlPieces ?? arrMerged?.pieces ?? undefined,
+      pieces: arrPiecesOut,
       weight: xlWeight ?? arrMerged?.weight ?? undefined,
       date: arrMerged?.date ?? undefined,
       estimated_date: arrMerged?.estimated_date ?? undefined,
@@ -803,9 +891,17 @@ export function computeMilestoneProjection(payload: {
   const shipmentHasTransit = events.some(e => ["DEP", "ARR", "MAN", "RCF"].includes(e.status_code || ""));
 
   const keepFlowAfterUnload = (flow: Leg[]): boolean => {
-    const isUnloaded = flow.some(
-      ln => ln.events && ln.events.length > 0 && ln.events.every(e => Number(e.pieces) === 0),
-    );
+    const isUnloaded = flow.some(ln => {
+      if (!ln.events || ln.events.length === 0) return false;
+      const parsedPieces = ln.events
+        .map(e => parseNullablePiecesCount(e.pieces ?? e.actual_pieces))
+        .filter((n): n is number => n !== null);
+      if (parsedPieces.length === 0) return false;
+      const allZeroPieces = parsedPieces.every(n => n === 0);
+      const explicitUnload = ln.events.some(hasUnloadSignal);
+      // Avoid pruning valid delivered/landed paths that happen to report 0 pieces.
+      return allZeroPieces && explicitUnload;
+    });
     if (isUnloaded) return false;
     if (shipmentHasTransit) {
       const flowHasTransit = flow.some(ln =>
@@ -821,7 +917,11 @@ export function computeMilestoneProjection(payload: {
 
   const excelHint = parseExcelPiecesHint(payload.excelPiecesHint);
   const maxPcsEvt = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
-  const treatAsSinglePiece = excelHint === 1 || (excelHint == null && maxPcsEvt === 1);
+  // If carrier events report 0/unknown pieces, keep pathing conservative to avoid
+  // phantom graph fan-out on single-shipment HAWBs. Do not trust excel "1" when
+  // the airline feed already shows multiple pieces (common HAWB import noise).
+  const treatAsSinglePiece =
+    (excelHint === 1 && maxPcsEvt <= 1) || (excelHint == null && maxPcsEvt <= 1);
 
   let collapseSingleTrace: string | null = null;
   if (treatAsSinglePiece && flows.length > 1) {
@@ -834,9 +934,7 @@ export function computeMilestoneProjection(payload: {
 
   const isDlv = events.some(e => e.status_code === "DLV") || payload.status === "Delivered";
   const isErr = payload.status === "Partial/Ground Error" || payload.status === "Error";
-  const overallStatus = isDlv
-    ? "Delivered"
-    : events.find(e => e.status_code === "DEP")?.status ?? payload.status ?? "In progress";
+  const overallStatus = deriveOverallStatus(events, payload.status, isDlv);
 
   const maxPcs = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
 
