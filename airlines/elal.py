@@ -235,31 +235,37 @@ class ElAlTracker(AirlineTracker):
             flight_num = g[0].strip()
             loaded_pcs = g[9]
             
+            pcs_to_use = g[7].strip()
+            wgt_to_use = g[8].strip()
+            extra_remark = f"Flight {flight_num} to {g[6].strip()}"
+            
             if loaded_pcs == '0':
                 failed_flights.add(flight_num)
-                # Normalize flight string to remove extra spaces just in case
                 failed_flights.add(re.sub(r'\s+', ' ', flight_num))
-                continue
+                # Explicitly mark as 0 pieces to signal to the UI that this path failed/wasn't loaded
+                pcs_to_use = "0"
+                wgt_to_use = "0"
+                extra_remark = f"Planned on {flight_num} but 0 pieces loaded"
                 
             events.append(TrackingEvent(
                 flight=flight_num,
                 date=g[2].strip(), 
                 location=g[5].strip(), 
                 status_code="DEP",
-                pieces=g[7].strip(),
-                weight=g[8].strip(),
+                pieces=pcs_to_use,
+                weight=wgt_to_use,
                 status=f"Departed {flight_num} from {g[5].strip()}",
-                remarks=f"Flight {flight_num} to {g[6].strip()}"
+                remarks=extra_remark
             ))
             events.append(TrackingEvent(
                 flight=flight_num,
                 date=g[4].strip(),
                 location=g[6].strip(),
                 status_code="ARR",
-                pieces=g[7].strip(),
-                weight=g[8].strip(),
+                pieces=pcs_to_use,
+                weight=wgt_to_use,
                 status=f"Arrived {flight_num} at {g[6].strip()}",
-                remarks=f"Flight {flight_num} from {g[5].strip()}"
+                remarks=extra_remark
             ))
             
         # 2. Parse status history (Table 1)
@@ -284,13 +290,16 @@ class ElAlTracker(AirlineTracker):
                     flight_match = re.search(r"([A-Z]{2,3})\s*(\d{1,4})", trailing, re.IGNORECASE)
                     if flight_match:
                         flight_val = f"{flight_match.group(1)} {flight_match.group(2)}"
-                        # Strip flight if it's a known failed flight
                         norm_flight = re.sub(r'\s+', ' ', flight_val)
+                        
+                        flight = flight_val
+                        # If this flight failed to load, override the event pieces to 0
                         if norm_flight in failed_flights or flight_val in failed_flights:
-                            flight = None
-                            remarks = trailing
+                            pieces = "0"
+                            weight = "0"
+                            remarks = f"{trailing} (Unloaded)"
                         else:
-                            flight = flight_val
+                            remarks = trailing
                     else:
                         remarks = trailing
                         

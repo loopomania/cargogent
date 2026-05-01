@@ -10,7 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from .base import AirlineTracker
-from .common import normalize_awb
+from .common import normalize_awb, get_uc_chrome_path
 from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingEvent, TrackingResponse
 
@@ -52,7 +52,8 @@ class CargoBookingTracker(AirlineTracker):
         text = ""
 
         try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
+            chrome_path = get_uc_chrome_path()
+            driver = uc.Chrome(options=options, browser_executable_path=chrome_path, headless=False, use_subprocess=True, version_main=133)
             driver.set_page_load_timeout(60)
             trace.append("chrome_started")
 

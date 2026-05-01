@@ -72,9 +72,9 @@ class ThaiTracker(AirlineTracker):
                     trace.append("navigating_to_skychain")
                     # Thai Cargo recently changed their endpoint to use PID=WEB01-10 instead of service=page/PublicTracking
                     direct_url = f"https://chorus.thaicargo.com/skychain/app?PID=WEB01-10&doc_typ=AWB&awb_pre={prefix}&awb_no={number}"
-                    page.goto(direct_url, timeout=60000)
+                    page.goto(direct_url, timeout=60000, wait_until="domcontentloaded")
 
-                    time.sleep(random.uniform(5.0, 8.0)) # SkyChain is slow
+                    time.sleep(random.uniform(8.0, 10.0)) # SkyChain uses a JS redirect on load, wait for it to finish
                     
                     # Handle iframes if results are inside one
                     frames = page.frames
@@ -113,22 +113,59 @@ class ThaiTracker(AirlineTracker):
         # ── Parsing Logic ────────────────────────────────────────────────────
         events: List[TrackingEvent] = []
         
+        STATUS_MAP_REVERSE = {
+            "Booked": "BKD",
+            "Received from Shipper": "RCS",
+            "Manifested": "MAN",
+            "Departed": "DEP",
+            "Arrived": "ARR",
+            "Received from Flight": "RCF",
+            "Delivered": "DLV",
+            "Consignee Notified": "NFD",
+            "Documents Delivered": "AWD",
+            "Customs Cleared": "CRC",
+            "Discrepancy": "DIS",
+        }
+        
         if not blocked and page_text:
-            # SkyChain table parsing
-            # Format: Status | Station | Date | Time | Flight | Pieces | Weight
-            # RCS BKK 21-Feb-2026 10:00 TG123 10 100
-            
-            lines = [l.strip() for l in page_text.split("\n") if l.strip()]
-            for i, line in enumerate(lines):
-                # Look for status code or name
-                # regex matches: (Code) (Location) (Date) (Time) (Flight)
-                match = re.search(r"\b(BKD|RCS|MAN|DEP|ARR|RCF|DLV|NFD|AWD|CRC)\b\s+([A-Z]{3})\b\s+(\d{1,2}-[A-Za-z]{3}-\d{4})\s+(\d{2}:\d{2})", line, re.I)
+            lines = [l.strip().replace("\xa0", " ") for l in page_text.split("\n") if l.strip()]
+            for line in lines:
+                # 1. Match SkyChain Table format: Station | Status Date | Status | Flight Details | Pieces | Weight
+                match = re.search(r"([A-Z]{3})\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2})\s+([A-Za-z\s]+?)\s+(TG\d{3,4}|LY\d{3,4}|[A-Z0-9]{2,3}\d{3,4}|-)", line, re.I)
+                
+                # 2. Match standard API/Legacy format (Fallback)
+                legacy_match = re.search(r"\b(BKD|RCS|MAN|DEP|ARR|RCF|DLV|NFD|AWD|CRC)\b\s+([A-Z]{3})\b\s+(\d{1,2}-[A-Za-z]{3}-\d{4})\s+(\d{2}:\d{2})", line, re.I)
+                
                 if match:
-                    code = match.group(1).upper()
-                    loc = match.group(2).upper()
-                    date_str = f"{match.group(3)} {match.group(4)}"
+                    loc = match.group(1).upper()
+                    date_str = match.group(2)
+                    status_text = match.group(3).strip()
+                    flight = match.group(4)
+                    if flight == "-": flight = None
                     
-                    # Look for flight in the same line
+                    pieces_weight_m = re.search(r"\s+(\d+)\s+([\d\.]+)\s*K?$", line)
+                    pieces = pieces_weight_m.group(1) if pieces_weight_m else None
+                    weight = pieces_weight_m.group(2) if pieces_weight_m else None
+                    
+                    code = STATUS_MAP_REVERSE.get(status_text, "UNKN")
+                    if code == "UNKN":
+                        # Attempt to see if the status_text is actually a code
+                        if status_text in THAI_STATUS_MAP: code = status_text
+                        
+                    events.append(TrackingEvent(
+                        status_code=code,
+                        status=status_text if code != "UNKN" else THAI_STATUS_MAP.get(code, status_text),
+                        location=loc,
+                        date=date_str,
+                        flight=flight,
+                        pieces=pieces,
+                        weight=weight,
+                        remarks=f"{status_text} (Thai)",
+                    ))
+                elif legacy_match:
+                    code = legacy_match.group(1).upper()
+                    loc = legacy_match.group(2).upper()
+                    date_str = f"{legacy_match.group(3)} {legacy_match.group(4)}"
                     flight_m = re.search(r"\b(TG\d{3,4})\b", line)
                     flight = flight_m.group(1) if flight_m else None
                     

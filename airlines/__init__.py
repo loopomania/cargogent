@@ -11,6 +11,12 @@ from .aircanada import AirCanadaTracker
 from .silkway import SilkWayTracker
 from .dhl_aviation import DHLAviationTracker
 from .cargobooking import CargoBookingTracker
+from .aireuropa import AirEuropaTracker
+from .etihad import EtihadTracker
+from .tap import TapTracker
+from .thai import ThaiTracker
+from .eva import EVATracker
+from .myfreighter import MyFreighterTracker
 
 __all__ = [
     "ElAlTracker",
@@ -25,5 +31,11 @@ __all__ = [
     "AirCanadaTracker",
     "SilkWayTracker",
     "DHLAviationTracker",
-    "CargoBookingTracker"
+    "CargoBookingTracker",
+    "AirEuropaTracker",
+    "EtihadTracker",
+    "TapTracker",
+    "ThaiTracker",
+    "EVATracker",
+    "MyFreighterTracker"
 ]

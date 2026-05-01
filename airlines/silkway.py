@@ -56,10 +56,32 @@ class SilkWayTracker(AirlineTracker):
                         if "routes" in info_data and info_data["routes"]:
                             # Attempting to derive from the airport map
                             airport_map = {a["id"]: a["iataCode"] for a in info_data.get("airports", [])}
+                            carrier_map = {c["id"]: c["airlineCode"] for c in info_data.get("carriers", [])}
+                            
                             first_route = info_data["routes"][0]
                             last_route = info_data["routes"][-1]
                             origin = airport_map.get(first_route.get("origin"))
                             destination = airport_map.get(last_route.get("destination"))
+                            
+                            # Add BKD events for each route leg to show scheduled flights
+                            for route in info_data["routes"]:
+                                r_origin = airport_map.get(route.get("origin"))
+                                r_dest = airport_map.get(route.get("destination"))
+                                r_carrier = carrier_map.get(route.get("carrier"), "7L")
+                                r_flight_nr = route.get("flightNr")
+                                r_date = route.get("flightDate")
+                                r_status = route.get("flightStatus", "BKD")
+                                
+                                flight = f"{r_carrier}{r_flight_nr}" if r_flight_nr else None
+                                
+                                if r_status == "BKD" and r_origin:
+                                    events.append(TrackingEvent(
+                                        status_code=r_status,
+                                        location=r_origin,
+                                        date=r_date,
+                                        flight=flight,
+                                        remarks=f"Booked for flight {flight} to {r_dest}"
+                                    ))
                     except BaseException as e:
                         pass
                 

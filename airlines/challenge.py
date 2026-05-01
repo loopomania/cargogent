@@ -1,16 +1,11 @@
 from __future__ import annotations
 import logging
-import time
-import re
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import asyncio
 from typing import List, Optional
+import re
 
 from .base import AirlineTracker
 from .common import normalize_awb
-from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingResponse, TrackingEvent
 
 logger = logging.getLogger(__name__)
@@ -20,65 +15,38 @@ class ChallengeTracker(AirlineTracker):
     base_url = "https://www.challenge-group.com/tracking/"
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
-        """Offload sync UC/Selenium work to the shared browser executor."""
-        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
-
-    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="700")
         trace = []
-        
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
-        
-        if self.proxy:
-            rotated_proxy = get_rotating_proxy(self.proxy)
-            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
-            if ext_path:
-                options.add_argument(f"--load-extension={ext_path}")
-            else:
-                options.add_argument(f'--proxy-server={rotated_proxy}')
-        
-        driver = None
-        try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
-            driver.set_page_load_timeout(90)
-            trace.append("chrome_started")
-            
-            driver.get(self.base_url)
-            time.sleep(5)
+
+        async def _run(page):
+            # Load page
             trace.append("page_loaded")
-            
-            wait = WebDriverWait(driver, 20)
+            await page.goto(self.base_url, wait_until="domcontentloaded", timeout=60000)
+            await asyncio.sleep(2)
             
             # Input AWB
+            await page.fill("#Pre1", prefix, force=True)
+            await page.fill("#AWB1", serial, force=True)
+            trace.append("awb_input_done")
+            
+            # Click Submit
+            await page.click(".submit_tracking", force=True)
+            trace.append("submit_clicked")
+            
+            # Wait for results or error
             try:
-                # Based on research, fields are Pre1 and AWB1
-                pre_input = wait.until(EC.element_to_be_clickable((By.ID, "Pre1")))
-                awb_input = driver.find_element(By.ID, "AWB1")
-                
-                pre_input.clear()
-                pre_input.send_keys(prefix)
-                
-                awb_input.clear()
-                awb_input.send_keys(serial)
-                
-                trace.append("awb_input_done")
-                
-                # Click Submit
-                submit_btn = driver.find_element(By.CSS_SELECTOR, ".submit_tracking")
-                driver.execute_script("arguments[0].click();", submit_btn)
-                trace.append("submit_clicked")
-                
-                time.sleep(10)
+                # wait for either table.tracking or error message
+                await page.wait_for_function("""() => {
+                    return document.querySelector('table.tracking') || 
+                           document.body.innerText.includes('No results were found');
+                }""", timeout=20000)
             except Exception as e:
                 trace.append(f"interaction_failed: {str(e)[:50]}")
-
+            
+            html = await page.content()
+            
             # Check for error message
-            html = driver.page_source
-            if "Error: No results were found" in html:
+            if "Error: No results were found" in html or "No results were found" in html:
                 trace.append("not_found")
                 return TrackingResponse(
                     awb=awb,
@@ -89,36 +57,124 @@ class ChallengeTracker(AirlineTracker):
                     raw_meta={"trace": trace}
                 )
 
-            # Scrape basic info and events
-            events = self._scrape_events(driver)
+            # Scrape events via JS
+            extraction_script = """
+            () => {
+                const results = [];
+                const tables = document.querySelectorAll('table.tracking');
+                tables.forEach(table => {
+                    const rows = table.querySelectorAll('tr');
+                    if (rows.length < 2) return;
+                    
+                    const dataRow = rows[1];
+                    const cols = dataRow.querySelectorAll('td');
+                    if (cols.length < 8) return;
+
+                    const fromLoc = cols[0].innerText.trim();
+                    const toLoc = cols[1].innerText.trim();
+                    const serviceType = cols[2].classList.contains('rfs') ? 'RFS' : (cols[2].classList.contains('flight') ? 'FLIGHT' : '');
+                    const flightNum = cols[3].innerText.trim();
+                    const depTime = cols[4].innerText.trim();
+                    const arrTime = cols[5].innerText.trim();
+                    const pcs = cols[6].innerText.trim();
+                    const wgt = cols[7].innerText.trim();
+
+                    let status = "Booked";
+                    let statusCode = "BKD";
+                    let nextNode = table.nextElementSibling;
+                    while (nextNode && !nextNode.classList.contains('tracking-details')) {
+                        nextNode = nextNode.nextElementSibling;
+                    }
+                    if (nextNode && nextNode.classList.contains('tracking-details')) {
+                        const activeIcon = nextNode.querySelector('li[class*="_on"]');
+                        if (activeIcon) {
+                            if (activeIcon.classList.contains('icon1_on')) { status = "Booked"; statusCode = "BKD"; }
+                            else if (activeIcon.classList.contains('icon2_on')) { status = "Received"; statusCode = "RCS"; }
+                            else if (activeIcon.classList.contains('icon3_on')) { status = "Departed"; statusCode = "DEP"; }
+                            else if (activeIcon.classList.contains('icon4_on')) { status = "Arrived"; statusCode = "ARR"; }
+                            else if (activeIcon.classList.contains('icon5_on')) { status = "Delivered"; statusCode = "DLV"; }
+                        }
+                    }
+
+                    // Check for .atd to determine if the segment has actually departed or arrived
+                    const isAtd = cols[4].querySelector('.atd') !== null;
+                    const isAta = cols[5].querySelector('.atd') !== null;
+
+                    let segDepStatus = statusCode === "DEP" || statusCode === "ARR" || statusCode === "DLV" ? "DEP" : "BKD";
+                    if (isAtd) {
+                        segDepStatus = "DEP"; // Has an ATD, so it has definitely departed
+                    } else if (statusCode === "BKD" || statusCode === "RCS") {
+                        segDepStatus = "BKD";
+                    }
+
+                    let segArrStatus = statusCode === "ARR" || statusCode === "DLV" ? "ARR" : "BKD";
+                    if (isAta) {
+                        segArrStatus = "ARR"; // Has an ATA, so it has definitely arrived
+                    } else if (segDepStatus === "DEP") {
+                        segArrStatus = "In Transit"; // Departed but arrival unknown
+                    } else if (arrTime) {
+                        segArrStatus = "RCF"; // Future arrival (scheduled)
+                    }
+
+                    if (depTime) {
+                        results.push({
+                            location: fromLoc,
+                            status: segDepStatus === "DEP" ? "Departed" : "Booked",
+                            statusCode: segDepStatus,
+                            date: depTime,
+                            pieces: pcs,
+                            weight: wgt,
+                            remarks: `Segment: ${fromLoc} to ${toLoc}. Service: ${serviceType}.`,
+                            flight: flightNum
+                        });
+                    }
+
+                    if (arrTime || depTime) {
+                        results.push({
+                            location: toLoc || fromLoc,
+                            status: segArrStatus === "ARR" ? "Arrived" : "Scheduled",
+                            statusCode: segArrStatus === "ARR" ? "ARR" : (segArrStatus === "RCF" ? "RCF" : "BKD"),
+                            date: arrTime || depTime,
+                            pieces: pcs,
+                            weight: wgt,
+                            remarks: `Segment: ${fromLoc} to ${toLoc}. Service: ${serviceType}. Departure: ${depTime}`,
+                            flight: flightNum
+                        });
+                    }
+                });
+                results.reverse();
+                return results;
+            }
+            """
             
+            raw_events = await page.evaluate(extraction_script)
+            events = []
+            for ev in raw_events:
+                events.append(TrackingEvent(
+                    location=ev.get("location"),
+                    status=ev.get("status"),
+                    status_code=ev.get("statusCode"),
+                    date=ev.get("date"),
+                    pieces=ev.get("pieces"),
+                    weight=ev.get("weight"),
+                    remarks=ev.get("remarks"),
+                    flight=ev.get("flight")
+                ))
+
             status = "In Transit"
             if events:
                 status = events[0].status
             
-            # Extract Origin/Destination
-            # Origin is the start of the first segment, Destination is the end of the last segment
+            origin = None
+            dest = None
             if events:
-                # events[0] is most recent, events[-1] is oldest
-                # My new JS sets location to 'To' city.
-                # So events[-1].location is the destination of the first segment.
-                # We also want the origin of the first segment.
-                # I'll update the JS to return more info or handle it here.
                 dest = events[0].location
-                # For origin, we might need to parse it from remarks if we don't return it explicitly
-                # Or just use the summary information from the table if available.
-                origin = None
                 if events[-1].remarks and "Segment: " in events[-1].remarks:
-                    # Segment: BLL to LGG. ...
                     m = re.search(r"Segment: (.*?) to ", events[-1].remarks)
                     if m:
                         origin = m.group(1).strip()
-                
                 if not origin:
-                    origin = events[-1].location # Fallback
-            else:
-                origin = None
-                dest = None
+                    origin = events[-1].location
 
             return TrackingResponse(
                 awb=awb,
@@ -130,6 +186,14 @@ class ChallengeTracker(AirlineTracker):
                 raw_meta={"trace": trace, "events_count": len(events)}
             )
 
+        try:
+            from playwright.async_api import async_playwright
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                res = await _run(page)
+                await browser.close()
+                return res
         except Exception as e:
             logger.error(f"Challenge tracking failed: {str(e)}")
             return TrackingResponse(
@@ -139,84 +203,3 @@ class ChallengeTracker(AirlineTracker):
                 events=[],
                 raw_meta={"error": str(e), "trace": trace}
             )
-        finally:
-            if driver:
-                driver.quit()
-
-    def _scrape_events(self, driver) -> List[TrackingEvent]:
-        # Based on research, results are in a structured layout. 
-        # I'll use a script to extract the columns.
-        extraction_script = """
-        const results = [];
-        // Tracking results are in tables with class 'tracking'
-        const tables = document.querySelectorAll('table.tracking');
-        tables.forEach(table => {
-            const rows = table.querySelectorAll('tr');
-            if (rows.length < 2) return;
-            
-            // Header is row 0, data is row 1
-            const dataRow = rows[1];
-            const cols = dataRow.querySelectorAll('td');
-            if (cols.length < 8) return;
-
-            const fromLoc = cols[0].innerText.trim();
-            const toLoc = cols[1].innerText.trim();
-            const serviceType = cols[2].classList.contains('rfs') ? 'RFS' : (cols[2].classList.contains('flight') ? 'FLIGHT' : '');
-            const flightNum = cols[3].innerText.trim();
-            const depTime = cols[4].innerText.trim();
-            const arrTime = cols[5].innerText.trim();
-            const pcs = cols[6].innerText.trim();
-            const wgt = cols[7].innerText.trim();
-
-            // Status is represented by icons in the following div.tracking-details
-            let status = "In Transit";
-            let statusCode = "DEP";
-            let nextNode = table.nextElementSibling;
-            while (nextNode && !nextNode.classList.contains('tracking-details')) {
-                nextNode = nextNode.nextElementSibling;
-            }
-            if (nextNode && nextNode.classList.contains('tracking-details')) {
-                const activeIcon = nextNode.querySelector('li[class*="_on"]');
-                if (activeIcon) {
-                    if (activeIcon.classList.contains('icon1_on')) { status = "Booked"; statusCode = "BKD"; }
-                    else if (activeIcon.classList.contains('icon2_on')) { status = "Received"; statusCode = "RCS"; }
-                    else if (activeIcon.classList.contains('icon3_on')) { status = "Departed"; statusCode = "DEP"; }
-                    else if (activeIcon.classList.contains('icon4_on')) { status = "Arrived"; statusCode = "ARR"; }
-                    else if (activeIcon.classList.contains('icon5_on')) { status = "Delivered"; statusCode = "DLV"; }
-                }
-            }
-
-            results.push({
-                location: toLoc || fromLoc,
-                status: status,
-                statusCode: statusCode,
-                date: arrTime || depTime,
-                pieces: pcs,
-                weight: wgt,
-                remarks: `Segment: ${fromLoc} to ${toLoc}. Service: ${serviceType}. Departure: ${depTime}`,
-                flight: flightNum
-            });
-        });
-        // Reverse to have latest event first
-        results.reverse();
-        return results;
-        """
-        
-        try:
-            raw_events = driver.execute_script(extraction_script)
-            results = []
-            for ev in raw_events:
-                results.append(TrackingEvent(
-                    location=ev.get("location"),
-                    status=ev.get("status"),
-                    status_code=ev.get("statusCode"),
-                    date=ev.get("date"),
-                    pieces=ev.get("pieces"),
-                    weight=ev.get("weight"),
-                    remarks=ev.get("remarks"),
-                    flight=ev.get("flight")
-                ))
-            return results
-        except Exception as e:
-            logger.error(f"Challenge scraping error: {e}")
-            return []

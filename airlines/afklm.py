@@ -22,6 +22,7 @@ from .base import AirlineTracker
 from .common import (
     is_bot_blocked_html,
     normalize_awb,
+    get_uc_chrome_path,
 )
 from .proxy_util import get_rotating_proxy, get_proxy_extension
 from models import TrackingEvent, TrackingResponse
@@ -124,6 +125,45 @@ class AFKLMTracker(AirlineTracker):
                             remarks=status_raw
                         ))
         
+        # 3. Extract Delivery/Action Box events
+        action_boxes = soup.find_all("afkl-action-box")
+        for box in action_boxes:
+            ul = box.find("ul", class_="caret")
+            if not ul: continue
+            for li in ul.find_all("li"):
+                spans = li.find_all("span")
+                texts = [s.get_text(strip=True) for s in spans if s.get_text(strip=True)]
+                if len(texts) >= 4:
+                    date_text = re.sub(r'[^a-zA-Z0-9\s:]', '', texts[1]).strip()
+                    ev_pcs = None
+                    m_pcs = re.search(r'(\d+)', texts[2])
+                    if m_pcs: ev_pcs = m_pcs.group(1)
+                    
+                    action_text = texts[3]
+                    act_low = action_text.lower()
+                    
+                    loc = None
+                    m_loc = re.search(r'at\s+([A-Z]{3})', action_text)
+                    if m_loc: loc = m_loc.group(1)
+                    
+                    flight = None
+                    m_flight = re.search(r'from\s+([A-Z0-9]{5,6})', action_text, re.I)
+                    if m_flight: flight = m_flight.group(1).upper()
+                    
+                    status_code = "UNKN"
+                    if "deliver" in act_low: status_code = "DLV"
+                    elif "receiv" in act_low: status_code = "RCF"
+                    
+                    if status_code != "UNKN":
+                        events.append(TrackingEvent(
+                            status_code=status_code,
+                            location=loc,
+                            date=date_text,
+                            pieces=ev_pcs,
+                            flight=flight,
+                            remarks=action_text
+                        ))
+        
         return {
             "pieces": pieces,
             "weight": weight,
@@ -160,7 +200,8 @@ class AFKLMTracker(AirlineTracker):
 
         driver = None
         try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
+            chrome_path = get_uc_chrome_path()
+            driver = uc.Chrome(options=options, browser_executable_path=chrome_path, headless=False, use_subprocess=True, version_main=133)
             driver.set_page_load_timeout(90)
 
             trace.append(f"navigating_to:{source_url}")

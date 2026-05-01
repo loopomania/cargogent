@@ -3,27 +3,16 @@ FROM mcr.microsoft.com/playwright/python:v1.50.0-jammy
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Xvfb, wget, gnupg, and Chrome pinned to 146 (matches version_main=146 in UC trackers)
-RUN apt-get update && apt-get install -y \
-    xvfb \
-    tzdata \
-    wget \
-    gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-cache madison google-chrome-stable \
-    && apt-get install -y "google-chrome-stable=146.0.7680.164-1" \
-    && apt-mark hold google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
+# Install Xvfb, wget, gnupg, and Chrome pinned to 146 (matches version_main=147 in UC trackers)
+RUN apt-get update && apt-get install -y xvfb tzdata && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python3 -m playwright install chromium
 
-# Pre-download ChromeDriver matching pinned Chrome version
-RUN python3 -c "import undetected_chromedriver as uc; uc.Chrome.__init__.__doc__" 2>/dev/null || true
+# Removed legacy UC warming logic
 
 COPY . .
 

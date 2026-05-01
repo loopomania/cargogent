@@ -8,4 +8,5 @@ Xvfb :99 -screen 0 1920x1080x24 -ac &
 sleep 2
 
 # Launch the FastAPI application
-exec uvicorn app:app --host 0.0.0.0 --port 8000
+export NEW_RELIC_CONFIG_FILE=newrelic.ini
+exec newrelic-admin run-program uvicorn app:app --host 0.0.0.0 --port 8000

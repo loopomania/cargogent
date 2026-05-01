@@ -340,10 +340,8 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None, ground
                     if loc:
                         if dir_type == "export":
                             res.origin = loc
-                            if not res.etd: res.etd = ev.date
                         elif dir_type == "import":
                             res.destination = loc
-                            if not res.eta: res.eta = ev.date
                         break
                 
                 if not h_val:
@@ -364,7 +362,7 @@ async def route_track(airline: str, awb: str, hawb: Optional[str] = None, ground
     return res
 
 
-async def route_track_by_awb(awb: str, hawb: Optional[str] = None) -> TrackingResponse:
+async def route_track_by_awb(awb: str, hawb: Optional[str] = None, ground_only: bool = False) -> TrackingResponse:
     """Route tracking by AWB only; airline is detected from AWB prefix."""
     airline = get_airline_from_awb(awb)
-    return await route_track(airline, awb, hawb=hawb)
+    return await route_track(airline, awb, hawb=hawb, ground_only=ground_only)

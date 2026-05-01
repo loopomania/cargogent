@@ -1,29 +1,22 @@
 """
 United Cargo tracker.
 
-Uses undetected-chromedriver to access https://www.unitedcargo.com/en/us/track/awb/{awb}.
-The site is built with Next.js and embeds tracking data in a JSON script tag.
+Uses direct HTTP requests to https://www.unitedcargo.com/en/us/track/awb/{awb}.
+The site is built with Next.js and embeds tracking data in a JSON __NEXT_DATA__ script tag,
+which is available in the initial HTML response without JavaScript execution.
 """
 
 from __future__ import annotations
 
 import re
-import time
 import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from curl_cffi import requests as cffi_requests
 
 from .base import AirlineTracker
-from .common import (
-    is_bot_blocked_html,
-    normalize_awb,
-)
-from .proxy_util import get_rotating_proxy, get_proxy_extension
+from .common import normalize_awb
 from models import TrackingEvent, TrackingResponse
 
 
@@ -34,15 +27,13 @@ class UnitedTracker(AirlineTracker):
     def _extract_from_json(self, html: str) -> Dict[str, Any]:
         """Extract tracking data from the __NEXT_DATA__ script tag."""
         try:
-            # Find the __NEXT_DATA__ script tag
             match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
             if not match:
                 return {}
             
             data = json.loads(match.group(1))
             
-            # Navigate to the tracking details
-            # Path: props -> pageProps -> api -> tracking -> [0]
+            # Navigate to: props -> pageProps -> api -> tracking -> [0]
             tracking_list = data.get("props", {}).get("pageProps", {}).get("api", {}).get("tracking", [])
             if not tracking_list:
                 return {}
@@ -59,7 +50,6 @@ class UnitedTracker(AirlineTracker):
         # United groups movements by station in sortedMovementList
         milestone_groups = raw_data.get("sortedMovementList", [])
         for group in milestone_groups:
-            # Note: Station group might have a station name but movements within it have their own station code
             movements = group.get("movements", [])
             
             for m in movements:
@@ -82,6 +72,7 @@ class UnitedTracker(AirlineTracker):
 
                 ev = TrackingEvent(
                     status_code=status_code,
+                    status=description,
                     location=station,
                     date=timestamp,
                     remarks=description,
@@ -99,7 +90,6 @@ class UnitedTracker(AirlineTracker):
             if not z:
                 return datetime.min
             try:
-                # Format: 2026-01-04 16:05:00
                 return datetime.strptime(z, "%Y-%m-%d %H:%M:%S")
             except:
                 return datetime.min
@@ -108,7 +98,11 @@ class UnitedTracker(AirlineTracker):
         return events
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
-        """Offload sync UC/Selenium work to the shared browser executor."""
+        """Fetch tracking data via direct HTTP — no browser needed.
+        
+        United's Next.js site embeds all tracking data in the __NEXT_DATA__ 
+        JSON blob in the initial server-rendered HTML, so no JS execution needed.
+        """
         return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
 
     def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
@@ -120,56 +114,30 @@ class UnitedTracker(AirlineTracker):
         source_url = f"{self.base_url}{awb_fmt}"
         trace = []
 
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-
-        if self.proxy:
-            rotated_proxy = get_rotating_proxy(self.proxy)
-            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
-            if ext_path:
-                options.add_argument(f"--load-extension={ext_path}")
-            else:
-                options.add_argument(f'--proxy-server={rotated_proxy}')
-
-        driver = None
         try:
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
-            driver.set_page_load_timeout(90)
+            trace.append(f"http_get:{source_url}")
+            resp = cffi_requests.get(
+                source_url,
+                impersonate="chrome131",
+                timeout=30,
+                allow_redirects=True,
+            )
+            html = resp.text
+            trace.append(f"status:{resp.status_code},len:{len(html)}")
 
-            trace.append(f"navigating_to:{source_url}")
-            driver.get(source_url)
-            
-            # Wait for any component that indicates load. Next.js usually renders skeleton or main container
-            try:
-                # This selector was seen in the header area in previous logs
-                WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
-                )
-                trace.append("page_rendered")
-            except:
-                trace.append("render_wait_timeout")
-
-            # Wait a few seconds for hydration/data to stay for sure
-            time.sleep(5)
-            html = driver.page_source
-
-            if is_bot_blocked_html(html):
+            if resp.status_code == 403 or "Access Denied" in html:
                 blocked = True
                 message = "Bot protection blocked the request."
+            elif resp.status_code != 200:
+                blocked = True
+                message = f"HTTP {resp.status_code}"
             else:
                 message = "Successfully loaded tracking data."
 
         except Exception as exc:
-            message = f"United tracking failed: {exc}"
+            message = f"United tracking failed: {str(exc)[:80]}"
             blocked = True
-        finally:
-            if driver:
-                try:
-                    driver.quit()
-                except Exception:
-                    pass
+            trace.append(f"error:{str(exc)[:40]}")
 
         # Process data
         raw_json = self._extract_from_json(html)

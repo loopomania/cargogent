@@ -8,3 +8,4 @@ undetected-chromedriver==3.5.5
 selenium==4.21.0
 curl_cffi==0.14.0
 tenacity==8.5.0
+newrelic==10.2.0

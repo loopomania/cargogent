@@ -52,13 +52,30 @@ class DeltaTracker(AirlineTracker):
         
         if not getattr(self, "proxy", None):
             blocked = True
-            message = "A Scraping Browser WSS URI must be provided for Delta."
+            message = "A proxy must be provided for Delta."
         else:
             try:
                 with sync_playwright() as p:
                     print("LAUNCHING PLAYWRIGHT CDI", file=sys.stderr)
-                    browser = p.chromium.connect_over_cdp(self.proxy)
-                    page = browser.new_page()
+                    
+                    proxy_config = None
+                    if self.proxy.startswith("wss://") or self.proxy.startswith("ws://"):
+                        browser = p.chromium.connect_over_cdp(self.proxy)
+                        context = browser.contexts[0] if browser.contexts else browser.new_context(ignore_https_errors=True)
+                        page = context.new_page()
+                    else:
+                        import re
+                        m = re.search(r'https?://(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)', self.proxy)
+                        if m:
+                            user, password, host, port = m.groups()
+                            proxy_config = {
+                                "server": f"http://{host}:{port}",
+                                "username": user,
+                                "password": password,
+                            }
+                        browser = p.chromium.launch(headless=True, proxy=proxy_config)
+                        context = browser.new_context(ignore_https_errors=True)
+                        page = context.new_page()
                     
                     # Set up response interceptor
                     def handle_response(response):

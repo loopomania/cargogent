@@ -2,285 +2,231 @@ from __future__ import annotations
 import logging
 import re
 import time
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import random
+import json
+from bs4 import BeautifulSoup
 from typing import List, Optional
 from datetime import datetime
 
 from .base import AirlineTracker
-from .common import (
-    normalize_awb,
-)
-from .proxy_util import get_rotating_proxy, get_proxy_extension
+from .common import normalize_awb
 from models import TrackingResponse, TrackingEvent
+
+import asyncio
+from playwright.async_api import async_playwright, Page
 
 logger = logging.getLogger(__name__)
 
+# Basic javascript injection payload to hide Playwright/Headless Chromium properties from Akamai
+AKAMAI_STEALTH_SCRIPT = """
+    // Mask webdriver
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    // Mock chrome
+    window.chrome = { runtime: {} };
+    // Mask WebGL rendering engine
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+        if (parameter === 37445) return 'Google Inc. (Apple)';
+        if (parameter === 37446) return 'ANGLE (Apple, Apple M1 Pro, OpenGL 4.1)';
+        return getParameter.apply(this, [parameter]);
+    };
+"""
+
+async def simulate_human_mouse(page: Page, target_selector: str):
+    """
+    Simulates a non-linear (bezier) mouse movement to the target selector.
+    Akamai's sensor relies heavily on `onmousemove` events to build its token.
+    """
+    element = await page.query_selector(target_selector)
+    if not element: return
+
+    box = await element.bounding_box()
+    if not box: return
+
+    # Target coordinates with a little randomness inside the element bounds
+    target_x = box['x'] + (box['width'] / 2) + random.randint(-5, 5)
+    target_y = box['y'] + (box['height'] / 2) + random.randint(-5, 5)
+
+    # Current generic start coordinates
+    current_x = random.randint(100, 300)
+    current_y = random.randint(100, 300)
+
+    # Move to starting pos instantly
+    await page.mouse.move(current_x, current_y)
+    
+    # Calculate bezier control point for a slight arc
+    control_x = current_x + (target_x - current_x) * 0.5 + random.randint(-50, 50)
+    control_y = current_y + (target_y - current_y) * 0.5 + random.randint(-50, 50)
+
+    steps = 20
+    for i in range(1, steps + 1):
+        t = i / steps
+        # Quadratic bezier formula
+        x = (1 - t)**2 * current_x + 2 * (1 - t) * t * control_x + t**2 * target_x
+        y = (1 - t)**2 * current_y + 2 * (1 - t) * t * control_y + t**2 * target_y
+        
+        await page.mouse.move(x, y)
+        await asyncio.sleep(random.uniform(0.01, 0.04))
+
 class CathayTracker(AirlineTracker):
     name = "cathay"
-    base_url = "https://www.cathaycargo.com/en-us/track-and-trace.html"
 
     async def track(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
-        """Offload sync UC/Selenium work to the shared browser executor."""
-        return await self.run_sync(self._track_sync, awb, hawb=hawb, **kwargs)
-
-    def _track_sync(self, awb: str, hawb=None, **kwargs) -> TrackingResponse:
         prefix, serial = normalize_awb(awb, default_prefix="160")
-        trace = []
+        awb_formatted = f"{prefix}-{serial}"
         
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
-        
-        if self.proxy:
-            rotated_proxy = get_rotating_proxy(self.proxy)
-            ext_path = get_proxy_extension(rotated_proxy, f"/tmp/proxy_ext_{self.name}")
-            if ext_path:
-                options.add_argument(f"--load-extension={ext_path}")
-            else:
-                options.add_argument(f'--proxy-server={rotated_proxy}')
-        
-        driver = None
         try:
-            # Use non-headless mode in virtual framebuffer (DISPLAY=:99)
-            driver = uc.Chrome(options=options, headless=False, use_subprocess=True, version_main=146)
-            driver.set_page_load_timeout(90)
-            trace.append("chrome_started")
-            
-            driver.get(self.base_url)
-            time.sleep(15) # Wait for potential Akamai challenge
-            trace.append("page_loaded")
-            
-            wait = WebDriverWait(driver, 25)
-            # Interact with the form
-            try:
-                # Accept cookies
+            async with async_playwright() as p:
+                if not self.proxy:
+                    raise Exception("Premium proxy required for Cathay")
+                browser = await p.chromium.connect_over_cdp(self.proxy)
+                context = browser.contexts[0]
+                page = await context.new_page()
+
+                # 1. Inject Application Layer Bypass script before page loads
+                await page.add_init_script(AKAMAI_STEALTH_SCRIPT)
+
+                # Navigate directly to the tracking endpoint
+                url = f"https://www.cathaycargo.com/en-us/track-and-trace.html"
+                
+                logger.info(f"[Cathay] Navigating to {url}")
+                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+                # Wait for page to settle
+                await asyncio.sleep(5)
+                
+                # Wait for and dismiss cookie banner
                 try:
-                    accept_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Accept all')]")))
-                    driver.execute_script("arguments[0].click();", accept_btn)
-                    trace.append("cookies_accepted")
-                    time.sleep(3)
+                    await page.wait_for_selector("button:has-text('Accept all')", timeout=15000)
+                    await page.click("button:has-text('Accept all')", timeout=5000)
+                except Exception as e:
+                    logger.debug(f"[Cathay] No cookie banner found or click failed: {e}")
+                
+                # Fallback JS hide just in case
+                try:
+                    await page.evaluate("""() => {
+                        const overlay = document.querySelector('.cargo_dialog-mask');
+                        if (overlay) overlay.style.display = 'none';
+                        const banner = document.querySelector('.cargo_cookieconsent');
+                        if (banner) banner.style.display = 'none';
+                    }""")
                 except:
                     pass
-
-                from selenium.webdriver.common.action_chains import ActionChains
-                actions = ActionChains(driver)
-
-                # Input prefix
-                prefix_input = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[id$="_airlineCodeField"]')))
-                actions.move_to_element(prefix_input).click().perform()
-                prefix_input.clear()
-                for char in prefix:
-                    prefix_input.send_keys(char)
-                    time.sleep(0.1)
-                prefix_input.send_keys(Keys.TAB)
-                trace.append("prefix_done")
+                await asyncio.sleep(1)
                 
-                # Input AWB serial
-                awb_input = driver.find_element(By.CSS_SELECTOR, 'input[id$="_airWaybill"]')
-                actions.move_to_element(awb_input).click().perform()
-                awb_input.clear()
-                for char in serial:
-                    awb_input.send_keys(char)
-                    time.sleep(0.1)
-                trace.append("serial_done")
+                # Type the AWB into the fields
+                await page.fill("input[name$='_airlineCodeField']", prefix)
+                await page.fill("input[name$='_airWaybill']", serial)
+                await page.keyboard.press("Enter")
+                await asyncio.sleep(2)
+
+                track_btn_selector = "input[value='Track now']"
                 
-                time.sleep(2)
+                json_data = None
+                try:
+                    # Expect the JSON API response from the new SPA
+                    async with page.expect_response(lambda response: "cargo-shipments/v1/tracking" in response.url and response.request.method != "OPTIONS", timeout=30000) as response_info:
+                        await page.click(track_btn_selector)
+                        
+                    response = await response_info.value
+                    if response.status == 200:
+                        json_data = await response.json()
+                except Exception as e:
+                    logger.warning(f"[Cathay] Could not extract API JSON or click track button: {e}")
                 
-                # Explicitly click submit button
-                submit_btn = driver.find_element(By.CSS_SELECTOR, ".-searchbar-submit")
-                actions.move_to_element(submit_btn).click().perform()
-                trace.append("submit_clicked")
+                await browser.close()
                 
-                time.sleep(10)
-            except Exception as e:
-                trace.append(f"interaction_failed: {str(e)[:50]}")
+                if not json_data:
+                     return TrackingResponse(
+                        awb=awb_formatted,
+                        airline="Cathay Cargo",
+                        status="Error",
+                        events=[],
+                        message="Bypass failed or AWB not found (No JSON returned)",
+                        raw_meta={"bypass_attempted": True},
+                    )
 
-            # Wait for any status text
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[class*='-overall-status-text'], [class*='timeline']")))
-                trace.append("results_rendered")
-            except:
-                trace.append("results_timeout")
-
-            # Expand shipment history
-            try:
-                driver.execute_script("window.scrollTo(0, 500);")
-                show_btns = driver.find_elements(By.XPATH, "//*[contains(text(), 'Show all details')]")
-                for btn in show_btns:
-                    if btn.is_displayed():
-                        driver.execute_script("arguments[0].click();", btn)
-                trace.append("expand_clicked")
-            except:
-                pass
-
-            # Scroll to bottom to ensure all scripts run
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
-
-            # Scrape events
-            events = self._scrape_events(driver)
-            
-            # Status and Header
-            status = "In Transit"
-            origin = None
-            dest = None
-            
-            try:
-                status_el = driver.find_element(By.CSS_SELECTOR, ".-overall-status-text")
-                status = status_el.text.strip()
-            except:
-                if events:
-                    status = events[-1].status if events else "UNKN"
-
-            try:
-                od_el = driver.find_element(By.CSS_SELECTOR, ".-overall-od")
-                text = od_el.text.strip()
-                if " to " in text:
-                    origin, dest = text.split(" to ")
-            except:
-                pass
-
-            # Finalize TrackingResponse
-            flight = next((e.flight for e in reversed(events) if e.flight), None)
-
-            return TrackingResponse(
-                awb=f"{prefix}-{serial}",
-                airline="Cathay Cargo",
-                origin=origin,
-                destination=dest,
-                status=status,
-                flight=flight,
-                events=events,
-                raw_meta={"trace": trace, "events_count": len(events)}
-            )
-
+                return self._parse_json(json_data, awb_formatted)
+                
         except Exception as e:
-            logger.error(f"Cathay tracking failed: {str(e)}")
+            logger.error(f"[Cathay] Error tracking {awb_formatted}: {e}")
             return TrackingResponse(
-                awb=awb,
+                awb=awb_formatted,
                 airline="Cathay Cargo",
                 status="Error",
                 events=[],
-                raw_meta={"error": str(e), "trace": trace}
+                message=f"Bypass failed: {str(e)}",
+                raw_meta={"error": str(e)},
             )
-        finally:
-            if driver:
-                driver.quit()
 
-    def _scrape_events(self, driver) -> List[TrackingEvent]:
-        # Extraction script returns a list of dictionaries
-        extraction_script = """
-        const events = [];
-        const text = document.body.innerText;
-        const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
+    def _parse_json(self, data: dict, awb: str) -> TrackingResponse:
+        events: List[TrackingEvent] = []
+        overall_status = "Pending Ground Data"
         
-        let currentDate = "";
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            // Date header: e.g., "16 Jan 2026"
-            if (line.match(/^\\d{1,2} [A-Z][a-z]{2} \\d{4}$/)) {
-                currentDate = line;
-                continue;
-            }
-            // Event row (Time + Loc): e.g., "05:13 HKG"
-            const timeMatch = line.match(/^(\\d{2}:\\d{2})(\\s+[A-Z]{3})?$/);
-            if (timeMatch) {
-                const timeStr = timeMatch[1];
-                let location = timeMatch[2]?.trim() || "";
-                let currentIdx = i;
-                if (!location && lines[i+1] && lines[i+1].match(/^[A-Z]{3}$/)) {
-                    location = lines[i+1].trim();
-                    currentIdx = i + 1;
-                }
-                const rawStatus = lines[currentIdx + 1] || "";
-                let remarks = "";
-                let j = currentIdx + 2;
-                // Accumulate remarks until next time or date header
-                while (j < lines.length && !lines[j].match(/^\\d{2}:\\d{2}/) && !lines[j].match(/^\\d{1,2} [A-Z][a-z]{2} \\d{4}$/)) {
-                    remarks += (remarks ? " | " : "") + lines[j];
-                    j++;
-                }
-                events.push({
-                    date: (currentDate ? currentDate + " " : "") + timeStr,
-                    location: location,
-                    status: rawStatus,
-                    remarks: remarks
-                });
-                i = j - 1;
-            }
-        }
-        return events;
-        """
-        try:
-            raw_events = driver.execute_script(extraction_script)
-            results = []
-            
-            # Helper for mapping status codes
-            def get_status_code(status_text: str) -> str:
-                s = status_text.lower()
-                if "arrived" in s: return "ARR"
-                if "departed" in s or "flight" in s: return "DEP"
-                if "delivered" in s: return "DLV"
-                if "received" in s or "rct" in s or "rcs" in s: return "RCS"
-                if "manifest" in s or "man" in s: return "MAN"
-                if "booked" in s or "bkd" in s: return "BKD"
-                if "ready" in s or "nfd" in s: return "NFD"
-                return "UNKN"
-
-            for ev in raw_events:
-                remarks = ev.get("remarks", "")
-                pieces = None
-                weight = None
-                flight = None
+        # 1. Parse flight bookings from bookingStatus
+        for bk in data.get("bookingStatus", []):
+            if bk.get("type") == "BKD":
+                status_desc = bk.get("status", "Booked")
+                station = bk.get("station", "")
+                flight = bk.get("flight", "").split("/")[0] if bk.get("flight") else ""
                 
-                # Parse pieces: e.g., "1pc(s)"
-                pc_match = re.search(r"(\d+)\s*pc\(s\)", remarks, re.IGNORECASE)
-                if pc_match:
-                    pieces = pc_match.group(1)
+                atd = bk.get("ATD")
+                etd = bk.get("ETD") or bk.get("STD")
+                date_val = atd or etd or bk.get("flightDate")
                 
-                # Parse weight: e.g., "344kg"
-                wt_match = re.search(r"(\d+)\s*kg", remarks, re.IGNORECASE)
-                if wt_match:
-                    weight = wt_match.group(1) + " KG"
+                if date_val:
+                    events.append(TrackingEvent(
+                        status_code="BKD",
+                        status=status_desc,
+                        location=station,
+                        date=atd or date_val,
+                        estimated_date=etd,
+                        flight=flight,
+                        pieces=str(bk.get("pieces")) if bk.get("pieces") is not None else None,
+                        weight=str(bk.get("weight")) if bk.get("weight") is not None else None,
+                        raw_meta={"type": "BKD"}
+                    ))
+        
+        # 2. Parse actual historical events from shipHistory
+        history = data.get("shipHistory", [])
+        for item in history:
+            status_desc = item.get("statusMsgDisplay") or item.get("statusMsg", "")
+            code = item.get("status", "")
+            station = item.get("station", "")
+            flight = item.get("flightInfo", "").split("/")[0] if item.get("flightInfo") else ""
+            if "ULD:" in flight:
+                flight = ""
                 
-                # Parse flight: e.g., "CX759", "K4701D"
-                fl_match = re.search(r"\b([A-Z0-9]{2}\d{3,4}[A-Z]?)\b", remarks)
-                if fl_match:
-                    flight = fl_match.group(1)
-                
-                # Cleanup remarks: remove the parts we extracted if they are at the start/end
-                clean_remarks = remarks
-                # If remarks starts with a code like ARR | or RCT |
-                clean_remarks = re.sub(r"^[A-Z]{3}\s*\|\s*", "", clean_remarks)
-                
-                results.append(TrackingEvent(
-                    status_code=get_status_code(ev.get("status", "")),
-                    status=ev.get("status"),
-                    location=ev.get("location"),
-                    date=ev.get("date"),
-                    pieces=pieces,
-                    weight=weight,
-                    remarks=clean_remarks,
-                    flight=flight
+            dt_str = item.get("dateTime")
+            if dt_str:
+                events.append(TrackingEvent(
+                    status_code=code,
+                    status=status_desc,
+                    location=station,
+                    date=dt_str,
+                    flight=flight,
+                    pieces=str(item.get("pieces")) if item.get("pieces") is not None else None,
+                    weight=str(item.get("weight")) if item.get("weight") is not None else None,
+                    raw_meta={"code": code}
                 ))
-            
-            # Sort events (Cathay usually shows newest first in UI, we want oldest first for consistency)
-            def parse_date(d_str):
-                try:
-                    # Format: "16 Jan 2026 05:13"
-                    return datetime.strptime(d_str, "%d %b %Y %H:%M")
-                except:
-                    return datetime.min
 
-            results.sort(key=lambda x: parse_date(x.date))
+        # Sort events chronologically
+        if events:
+            try:
+                events.sort(key=lambda x: x.date if 'T' in x.date else "")
+            except:
+                pass
             
-            return results
-        except Exception as e:
-            logger.error(f"Cathay scraping error: {e}")
-            return []
+            latest = data.get("latestStatus", {}).get("status")
+            if latest:
+                overall_status = latest
+            else:
+                overall_status = events[-1].status
+
+        return TrackingResponse(
+            awb=awb,
+            airline="Cathay Cargo",
+            status=overall_status,
+            events=events,
+            raw_meta={"source": "api_scraper", "event_count": len(events)}
+        )

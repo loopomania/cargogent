@@ -13,7 +13,18 @@ except ImportError:
 
 from models import TrackingEvent
 
-
+_chrome_executable_path = None
+def get_uc_chrome_path() -> Optional[str]:
+    """Dynamically get the Playwright Chromium executable path for undetected_chromedriver."""
+    global _chrome_executable_path
+    if not _chrome_executable_path:
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                _chrome_executable_path = p.chromium.executable_path
+        except Exception:
+            return None
+    return _chrome_executable_path
 DEFAULT_TRACKING_CODES = {
     "BKD", "RCS", "DEP", "ARR", "RCF", "NFD", "AWD", "DLV",
     "FOH", "MSG", "DIS", "MAN", "RDD", "CRC", "FPS", "DDL",
@@ -89,7 +100,7 @@ def summarize_from_events(events: List[TrackingEvent]) -> Tuple[Optional[str], O
     if not meaningful:
         return None, None, None, None
     origin = meaningful[0].location
-    destination = meaningful[-1].location
+    destination = meaningful[-1].location if len(meaningful) > 1 else None
     status = meaningful[-1].status_code
     flight = next((e.flight for e in meaningful if e.flight), None)
     return origin, destination, status, flight

@@ -125,7 +125,13 @@ class MamanGroundTracker:
         try:
             html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8")
         except urllib.error.URLError as e:
-            logger.error(f"Maman request failed: {e}")
+            logger.error(f"Maman request URLError: {e}")
+            return None, None, []
+        except TimeoutError as e:
+            logger.error(f"Maman request TimeoutError: {e}")
+            return None, None, []
+        except Exception as e:
+            logger.error(f"Maman request Exception: {e}")
             return None, None, []
 
             

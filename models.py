@@ -10,10 +10,13 @@ class TrackingEvent(BaseModel):
     status: Optional[str] = None
     location: Optional[str] = None
     date: Optional[str] = None
+    estimated_date: Optional[str] = None
     pieces: Optional[str] = None
     weight: Optional[str] = None
     remarks: Optional[str] = None
     flight: Optional[str] = None
+    customs: Optional[str] = None
+    source: Optional[str] = None
 
 
 class TrackingResponse(BaseModel):
@@ -24,7 +27,14 @@ class TrackingResponse(BaseModel):
     destination: Optional[str] = None
     status: Optional[str] = None
     flight: Optional[str] = None
+    etd: Optional[str] = None
+    eta: Optional[str] = None
     events: List[TrackingEvent] = Field(default_factory=list)
     message: str = "ok"
     blocked: bool = False
-    raw_meta: Dict[str, Any] = Field(default_factory=dict)
+    raw_meta: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "hawb_validated": None,
+            "ground_query_method": None,
+        }
+    )
