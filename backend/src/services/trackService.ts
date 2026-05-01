@@ -11,6 +11,7 @@ export interface TrackingResponse {
   message: string;
   blocked: boolean;
   raw_meta?: Record<string, unknown>;
+  milestone_projection?: Record<string, unknown>;
 }
 
 const BASE = config.awbTrackersUrl;

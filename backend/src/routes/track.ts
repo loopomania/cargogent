@@ -516,8 +516,8 @@ export async function saveTrackingResult(
     [tenantId, mawb, hawbKey]
   );
   
-  if (events.length > 0) {
-    for (const ev of events) {
+  if (sorted.length > 0) {
+    for (const ev of sorted) {
       await p.query(
         `INSERT INTO query_events
            (tenant_id, mawb, hawb, provider, source, occurred_at, status_code, status_text, location, weight, pieces, payload)
@@ -539,6 +539,12 @@ export async function saveTrackingResult(
       );
     }
   }
+
+  // HTTP response must mirror what we persist (merged airline + deduped + milestone),
+  // otherwise "Sync Now" showed a projection built before ground_only/DB airline restore.
+  data.events = sorted;
+  data.status = derivedStatus;
+  data.milestone_projection = milestone_projection;
 
   // 4. Check if fully delivered and stop querying
   if (isFullyDelivered) {
@@ -986,8 +992,10 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
     } catch (e: any) {
       console.warn("[GET /track/:airline] TAP merge skipped:", e?.message ?? e);
     }
-    if (milestoneEnrichmentEnabled()) enrichTrackingPayloadWithMilestone(data);
     await persistLiveEnrichedTracking(user, mawbClean, hawbQ, data);
+    if (milestoneEnrichmentEnabled() && !data.milestone_projection) {
+      enrichTrackingPayloadWithMilestone(data);
+    }
 
     res.status(status).json(data);
   } catch (err) {
@@ -1037,8 +1045,10 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
     } catch (e: any) {
       console.warn("[GET /track/:awb] TAP merge skipped:", e?.message ?? e);
     }
-    if (milestoneEnrichmentEnabled()) enrichTrackingPayloadWithMilestone(data);
     await persistLiveEnrichedTracking(user, mawbClean, hawbQ, data);
+    if (milestoneEnrichmentEnabled() && !data.milestone_projection) {
+      enrichTrackingPayloadWithMilestone(data);
+    }
 
     res.status(status).json(data);
   } catch (err) {
