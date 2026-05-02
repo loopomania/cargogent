@@ -5,11 +5,15 @@ import ForgotPassword from "./pages/ForgotPassword";
 import InviteExpired from "./pages/InviteExpired";
 import AdminDashboard from "./pages/AdminDashboard";
 import TrackedAwbsList from "./pages/TrackedAwbsList";
+import ActiveQueries from "./pages/ActiveQueries";
 import Users from "./pages/Users";
 import Logs from "./pages/Logs";
-import CustomerAwbs from "./pages/CustomerAwbs";
+import ActiveShipments from "./pages/ActiveShipments";
+import ArchivedShipments from "./pages/ArchivedShipments";
 import CustomerSettings from "./pages/CustomerSettings";
 import SetupPassword from "./pages/SetupPassword";
+import EmailsHandled from "./pages/EmailsHandled";
+import ServicesStatus from "./pages/ServicesStatus";
 import Layout from "./layouts/Layout";
 
 function isCustomerRole(r: string) {
@@ -48,8 +52,11 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<AdminDashboard />} />
                 <Route path="/tracked" element={<TrackedAwbsList />} />
+                <Route path="/active-queries" element={<ActiveQueries />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/logs" element={<Logs />} />
+                <Route path="/ingested-emails" element={<EmailsHandled />} />
+                <Route path="/services" element={<ServicesStatus />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
@@ -61,7 +68,8 @@ export default function App() {
           <ProtectedRoute role="customer">
             <Layout role="customer">
               <Routes>
-                <Route path="/" element={<CustomerAwbs />} />
+                <Route path="/" element={<ActiveShipments />} />
+                <Route path="/archived" element={<ArchivedShipments />} />
                 <Route path="/settings" element={<CustomerSettings />} />
               </Routes>
             </Layout>

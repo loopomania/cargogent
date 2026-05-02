@@ -1,6 +1,7 @@
 
 import { Plane, CheckCircle, Clock, Bookmark, Archive, Package, Truck } from "lucide-react";
-import type { TrackingEvent, TrackingResponse } from "../lib/api";
+import type { TrackingEvent, TrackingResponse, MilestoneProjectionStep } from "../lib/api";
+import { canonicalShipmentPieceCount } from "../lib/shipmentPiecesDisplay";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -389,7 +390,7 @@ function MilestoneNode({
   if (code === "DEP" && event && ["RCS", "MAN", "BKD", "FOH", "DIS"].includes(event.status_code ?? "")) {
     actual = undefined;
     if (event.status_code === "BKD" && !estimated) {
-      estimated = event.date || event.estimated_date;
+      estimated = event.departure_date || event.estimated_date || event.date;
     }
   }
 
@@ -708,6 +709,175 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
 
 interface Props { data: TrackingResponse }
 
+function renderCanonProjectionStep(step: MilestoneProjectionStep, key: string) {
+  if (step.kind === "arrow") return <Arrow key={key} done={step.done} />;
+  const ev: TrackingEvent = {
+    source: "airline",
+    status_code: step.status_code ?? step.code,
+    location: step.location ?? "",
+    date: step.date,
+    estimated_date: step.estimated_date ?? undefined,
+    departure_date: step.departure_date ?? undefined,
+    arrival_date: step.arrival_date ?? undefined,
+    flight: step.flight,
+    pieces: step.pieces ?? undefined,
+    weight: step.weight ?? undefined,
+  };
+  return (
+    <MilestoneNode
+      key={key}
+      code={step.code}
+      label={step.label}
+      desc={step.desc}
+      done={step.done}
+      active={step.active}
+      event={ev}
+      excelEtd={step.excelEtd ?? undefined}
+      excelEta={step.excelEta ?? undefined}
+    />
+  );
+}
+
+function CanonicalMilestonePlan({ data }: Props) {
+  const proj = data.milestone_projection!;
+  const meta = proj.meta;
+  const statusColor = meta.is_dlv ? C.green : meta.is_err ? C.amber : C.accent;
+  const headerPieces = canonicalShipmentPieceCount(proj, data.raw_meta?.pieces);
+
+  return (
+    <div style={{
+      background: C.bg,
+      border: `1px solid ${C.border}`,
+      borderRadius: 14,
+      overflow: "hidden",
+      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.8rem",
+        padding: "1rem 1.5rem",
+        borderBottom: `1px solid ${C.border}`,
+        backgroundColor: C.bgCard,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginRight: "0.5rem" }}>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {proj.origin_display}
+          </span>
+          <span style={{ color: C.accent, fontSize: "1.3rem", marginTop: "-2px" }}>→</span>
+          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1.1rem", color: "#fff" }}>
+            {proj.dest_display}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+          {meta.is_dlv ? <CheckCircle size={15} color={C.green} /> : <Clock size={15} color={C.accent} />}
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: statusColor }}>
+            {meta.overall_status}
+          </span>
+        </div>
+        {meta.ground_handlers_label && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            fontWeight: 600, fontSize: "0.85rem", color: C.dim,
+            padding: "0.2rem 0.6rem", borderRadius: 6,
+            backgroundColor: "rgba(255,255,255,0.04)",
+          }}>
+            <Truck size={14} />
+            {meta.ground_handlers_label}
+          </div>
+        )}
+        {headerPieces > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+            <Package size={15} color={C.dim} />
+            <span style={{ fontSize: "0.82rem", color: C.dim, fontWeight: 600 }}>
+              {headerPieces} pcs
+            </span>
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+          <span style={{ fontSize: "0.72rem", color: C.dim2, fontFamily: "monospace" }}>
+            v{proj.milestone_projection_version}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.2rem 0.6rem", borderRadius: 6, backgroundColor: "rgba(255,255,255,0.04)" }}>
+          <span style={{ fontSize: "0.75rem", color: C.dim2, fontWeight: 600 }}>
+            {meta.paths_count} path{meta.paths_count !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </div>
+
+      <div style={{
+        padding: "3rem 1.5rem",
+        backgroundColor: C.bgCard,
+        overflowX: "auto",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: "4rem",
+      }}>
+        {proj.flows_steps.length > 0 ? proj.flows_steps.map((steps, fi) => (
+          <div key={fi} style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: "max-content", margin: "0 auto" }}>
+            {steps.map((step, si) => renderCanonProjectionStep(step, `${fi}-${si}`))}
+          </div>
+        )) : (
+          <div style={{ textAlign: "center", color: C.dim }}>Awaiting airline updates...</div>
+        )}
+      </div>
+
+      {proj.failed_route_summaries.length > 0 && (
+        <div style={{
+          margin: "0 1.5rem 1.5rem 1.5rem",
+          padding: "1rem",
+          backgroundColor: "rgba(251, 192, 45, 0.05)",
+          border: `1px solid rgba(251, 192, 45, 0.2)`,
+          borderRadius: 8,
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
+        }}>
+          <div style={{ color: "#fbc02d", fontSize: "0.85rem" }}>
+            Unloaded / Failed Routes:
+            <ul style={{ margin: "0.5rem 0 0 1.5rem", padding: 0 }}>
+              {proj.failed_route_summaries.map((f, i) => {
+                const parsed = Date.parse(f.plannedHint);
+                const planned =
+                  f.plannedHint === "Unknown" || !Number.isFinite(parsed)
+                    ? f.plannedHint
+                    : new Date(parsed).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                return (
+                  <li key={i} style={{ color: C.dim }}>
+                    {f.routeText} | Flight: {f.flightNo} | Planned: {planned}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <div style={{
+        display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: "1rem",
+        padding: "0.8rem 1.5rem", borderTop: `1px solid ${C.border}`,
+        backgroundColor: C.bgCard, fontSize: "0.75rem", fontFamily: "monospace",
+      }}>
+        <div style={{ display: "flex", gap: "1.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: C.amber }} />
+            <span style={{ color: C.dim }}>Estimated</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: C.green }} />
+            <span style={{ color: C.dim }}>Actual</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function cleanCity(loc?: string | null): string | null {
   if (!loc || loc === "???") return null;
   const match = loc.match(/\(([A-Za-z]{3})\)/);
@@ -720,7 +890,7 @@ function cleanCity(loc?: string | null): string | null {
   return clean;
 }
 
-export default function MilestonePlan({ data }: Props) {
+function LegacyMilestonePlan({ data }: Props) {
   const events = data.events ?? [];
   
   let origin = cleanCity(data.origin);
@@ -939,4 +1109,11 @@ export default function MilestonePlan({ data }: Props) {
       </div>
     </div>
   );
+}
+
+export default function MilestonePlan({ data }: Props) {
+  if (data.milestone_projection && import.meta.env.VITE_LEGACY_MILESTONE_UI !== "true") {
+    return <CanonicalMilestonePlan data={data} />;
+  }
+  return <LegacyMilestonePlan data={data} />;
 }

@@ -1,0 +1,20 @@
+{
+  "origin": "TLV",
+  "destination": null,
+  "status": null,
+  "events": [
+    {
+      "status_code": "RCS",
+      "status": "Ready for flight",
+      "location": "TLV (MAMAN)",
+      "date": "2026-04-17 02:14:16",
+      "estimated_date": null,
+      "pieces": "2",
+      "weight": "140.0",
+      "remarks": "Customs: Cleared / Storage: Standard / Assigned Flight: LY843 @ 20/04/26",
+      "flight": "LY843",
+      "customs": "Cleared",
+      "source": "maman"
+    }
+  ]
+}

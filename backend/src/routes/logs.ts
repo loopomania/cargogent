@@ -28,6 +28,7 @@ router.get("/", authOptional, requireAdmin, async (req, res) => {
         ql.airline_code,
         ql.status,
         ql.duration_ms,
+        ql.error_message,
         ql.created_at,
         u.username AS user_name
        FROM query_logs ql
@@ -41,6 +42,29 @@ router.get("/", authOptional, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("Failed to read query_logs:", err);
     res.status(500).json({ error: "Failed to fetch logs" });
+  }
+});
+
+/** GET /api/logs/batches — lists emails handled and shipments ingested, admin only */
+router.get("/batches", authOptional, requireAdmin, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(500).json({ error: "DB not connected" });
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+         b.id, 
+         b.ingested_at, 
+         b.sender_email, 
+         (SELECT COUNT(DISTINCT (master_awb, house_ref)) FROM excel_transport_lines WHERE batch_id = b.id) as shipments_count
+       FROM excel_import_batches b
+       ORDER BY b.ingested_at DESC
+       LIMIT 100`
+    );
+    res.json({ batches: result.rows });
+  } catch (err) {
+    console.error("Failed to read excel_import_batches:", err);
+    res.status(500).json({ error: "Failed to fetch batches" });
   }
 });
 

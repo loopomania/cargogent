@@ -8,6 +8,25 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
+// GET /api/ingest/allowed-domains
+// Fetches the secure list of whitelisted sender domains globally registered in the database for N8N filtering
+router.get("/allowed-domains", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p) return res.status(500).json({ error: "DB not connected" });
+
+    const result = await p.query(
+      `SELECT DISTINCT split_part(username, '@', 2) as domain FROM users WHERE username LIKE '%@%'`
+    );
+    const domains = result.rows.map(r => r.domain.toLowerCase()) || [];
+    
+    return res.json({ domains });
+  } catch (err) {
+    console.error("[Allowed Domains Error]", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/ingest/webhook
 // Called by n8n triggered by incoming IMAP email via multipart/form-data
 router.post("/webhook", upload.single("file"), async (req, res) => {
@@ -28,29 +47,25 @@ router.post("/webhook", upload.single("file"), async (req, res) => {
     const p = getPool();
     if (!p) return res.status(500).json({ error: "DB not connected" });
 
-    // Find a user with the same domain (rough check)
-    const userRes = await p.query(
-      `SELECT t.id as tenant_id 
-       FROM users u 
-       JOIN tenants t ON u.tenant_id = t.id 
-       WHERE u.username LIKE $1 
-       LIMIT 1`,
-      [`%@${domain}`]
+    // Find the tenant for this domain
+    const tenantRes = await p.query(
+      `SELECT id as tenant_id FROM tenants WHERE name = $1 LIMIT 1`,
+      [domain]
     );
 
-    if (userRes.rows.length === 0) {
+    if (tenantRes.rows.length === 0) {
       console.warn(`[Ingest Webhook] Rejected email from unknown domain: ${fromEmail}`);
-      return res.status(403).json({ error: "Sender domain not recognized" });
+      return res.status(200).json({ ignored: true, message: "Sender domain not recognized. Gracefully dropping without failing n8n." });
     }
 
-    const tenantId = userRes.rows[0].tenant_id;
+    const tenantId = tenantRes.rows[0].tenant_id;
     console.log(`[Ingest Webhook] Processing Excel sheet from ${fromEmail} (Tenant: ${tenantId})`);
 
     // Parse the physical Excel file natively
     const lines = parseExcelBuffer(file.buffer);
     
     // Inject the lines straight into Postgres seamlessly
-    const batchId = await processIngestedExcel(tenantId, file.originalname || "Unknown.xlsx", lines);
+    const batchId = await processIngestedExcel(tenantId, file.originalname || "Unknown.xlsx", lines, fromEmail);
     
     return res.json({ 
         message: "File ingested and parsed successfully.",

@@ -59,11 +59,32 @@ services:
     environment:
       N8N_HOST: 0.0.0.0
       N8N_PORT: "5678"
-      WEBHOOK_URL: https://168.119.228.149:8433/
+      WEBHOOK_URL: https://cargogent.com:8433/
       N8N_BACKEND_URL: ${N8N_BACKEND_URL:-}
     depends_on:
       - backend
+    volumes:
+      - n8n_data:/home/node/.n8n
     deploy:
       restart_policy:
         condition: on-failure
+
+  newrelic-infra:
+    image: newrelic/infrastructure:latest
+    container_name: newrelic-infra
+    cap_add:
+      - SYS_PTRACE
+    network_mode: host
+    pid: host
+    privileged: true
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    env_file:
+      - .env-prod
+    environment:
+      NRIA_DISPLAY_NAME: "CargoGent-Production"
+
+volumes:
+  n8n_data:
 

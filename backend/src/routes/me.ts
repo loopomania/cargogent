@@ -5,7 +5,7 @@ import {
   getNotificationSettings,
   updateNotificationSettings,
 } from "../services/userService.js";
-import { listAttentionAwbsForTenant } from "../services/awbReadService.js";
+import { listAttentionAwbsForTenant, listOpenAwbsForTenant, listArchivedAwbsForTenant } from "../services/awbReadService.js";
 
 const router = Router();
 
@@ -73,20 +73,81 @@ router.get("/awbs/attention", requireCustomerRole, async (req, res) => {
     return;
   }
   let tenantId = user.tenant_id;
-  if (!tenantId) {
-    const row = await getUserById(user.sub);
-    tenantId = row?.tenant_id ?? undefined;
-  }
+  let domainName: string | undefined;
+  
+  const row = await getUserById(user.sub);
+  tenantId = tenantId || row?.tenant_id || undefined;
+  if (row?.username && row.role !== 'admin') domainName = row.username.split('@')[1];
+
   if (!tenantId) {
     res.json({ awbs: [] });
     return;
   }
   try {
-    const awbs = await listAttentionAwbsForTenant(tenantId);
+    const awbs = await listAttentionAwbsForTenant(tenantId, domainName);
     res.json({ awbs });
   } catch (e) {
     console.error("GET /api/me/awbs/attention", e);
     res.status(503).json({ error: "Database query failed; ensure migrations are applied" });
+  }
+});
+
+/** GET /api/me/awbs/open — standard Open Shipments table (active but not attention) */
+router.get("/awbs/open", requireCustomerRole, async (req, res) => {
+  const user = (req as Request & { user?: { sub: string; tenant_id?: string } }).user;
+  if (!user?.sub) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+  let tenantId = user.tenant_id;
+  let domainName: string | undefined;
+
+  const row = await getUserById(user.sub);
+  tenantId = tenantId || row?.tenant_id || undefined;
+  if (row?.username && row.role !== 'admin') domainName = row.username.split('@')[1];
+
+  if (!tenantId) {
+    res.json({ awbs: [] });
+    return;
+  }
+  try {
+    const awbs = await listOpenAwbsForTenant(tenantId, domainName);
+    res.json({ awbs });
+  } catch (e) {
+    console.error("GET /api/me/awbs/open", e);
+    res.status(503).json({ error: "Database query failed" });
+  }
+});
+
+/** GET /api/me/awbs/archived — historical Archived Shipments table (paginated) */
+router.get("/awbs/archived", requireCustomerRole, async (req, res) => {
+  const user = (req as Request & { user?: { sub: string; tenant_id?: string } }).user;
+  if (!user?.sub) {
+    res.status(401).json({ error: "Session expired" });
+    return;
+  }
+  let tenantId = user.tenant_id;
+  let domainName: string | undefined;
+
+  const row = await getUserById(user.sub);
+  tenantId = tenantId || row?.tenant_id || undefined;
+  if (row?.username && row.role !== 'admin') domainName = row.username.split('@')[1];
+
+  if (!tenantId) {
+    res.json({ data: [], total: 0 });
+    return;
+  }
+
+  const page = parseInt(req.query.page as string || "1", 10);
+  const limit = parseInt(req.query.limit as string || "100", 10);
+  const search = req.query.search as string || "";
+
+  try {
+    const result = await listArchivedAwbsForTenant(tenantId, page, limit, search, domainName);
+    res.json(result);
+  } catch (e) {
+    console.error("GET /api/me/awbs/archived", e);
+    res.status(503).json({ error: "Database query failed" });
   }
 });
 

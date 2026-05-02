@@ -12,6 +12,16 @@ function safeDateStr(val: any): string | null {
 }
 
 import { getPool } from "../services/db.js";
+import { normalizeEventDate } from "../services/eventDateNormalize.js";
+import {
+  computeMilestoneProjection,
+  enrichTrackingPayloadWithMilestone,
+} from "../services/milestoneEngine.js";
+import { merge047TapIntoTrackingPayload } from "../services/tapCargoRouting.js";
+
+function milestoneEnrichmentEnabled(): boolean {
+  return process.env.SKIP_ENRICH_MILESTONE !== "1";
+}
 
 async function getActualTenantId(user: any, awb: string, hawb?: string): Promise<string | undefined> {
   if (user?.tenant_id) return user.tenant_id;
@@ -25,6 +35,29 @@ async function getActualTenantId(user: any, awb: string, hawb?: string): Promise
     return res.rows[0]?.tenant_id;
   } catch (err) {
     return undefined;
+  }
+}
+
+/** Persist a live enrichment back to queue/summary/events when this tenant already owns the shipment (updates cache on "Sync Now"). */
+async function persistLiveEnrichedTracking(
+  user: { tenant_id?: string; email?: string } | undefined,
+  mawbClean: string,
+  hawbFromQuery: string | undefined,
+  data: any,
+): Promise<void> {
+  if (!user?.tenant_id) return;
+  const p = getPool();
+  if (!p) return;
+  try {
+    const shipmentId = hawbFromQuery || mawbClean;
+    const own = await p.query(
+      `SELECT 1 FROM leg_status_summary WHERE tenant_id = $1 AND shipment_id = $2 LIMIT 1`,
+      [user.tenant_id, shipmentId]
+    );
+    if (own.rows.length === 0) return;
+    await saveTrackingResult(user.tenant_id, mawbClean, hawbFromQuery, data, (user as { email?: string }).email);
+  } catch (e) {
+    console.warn("[track] persist enriched snapshot skipped:", e);
   }
 }
 
@@ -128,50 +161,7 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
   }
   return data;
 }
-export function normalizeEventDate(rawStr: string | null | undefined): string | null {
-  const raw = (rawStr || "").trim();
-  if (!raw) return null;
-
-  // 1. ISO or YYYY-MM-DD (e.g., United, Maman)
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d{3}Z)?)?/);
-  if (isoMatch && raw.includes('Z')) {
-    const d = new Date(raw);
-    if (!isNaN(d.getTime())) return d.toISOString();
-  } else if (isoMatch) {
-    const [, y, m, d, hh = "00", mi = "00", ss = "00"] = isoMatch;
-    const parsed = new Date(`${y}-${m}-${d}T${hh}:${mi}:${ss}`);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-
-  // 2. DD/MM/YY HH:MM (Delta, Lufthansa, etc.)
-  const ddmmyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
-  if (ddmmyy) {
-    const [, dd, mm, yy, hh = "00", mi = "00"] = ddmmyy;
-    const parsed = new Date(`20${yy}-${mm}-${dd}T${hh}:${mi}:00`);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-
-  // 3. DD MON HH:MM
-  const ddmon = raw.match(/^(\d{1,2})\s+([A-Z]{3})(?:\s+(\d{2}:\d{2}))?/i);
-  if (ddmon) {
-    const months: Record<string, string> = {
-      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
-      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
-    };
-    const m = months[ddmon[2].toUpperCase()] ?? "01";
-    const time = ddmon[3] ?? "00:00";
-    const year = new Date().getFullYear();
-    const parsed = new Date(`${year}-${m}-${ddmon[1].padStart(2, "0")}T${time}:00`);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-
-  // 4. Last resort: Standard JS Date
-  const parsed = new Date(raw);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString();
-
-  return raw;
-}
-
+export { normalizeEventDate } from "../services/eventDateNormalize.js";
 
 /** Shared helper: persist a tracking result into query_schedule + leg_status_summary + query_events */
 export async function saveTrackingResult(
@@ -212,6 +202,14 @@ export async function saveTrackingResult(
       data.status = airlineEvs[airlineEvs.length - 1].status || data.status;
     }
   }
+
+  data.events = events;
+  try {
+    await merge047TapIntoTrackingPayload(data);
+  } catch (e: any) {
+    console.warn("[saveTrackingResult] TAP merge skipped:", e?.message ?? e);
+  }
+  events = data.events || [];
 
   // NORMALIZATION & DEDUPLICATION
   const uniqueEventsMap = new Map<string, any>();
@@ -382,11 +380,11 @@ export async function saveTrackingResult(
     );
   }
   
-  const etdEvent = sorted.find(
-    (e: any) => e.status_code === "DEP"
-  )?.date ?? sorted.find(
-    (e: any) => e.status_code === "BKD"
-  )?.date ?? data.etd;
+  const etdEvent =
+    sorted.find((e: any) => e.status_code === "DEP")?.date ??
+    sorted.find((e: any) => e.status_code === "BKD")?.departure_date ??
+    sorted.find((e: any) => e.status_code === "BKD")?.date ??
+    data.etd;
 
   console.log(`[saveTrackingResult] HAWB: ${hawbKey} | Events: ${events.length} | ETD: ${etdEvent}`);
 
@@ -413,6 +411,15 @@ export async function saveTrackingResult(
   }
 
   // Discrepancy checks
+  const milestone_projection = computeMilestoneProjection({
+    events: sorted as any,
+    origin: data.origin ?? null,
+    destination: data.destination ?? null,
+    status: derivedStatus ?? data.status ?? null,
+    excelLegs: (data.raw_meta?.excel_legs ?? []) as any,
+    excelPiecesHint: data.raw_meta?.pieces as string | number | undefined,
+  });
+
   const excelLegs = data.raw_meta?.excel_legs;
   if (excelLegs && excelLegs.length > 0 && events.length > 0) {
     const lastExcel = excelLegs[excelLegs.length - 1];
@@ -464,6 +471,7 @@ export async function saveTrackingResult(
           message: data.message ?? null,
           events_count: events.length,
           raw_meta: data.raw_meta ?? null,
+          milestone_projection,
         }),
         domainName,
         currentHash
@@ -478,7 +486,8 @@ export async function saveTrackingResult(
          aggregated_status = EXCLUDED.aggregated_status,
          last_event_at     = EXCLUDED.last_event_at,
          summary           = EXCLUDED.summary,
-         updated_at        = EXCLUDED.updated_at`,
+         updated_at        = EXCLUDED.updated_at,
+         last_event_list_hash = EXCLUDED.last_event_list_hash`,
       [
         tenantId,
         hawbKey,
@@ -494,6 +503,7 @@ export async function saveTrackingResult(
           message: data.message ?? null,
           events_count: events.length,
           raw_meta: data.raw_meta ?? null,
+          milestone_projection,
         }),
         currentHash
       ]
@@ -506,8 +516,8 @@ export async function saveTrackingResult(
     [tenantId, mawb, hawbKey]
   );
   
-  if (events.length > 0) {
-    for (const ev of events) {
+  if (sorted.length > 0) {
+    for (const ev of sorted) {
       await p.query(
         `INSERT INTO query_events
            (tenant_id, mawb, hawb, provider, source, occurred_at, status_code, status_text, location, weight, pieces, payload)
@@ -529,6 +539,12 @@ export async function saveTrackingResult(
       );
     }
   }
+
+  // HTTP response must mirror what we persist (merged airline + deduped + milestone),
+  // otherwise "Sync Now" showed a projection built before ground_only/DB airline restore.
+  data.events = sorted;
+  data.status = derivedStatus;
+  data.milestone_projection = milestone_projection;
 
   // 4. Check if fully delivered and stop querying
   if (isFullyDelivered) {
@@ -733,11 +749,25 @@ router.get("/stored/:mawb/:hawb", authOptional, requireAuthenticated, async (req
       return;
     }
 
-    const summary = summaryRes.rows[0]?.summary ?? {};
+    const summaryRaw = summaryRes.rows[0]?.summary ?? {};
+    const summary =
+      typeof summaryRaw === "string"
+        ? (() => {
+            try {
+              return JSON.parse(summaryRaw) as Record<string, unknown>;
+            } catch {
+              return {} as Record<string, unknown>;
+            }
+          })()
+        : summaryRaw;
     const events = eventsRes.rows.map((r: any) => {
       try { return typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload; }
       catch { return { status_code: r.status_code, status: r.status_text, location: r.location, date: r.occurred_at, weight: r.weight, pieces: r.pieces, source: r.source }; }
     });
+
+    const smRm = summary.raw_meta as Record<string, unknown> | undefined;
+    const persistedExtras =
+      smRm && typeof smRm === "object" && !Array.isArray(smRm) ? { ...smRm } : {};
 
     let responseData: any = {
       airline: summary.airline ?? "unknown",
@@ -750,11 +780,25 @@ router.get("/stored/:mawb/:hawb", authOptional, requireAuthenticated, async (req
       events,
       message: summary.message ?? `Loaded from DB — ${events.length} events`,
       blocked: false,
-      raw_meta: { source: "database", last_synced: summaryRes.rows[0]?.updated_at ?? null },
+      raw_meta: {
+        source: "database",
+        last_synced: summaryRes.rows[0]?.updated_at ?? null,
+        ...persistedExtras,
+      },
     };
-    
+
     const actualTenantId = isAdmin ? summaryRes.rows[0]?.tenant_id : user?.tenant_id;
     responseData = await appendExcelDatesToTrackingData(actualTenantId, mawbClean, hawbKey, responseData);
+    responseData.events = responseData.events || [];
+    try {
+      await merge047TapIntoTrackingPayload(responseData);
+    } catch (e: any) {
+      console.warn("[GET /stored] TAP merge skipped:", e?.message ?? e);
+    }
+    if (milestoneEnrichmentEnabled()) enrichTrackingPayloadWithMilestone(responseData);
+    else if (typeof summary?.milestone_projection === "object" && summary?.milestone_projection !== null) {
+      responseData.milestone_projection = summary.milestone_projection;
+    }
     res.json(responseData);
   } catch (err) {
     console.error("GET /api/track/stored error:", err);
@@ -937,7 +981,22 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
       logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
-    // Return data without persisting to DB for ad-hoc queries
+
+    const mawbClean = awb.replace(/-/g, "");
+    const hawbQ = typeof hawb === "string" && hawb.trim() !== "" ? hawb.trim() : undefined;
+    const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
+    await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
+    data.events = data.events ?? [];
+    try {
+      await merge047TapIntoTrackingPayload(data as unknown as Record<string, unknown>);
+    } catch (e: any) {
+      console.warn("[GET /track/:airline] TAP merge skipped:", e?.message ?? e);
+    }
+    await persistLiveEnrichedTracking(user, mawbClean, hawbQ, data);
+    if (milestoneEnrichmentEnabled() && !data.milestone_projection) {
+      enrichTrackingPayloadWithMilestone(data);
+    }
+
     res.status(status).json(data);
   } catch (err) {
     console.error("trackByAirline error:", err);
@@ -975,7 +1034,22 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
       logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
-    // Return data without persisting to DB for ad-hoc queries
+
+    const mawbClean = awb.replace(/-/g, "");
+    const hawbQ = typeof hawb === "string" && hawb.trim() !== "" ? hawb.trim() : undefined;
+    const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
+    await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
+    data.events = data.events ?? [];
+    try {
+      await merge047TapIntoTrackingPayload(data as unknown as Record<string, unknown>);
+    } catch (e: any) {
+      console.warn("[GET /track/:awb] TAP merge skipped:", e?.message ?? e);
+    }
+    await persistLiveEnrichedTracking(user, mawbClean, hawbQ, data);
+    if (milestoneEnrichmentEnabled() && !data.milestone_projection) {
+      enrichTrackingPayloadWithMilestone(data);
+    }
+
     res.status(status).json(data);
   } catch (err) {
     console.error("trackByAwb error:", err);
@@ -1148,36 +1222,5 @@ router.delete("/remove/:mawb/:hawb", authOptional, requireAuthenticated, async (
     res.status(500).json({ error: "Failed to remove shipment" });
   }
 });
-
-
-/** GET /api/track/active-queries — Admin endpoint to view running query schedule */
-router.get("/active-queries", authOptional, requireAuthenticated, async (req, res) => {
-  const p = getPool();
-  if (!p) {
-    res.status(500).json({ error: "DB not connected" });
-    return;
-  }
-  
-  try {
-    const query = `
-      SELECT 
-        t.name as customer,
-        q.mawb,
-        q.hawb,
-        q.last_check_at as last_query_date,
-        q.started_at,
-        EXTRACT(DAY FROM (NOW() - q.started_at)) as active_time_days
-      FROM query_schedule q
-      JOIN tenants t ON t.id = q.tenant_id
-      ORDER BY q.started_at DESC
-    `;
-    const result = await p.query(query);
-    res.json({ active_queries: result.rows });
-  } catch (err) {
-    console.error("active-queries error:", err);
-    res.status(500).json({ error: "Internal Error" });
-  }
-});
-
 export default router;
 

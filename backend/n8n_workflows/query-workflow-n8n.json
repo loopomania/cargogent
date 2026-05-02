@@ -1,0 +1,92 @@
+{
+  "updatedAt": "2026-04-20T13:11:38.178Z",
+  "createdAt": "2026-04-20T13:11:38.178Z",
+  "id": "query-workflow-n8n",
+  "name": "Query Workflow",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        240
+      ],
+      "id": "6bcb193c-9431-4a98-bb34-7d294e311f4b"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:3000/api/track/run-scheduled",
+        "sendBody": false,
+        "options": {}
+      },
+      "name": "Trigger Tracking Jobs on Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        480,
+        240
+      ],
+      "id": "97a548fb-6a8b-47c1-9397-661b581ff5aa"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Trigger Tracking Jobs on Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "7dbcd354-3d56-49d5-acc4-53017ff15966",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-04-20T13:11:38.182Z",
+      "createdAt": "2026-04-20T13:11:38.182Z",
+      "role": "workflow:owner",
+      "workflowId": "query-workflow-n8n",
+      "projectId": "n9R3JC0s8AHy3hZM",
+      "project": {
+        "updatedAt": "2026-04-08T19:34:40.402Z",
+        "createdAt": "2026-04-08T19:34:40.402Z",
+        "id": "n9R3JC0s8AHy3hZM",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "c9b62548-9f55-45da-ad59-d7363fb7857d"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

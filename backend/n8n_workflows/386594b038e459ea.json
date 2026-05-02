@@ -1,0 +1,233 @@
+{
+  "updatedAt": "2026-04-20T13:11:32.600Z",
+  "createdAt": "2026-04-20T13:11:32.600Z",
+  "id": "386594b038e459ea",
+  "name": "workflow-user-email",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "user-email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-invite",
+              "leftValue": "={{ $json.body.flow_type }}",
+              "rightValue": "invite",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "branch-flow-type",
+      "name": "Branch on flow_type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@cargogent.com",
+        "toEmail": "={{ $json.body.email }}",
+        "subject": "={{ $json.body.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body.html_body }}",
+        "html": "={{ $json.body.html_body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-invite-email",
+      "name": "Send Invite Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        -120
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "QF6LvYDoe1D3Q3ju",
+          "name": "CargoGent SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@cargogent.com",
+        "toEmail": "={{ $json.body.email }}",
+        "subject": "={{ $json.body.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body.html_body }}",
+        "html": "={{ $json.body.html_body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-reset-email",
+      "name": "Send Reset Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        120
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "QF6LvYDoe1D3Q3ju",
+          "name": "CargoGent SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {}
+      },
+      "id": "respond-ok-invite",
+      "name": "Respond OK (invite)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {}
+      },
+      "id": "respond-ok-reset",
+      "name": "Respond OK (reset)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        720,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Branch on flow_type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch on flow_type": {
+      "main": [
+        [
+          {
+            "node": "Send Invite Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reset Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Invite Email": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (invite)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reset Email": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (reset)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": null,
+  "versionId": "2e515677-ee19-47c1-9089-c75d372be34c",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-04-20T13:11:32.603Z",
+      "createdAt": "2026-04-20T13:11:32.603Z",
+      "role": "workflow:owner",
+      "workflowId": "386594b038e459ea",
+      "projectId": "n9R3JC0s8AHy3hZM",
+      "project": {
+        "updatedAt": "2026-04-08T19:34:40.402Z",
+        "createdAt": "2026-04-08T19:34:40.402Z",
+        "id": "n9R3JC0s8AHy3hZM",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "c9b62548-9f55-45da-ad59-d7363fb7857d"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

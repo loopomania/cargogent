@@ -52,10 +52,26 @@ export async function getUserByUsername(username: string): Promise<User & { pass
   return res.rows[0] || null;
 }
 
-export async function createUser(username: string, name: string = "", tenantId: string = '00000000-0000-0000-0000-000000000000'): Promise<User> {
+export async function createUser(username: string, name: string = "", tenantId?: string): Promise<User> {
   const pool = getPool();
   if (!pool) throw new Error("Database not connected");
   
+  let finalTenantId = tenantId;
+  if (!finalTenantId || finalTenantId === '00000000-0000-0000-0000-000000000000') {
+    const domain = username.split('@')[1]?.toLowerCase();
+    if (domain) {
+      const existing = await pool.query("SELECT id FROM tenants WHERE name = $1 LIMIT 1", [domain]);
+      if (existing.rows.length > 0) {
+        finalTenantId = existing.rows[0].id;
+      } else {
+        const newTenant = await pool.query("INSERT INTO tenants (name) VALUES ($1) RETURNING id", [domain]);
+        finalTenantId = newTenant.rows[0].id;
+      }
+    } else {
+      finalTenantId = '00000000-0000-0000-0000-000000000000';
+    }
+  }
+
   // Set an impossible password initially, they will set it via magic link
   const placeholderHash = await bcrypt.hash(crypto.randomUUID(), 10);
   
@@ -63,7 +79,7 @@ export async function createUser(username: string, name: string = "", tenantId: 
     `INSERT INTO users (username, name, password_hash, role, tenant_id)
      VALUES ($1, $2, $3, 'user', $4)
      RETURNING id, username, name, role, tenant_id, access_key_hash, created_at`,
-    [username, name || null, placeholderHash, tenantId]
+    [username, name || null, placeholderHash, finalTenantId]
   );
   return res.rows[0];
 }

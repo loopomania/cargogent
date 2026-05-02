@@ -155,8 +155,16 @@ function parseL2077(rows: Record<string, any>[]): ParsedTransportLine[] {
     const fileNumber = String(row["File Number"] || "").trim();
     if (!fileNumber) continue;
 
-    const masterAwb = String(row["Master AWB"] || row["Master BL"] || "").trim();
+    let masterAwb = String(row["Master AWB"] || row["Master BL"] || "").trim();
     const houseRef = String(row["House AWB"] || row["Full HAWB"] || "").trim();
+    const carrierId = String(row["Carrier ID"] || "").trim();
+
+    // If master is just the 8-digit serial and we have a 3-digit carrier ID, combine them
+    if (masterAwb.length === 8 && /^\d{8}$/.test(masterAwb) && /^\d{3}$/.test(carrierId)) {
+      masterAwb = `${carrierId}-${masterAwb}`;
+    } else if (masterAwb.length === 11 && /^\d{11}$/.test(masterAwb)) {
+      masterAwb = `${masterAwb.substring(0, 3)}-${masterAwb.substring(3)}`;
+    }
 
     // Isolate specific versioned fields specified in PRD
     const versioned = {
@@ -165,7 +173,13 @@ function parseL2077(rows: Record<string, any>[]): ParsedTransportLine[] {
       "ETD": row["ETD"],
       "ATD": row["ATD"],
       "ETA": row["ETA"],
-      "ATA": row["ATA"]
+      "ATA": row["ATA"],
+      "Carrier ID": row["Carrier ID"],
+      "Carrier Name": row["Carrier Name"],
+      "Load Port/Gateway ID": row["Load Port/Gateway ID"],
+      "Customs File No": row["Customs File No"],
+      "Importer Name": row["Importer Name"],
+      "Exporter Name": row["Exporter Name"]
     };
 
     results.push({
@@ -175,6 +189,8 @@ function parseL2077(rows: Record<string, any>[]): ParsedTransportLine[] {
       legSequence: 1, // Start at 1 natively for imports
       masterAwb,
       houseRef,
+      origin: String(row["Load Port/Gateway ID"] || "").trim(),
+      destination: "TLV", // Implied for import documents to Israel
       firstLegEtd: parseExcelDate(row["ETD"]),
       firstLegAtd: parseExcelDate(row["ATD"]),
       israelLandingEta: parseExcelDate(row["ETA"]),

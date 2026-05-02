@@ -14,12 +14,11 @@ export function parseEventDate(ev: TrackingEvent): Date {
   ).trim();
   if (!raw) return new Date(0);
 
-  // ISO or YYYY-MM-DD (e.g., United, Maman)
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (iso) {
-    const [, y, m, d, hh = "00", mi = "00", ss = "00"] = iso;
-    return new Date(`${y}-${m}-${d}T${hh}:${mi}:${ss}`);
-  }
+  // If the backend has normalized it, it's a valid ISO string. Let the JS engine parse it natively to preserve Timezones (Z).
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) return d;
+
+  // --- Legacy Fallbacks (just in case) ---
 
   // DD/MM/YY HH:MM (Delta, Lufthansa, etc.)
   const ddmmyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
@@ -41,9 +40,7 @@ export function parseEventDate(ev: TrackingEvent): Date {
     return new Date(`${year}-${m}-${ddmon[1].padStart(2, "0")}T${time}:00`);
   }
 
-  // Last resort: Standard JS Date
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? new Date(0) : d;
+  return new Date(0);
 }
 
 export function extractPcs(s?: string | null): number | null {

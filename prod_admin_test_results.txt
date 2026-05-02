@@ -1,4 +1,0 @@
-Testing 14 AWBs against Prod Admin Console (http://168.119.228.149/api/track/...)
-
-Airline         | AWB          | Duration | Status | Events | Message
---------------------------------------------------------------------------------

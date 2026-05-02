@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Deployment script for CargoGent AWBTrackers to Hetzner
-# IP: 168.119.228.149
+# IP: cargogent.com
 
-SERVER_IP="168.119.228.149"
+SERVER_IP="cargogent.com"
 SERVER_USER="root"
 IMAGE_NAME="cargogent"
 CONTAINER_NAME="cargogent_tracker"
@@ -59,6 +59,17 @@ ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} << 'EOF'
     # Build the image
     echo "🏗️  Building Docker image..."
     docker build -t cargogent .
+
+    echo "Skipping n8n workflow auto-import to preserve manual Active toggles."
+#   if [ -d "/app/cargogent/n8n-workflows" ] || [ -d "/app/cargogent/backend/n8n_workflows" ]; then
+#     for f in /app/cargogent/n8n-workflows/*.json /app/cargogent/backend/n8n_workflows/*.json; do
+#       if [ -f "$f" ]; then
+#         echo "Importing $(basename "$f")..."
+#         docker cp "$f" cargogent-n8n-1:"/tmp/$(basename "$f")"
+#         docker exec -u node cargogent-n8n-1 n8n import:workflow --input="/tmp/$(basename "$f")" || echo "Warning: Workflow import failed for $f"
+#       fi
+#     done
+#   fi
 
     # Stop and remove existing container if it exists
     if [ "$(docker ps -aq -f name=cargogent_tracker)" ]; then
