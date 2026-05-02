@@ -11,16 +11,84 @@ function safeDateStr(val: any): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/**
+ * True when the upstream AWB tracker indicates the airline scrape failed.
+ * Trackers may still return HTTP 200 with ground-only events and a nominal status
+ * (e.g. "Ready for flight") while raw_meta.trace records driver_error.
+ */
+function hasAirlineTrackerFailure(data: any): boolean {
+  if (!data || typeof data !== "object") return false;
+  if (data.status === "Error") return true;
+  const st = typeof data.status === "string" ? data.status.toLowerCase() : "";
+  if (st.includes("circuit breaker")) return true;
+  const msg = typeof data.message === "string" ? data.message.toLowerCase() : "";
+  if (msg.includes("driver error")) return true;
+  const trace = data.raw_meta?.trace;
+  if (Array.isArray(trace) && trace.some((t: unknown) => String(t).includes("driver_error"))) {
+    return true;
+  }
+  return false;
+}
+
 import { getPool } from "../services/db.js";
 import { normalizeEventDate } from "../services/eventDateNormalize.js";
 import {
   computeMilestoneProjection,
   enrichTrackingPayloadWithMilestone,
+  isReturnToOriginDelivery,
 } from "../services/milestoneEngine.js";
 import { merge047TapIntoTrackingPayload } from "../services/tapCargoRouting.js";
 
 function milestoneEnrichmentEnabled(): boolean {
   return process.env.SKIP_ENRICH_MILESTONE !== "1";
+}
+
+/** When live airline scrape fails, merge last persisted airline events (parity with saveTrackingResult). */
+async function mergePersistedAirlineEventsWhenLiveTrackerFailed(
+  data: any,
+  tenantId: string | undefined,
+  mawbClean: string,
+  hawbQ: string | undefined,
+): Promise<void> {
+  if (!tenantId) return;
+  if (!hasAirlineTrackerFailure(data)) return;
+  if (data.raw_meta?.ground_only) return;
+  const hawbKey = hawbQ && hawbQ.trim() !== "" ? hawbQ.trim() : mawbClean;
+  const p = getPool();
+  if (!p) return;
+  try {
+    const existingAirlineEvents = await p.query(
+      `SELECT payload FROM query_events WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3 AND source = 'airline'`,
+      [tenantId, mawbClean, hawbKey],
+    );
+    const airlineEvs = existingAirlineEvents.rows.map((r: any) =>
+      typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload,
+    );
+    if (airlineEvs.length === 0) return;
+    data.events = [...(data.events || []), ...airlineEvs];
+    const lastAir = airlineEvs[airlineEvs.length - 1];
+    if (data.status === "Error" && lastAir?.status) {
+      data.status = lastAir.status;
+    }
+    const uniqueEventsMap = new Map<string, any>();
+    for (const ev of data.events) {
+      ev.date = normalizeEventDate(ev.date) || ev.date;
+      if (ev.departure_date) ev.departure_date = normalizeEventDate(ev.departure_date) || ev.departure_date;
+      if (ev.arrival_date) ev.arrival_date = normalizeEventDate(ev.arrival_date) || ev.arrival_date;
+      const code = ev.status_code || "UNKN";
+      const loc = (ev.location || "").trim().toUpperCase();
+      const dt = ev.date || "";
+      const pcs = ev.pieces || ev.actual_pieces || "0";
+      const key = `${code}|${loc}|${dt}|${pcs}`;
+      if (!uniqueEventsMap.has(key)) uniqueEventsMap.set(key, ev);
+    }
+    data.events = Array.from(uniqueEventsMap.values()).sort(
+      (a: any, b: any) =>
+        new Date((a.date as string) || 0).getTime() - new Date((b.date as string) || 0).getTime(),
+    );
+  } catch (e) {
+    console.warn("[track] merge persisted airline events skipped:", e);
+  }
 }
 
 async function getActualTenantId(user: any, awb: string, hawb?: string): Promise<string | undefined> {
@@ -185,9 +253,10 @@ export async function saveTrackingResult(
 
   let events = data.events || [];
   
-  // If Python returned ground_only, or if the primary airline tracker failed (Error/Circuit Breaker),
-  // we MUST restore existing airline events from DB to prevent a destructive wipe.
-  const hasAirlineError = data.status === "Error" || data.status?.toLowerCase().includes("circuit breaker");
+  // If Python returned ground_only, or if the primary airline tracker failed (Error / circuit breaker /
+  // Playwright driver_error with ground snapshot), we MUST restore existing airline events from DB
+  // to prevent a destructive wipe.
+  const hasAirlineError = hasAirlineTrackerFailure(data);
   
   if (data.raw_meta?.ground_only || hasAirlineError) {
     const existingAirlineEvents = await p.query(
@@ -271,6 +340,7 @@ export async function saveTrackingResult(
     let groundDeliveredTotal = 0;
     let airlineDlvCount = 0;
     let groundDlvCount = 0;
+    let airlineDlvWithoutPiecesAtDestination = false;
     for (const e of dlvEvents) {
       const pcs = extractPcs(e.actual_pieces || e.pieces);
       if (e.source === "maman" || e.source === "swissport" || e.source === "ground") {
@@ -279,6 +349,11 @@ export async function saveTrackingResult(
       } else {
         airlineDeliveredTotal += pcs;
         airlineDlvCount++;
+        const evLoc = String(e.location || "").toUpperCase();
+        const destLoc = String(data.destination || "").toUpperCase();
+        if (pcs === 0 && destLoc && evLoc.includes(destLoc)) {
+          airlineDlvWithoutPiecesAtDestination = true;
+        }
       }
     }
 
@@ -296,7 +371,11 @@ export async function saveTrackingResult(
         derivedStatus = "Partial Delivery";
       }
     } else if (isExport) {
-      if ((expectedTotal > 0 && airlineDeliveredTotal >= expectedTotal) || (expectedTotal === 0 && airlineDlvCount > 0)) {
+      if (
+        (expectedTotal > 0 && airlineDeliveredTotal >= expectedTotal) ||
+        (expectedTotal === 0 && airlineDlvCount > 0) ||
+        airlineDlvWithoutPiecesAtDestination
+      ) {
         isFullyDelivered = true;
         derivedStatus = "Delivered";
       } else {
@@ -305,7 +384,11 @@ export async function saveTrackingResult(
     } else {
       // Default fallback if not TLV
       const bestDelivered = Math.max(airlineDeliveredTotal, groundDeliveredTotal);
-      if ((expectedTotal > 0 && bestDelivered >= expectedTotal) || (expectedTotal === 0 && dlvEvents.length > 0)) {
+      if (
+        (expectedTotal > 0 && bestDelivered >= expectedTotal) ||
+        (expectedTotal === 0 && dlvEvents.length > 0) ||
+        airlineDlvWithoutPiecesAtDestination
+      ) {
         isFullyDelivered = true;
         derivedStatus = "Delivered";
       } else {
@@ -314,13 +397,26 @@ export async function saveTrackingResult(
     }
   }
 
-  const ataEventObj = sorted.find(
-    (e: any) => e.status_code === "ARR" || e.status_code === "RCF" || e.status_code === "DLV"
-  );
+  /** Pick latest ATA/ETA snapshots — chronological `find()` kept first hub arrivals on long exports. */
+  let ataEventObj: any;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const e = sorted[i];
+    const c = e?.status_code;
+    if (c === "ARR" || c === "RCF" || c === "DLV") {
+      ataEventObj = e;
+      break;
+    }
+  }
   const ataEvent = ataEventObj?.date;
-  const etaEvent = sorted.find(
-    (e: any) => e.status_code === "ARR" || e.status_code === "RCF"
-  )?.estimated_date ?? data.eta;
+  let etaEvent: string | undefined = data.eta;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const e = sorted[i];
+    const c = e?.status_code;
+    if ((c === "ARR" || c === "RCF") && e?.estimated_date) {
+      etaEvent = e.estimated_date as string;
+      break;
+    }
+  }
 
   const isAirborne = derivedStatus === "Departed" || derivedStatus === "DEP";
   const groundHours = Math.floor(Math.random() * (9 - 6 + 1)) + 6; // 6 to 9
@@ -380,17 +476,24 @@ export async function saveTrackingResult(
     );
   }
   
-  const etdEvent =
-    sorted.find((e: any) => e.status_code === "DEP")?.date ??
-    sorted.find((e: any) => e.status_code === "BKD")?.departure_date ??
-    sorted.find((e: any) => e.status_code === "BKD")?.date ??
+  // Latest uplift for summary — first `DEP` was always TLV on multi-hop feeders.
+  let etdEvent =
+    [...sorted].reverse().find(e => e.status_code === "DEP")?.date ??
+    [...sorted].reverse().find(e => e.status_code === "BKD")?.departure_date ??
+    [...sorted].reverse().find(e => e.status_code === "BKD")?.date ??
     data.etd;
 
   console.log(`[saveTrackingResult] HAWB: ${hawbKey} | Events: ${events.length} | ETD: ${etdEvent}`);
 
   // Derive display status from events (matches MilestonePlan logic)
 
-  
+  if (
+    derivedStatus === "Delivered" &&
+    (data.raw_meta?.return_to_origin === true || isReturnToOriginDelivery(sorted))
+  ) {
+    derivedStatus = "Delivered to origin";
+  }
+
   const currentHash = events.length + "-" + derivedStatus;
   const prevQuery = await p.query(
     `SELECT aggregated_status, last_event_list_hash FROM leg_status_summary WHERE tenant_id = $1 AND shipment_id = $2 AND leg_sequence = 1`,
@@ -546,8 +649,16 @@ export async function saveTrackingResult(
   data.status = derivedStatus;
   data.milestone_projection = milestone_projection;
 
-  // 4. Check if fully delivered and stop querying
-  if (isFullyDelivered) {
+  // Stop polling once the shipment is terminal-delivered for UX (Need Attention / Open lists).
+  // isFullyDelivered alone misses cases where status shows Delivered but piece math stayed "partial".
+  const derivedNorm = String(derivedStatus ?? "").trim().toLowerCase();
+  const terminalDeliveredStatus =
+    derivedNorm === "delivered" ||
+    derivedNorm.startsWith("delivered to origin") ||
+    derivedNorm === "status dlv";
+  const stopActivePolling = isFullyDelivered || terminalDeliveredStatus;
+
+  if (stopActivePolling) {
     await p.query(
       `DELETE FROM query_schedule WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3`,
       [tenantId, mawb, hawbKey]
@@ -854,7 +965,7 @@ router.post("/run-scheduled", async (req, res) => {
        LEFT JOIN leg_status_summary l ON l.tenant_id = q.tenant_id AND l.shipment_id = COALESCE(q.hawb, q.mawb) AND l.leg_sequence = 1
        WHERE q.next_status_check_at <= now() 
          AND q.is_halted = false 
-         AND COALESCE(l.aggregated_status, '') NOT IN ('Status DLV', 'Delivered')
+         AND COALESCE(l.aggregated_status, '') NOT IN ('Status DLV', 'Delivered', 'Delivered to origin')
        LIMIT 100`
     );
     
@@ -987,6 +1098,7 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
     const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
     await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
     data.events = data.events ?? [];
+    await mergePersistedAirlineEventsWhenLiveTrackerFailed(data, tenantId, mawbClean, hawbQ);
     try {
       await merge047TapIntoTrackingPayload(data as unknown as Record<string, unknown>);
     } catch (e: any) {
@@ -1040,6 +1152,7 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
     const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
     await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
     data.events = data.events ?? [];
+    await mergePersistedAirlineEventsWhenLiveTrackerFailed(data, tenantId, mawbClean, hawbQ);
     try {
       await merge047TapIntoTrackingPayload(data as unknown as Record<string, unknown>);
     } catch (e: any) {
@@ -1181,6 +1294,107 @@ router.post("/mark-archived/:mawb/:hawb", authOptional, requireAuthenticated, as
     await p.query("ROLLBACK").catch(() => {});
     console.error("POST /api/track/mark-archived error:", err);
     res.status(500).json({ error: "Failed to mark shipment as archived" });
+  }
+});
+
+/** POST /api/track/archive-delivered-bulk — Move every delivered shipment to archived (remove schedule, set status, optional ARC audit row). */
+router.post("/archive-delivered-bulk", authOptional, requireAuthenticated, async (req, res) => {
+  const p = getPool();
+  if (!p) {
+    res.status(500).json({ error: "DB not connected" });
+    return;
+  }
+
+  const user = (req as any).user;
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const tenantFilter =
+    user.role === "admin" && typeof req.query.tenant_id === "string" && req.query.tenant_id.length > 0
+      ? (req.query.tenant_id as string)
+      : user.role === "admin"
+        ? null
+        : user.tenant_id;
+
+  if (!tenantFilter && user.role !== "admin") {
+    res.status(403).json({ error: "Tenant required" });
+    return;
+  }
+
+  const deliveredStatuses = ["Delivered", "Delivered to origin", "Status DLV"];
+  const arcPayload = { remarks: "Bulk archive: delivered shipments moved to archived" };
+
+  try {
+    await p.query("BEGIN");
+
+    const delSchedule = await p.query(
+      `DELETE FROM query_schedule qs
+       USING leg_status_summary ls
+       WHERE qs.tenant_id = ls.tenant_id
+         AND ls.leg_sequence = 1
+         AND ls.shipment_id = COALESCE(qs.hawb, qs.mawb)
+         AND ls.aggregated_status = ANY($2::text[])
+         AND ($1::uuid IS NULL OR qs.tenant_id = $1::uuid)`,
+      [tenantFilter, deliveredStatuses],
+    );
+
+    const arcInsert = await p.query(
+      `INSERT INTO query_events
+         (tenant_id, mawb, hawb, provider, source, occurred_at, status_code, status_text, location, weight, pieces, payload)
+       SELECT DISTINCT ON (qe.tenant_id, qe.mawb, qe.hawb)
+         qe.tenant_id,
+         qe.mawb,
+         qe.hawb,
+         'system',
+         'bulk_archive',
+         NOW(),
+         'ARC',
+         'Archived',
+         NULL,
+         NULL,
+         NULL,
+         $3::jsonb
+       FROM query_events qe
+       INNER JOIN leg_status_summary ls
+         ON ls.tenant_id = qe.tenant_id
+         AND ls.leg_sequence = 1
+         AND ls.shipment_id = COALESCE(qe.hawb, qe.mawb)
+       WHERE ls.aggregated_status = ANY($2::text[])
+         AND ($1::uuid IS NULL OR ls.tenant_id = $1::uuid)
+         AND NOT EXISTS (
+           SELECT 1 FROM query_events prev
+           WHERE prev.tenant_id = qe.tenant_id
+             AND prev.mawb = qe.mawb
+             AND COALESCE(prev.hawb, '') = COALESCE(qe.hawb, '')
+             AND prev.status_code = 'ARC'
+         )
+       ORDER BY qe.tenant_id, qe.mawb, qe.hawb, qe.occurred_at DESC NULLS LAST`,
+      [tenantFilter, deliveredStatuses, arcPayload],
+    );
+
+    const updSummary = await p.query(
+      `UPDATE leg_status_summary ls
+       SET aggregated_status = 'Archived', updated_at = NOW()
+       WHERE ls.leg_sequence = 1
+         AND ls.aggregated_status = ANY($2::text[])
+         AND ($1::uuid IS NULL OR ls.tenant_id = $1::uuid)`,
+      [tenantFilter, deliveredStatuses],
+    );
+
+    await p.query("COMMIT");
+
+    res.json({
+      ok: true,
+      query_schedule_removed: delSchedule.rowCount ?? 0,
+      arc_events_inserted: arcInsert.rowCount ?? 0,
+      leg_status_summary_updated: updSummary.rowCount ?? 0,
+    });
+  } catch (err) {
+    await p.query("ROLLBACK").catch(() => {});
+    console.error("POST /api/track/archive-delivered-bulk error:", err);
+    res.status(500).json({ error: "Failed to bulk-archive delivered shipments" });
   }
 });
 

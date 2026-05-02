@@ -106,7 +106,7 @@ interface Leg {
 }
 
 const cycleOrder: Record<string, number> = {
-  BKD: 1, RCS: 2, FOH: 2, DIS: 2, MAN: 3, DEP: 4, ARR: 5, RCF: 6, NFD: 7, AWD: 8, DLV: 9,
+  BKD: 1, RCS: 2, FOH: 2, DIS: 2, SFM: 2, MAN: 3, DEP: 4, ARR: 5, RCF: 6, NFD: 7, AWD: 8, DLV: 9,
 };
 
 /** First integer in carrier piece strings ("1 pcs", "1 / 46") */
@@ -140,6 +140,7 @@ const STATUS_TIER: Record<string, number> = {
   RCS: 42,
   FOH: 42,
   DIS: 42,
+  SFM: 22,
   BKD: 12,
 };
 
@@ -152,13 +153,62 @@ function isGroundHandlerTimelineNoise(e: MilestoneEvent): boolean {
   );
 }
 
+const MANIFEST_INTENT_BEFORE_DEP_MS = 4 * 60 * 60 * 1000;
+
+/** When ACS splits MAN + DEP into neighboring rows — surface both in the condensed header status. */
+function enrichOverallStatusDepWithManifest(best: MilestoneEvent, airlinePool: MilestoneEvent[]): string | null {
+  if (best.status_code !== "DEP") return best.status ?? best.status_code ?? null;
+  const base = `${best.status ?? ""}`.trim();
+  const bt = safeTime(best);
+  const depHub = cleanCity(best.location ?? "");
+  if (!depHub || !bt) return base || best.status_code || null;
+
+  const expectedFlt = normalizeFlight(best.flight);
+
+  let manifest: MilestoneEvent | null = null;
+  for (const e of airlinePool) {
+    if (!(e.status_code === "MAN" || e.status_code === "FFM")) continue;
+    const t = safeTime(e);
+    if (!t || t > bt || bt - t > MANIFEST_INTENT_BEFORE_DEP_MS) continue;
+    const evFl = normalizeFlight(e.flight);
+    if (expectedFlt && evFl !== expectedFlt) continue;
+    if (cleanCity(e.location ?? "") !== depHub) continue;
+    manifest = !manifest || t > safeTime(manifest) ? e : manifest;
+  }
+
+  const manifestLine = `${manifest?.status ?? manifest?.remarks ?? ""}`.trim();
+  if (!manifestLine) return base || best.status_code || null;
+
+
+  const baseUpper = base.toUpperCase();
+
+
+  const manUpper = manifestLine.toUpperCase();
+  const baseDuplicatesManifest =
+    baseUpper.length >= 10 && manUpper.includes(baseUpper.slice(0, 10));
+
+
+  const baseCarriesInbound = /\bmovement\b|\bmanifested\b/i.test(base);
+  const genericDepartBlurb =
+    /\bdepart\b/i.test(base) && (!baseCarriesInbound || /^DEP\b/i.test(base.trim()));
+
+
+  if (baseDuplicatesManifest || baseCarriesInbound) return base || manifestLine;
+  const merged =
+    genericDepartBlurb && base.length ? `${manifestLine} · ${base}` : `${manifestLine}${base.length ? ` · ${base}` : ""}`;
+  return merged;
+}
+
 /** Latest meaningful airline scan for header text — avoids stale schedule status when events advanced. */
 function deriveOverallStatus(
   events: MilestoneEvent[],
   payloadStatus: string | null | undefined,
   isDlv: boolean,
 ): string {
-  if (isDlv) return "Delivered";
+  if (isDlv) {
+    if (isReturnToOriginDelivery(events)) return "Delivered to origin";
+    return "Delivered";
+  }
   const airlinePool = events.filter(e => !isGroundHandlerTimelineNoise(e) && safeTime(e) > 0);
   let best: MilestoneEvent | null = null;
   for (const e of airlinePool) {
@@ -172,9 +222,27 @@ function deriveOverallStatus(
     const bCode = best.status_code ?? "";
     const bTier = STATUS_TIER[bCode] ?? 0;
     const bt = safeTime(best);
-    if (tier > bTier || (tier === bTier && t > bt)) best = e;
+    const muchLater = t > bt + 6 * 60 * 60 * 1000;
+    const movementCodes = ["DEP", "ARR", "RCF", "NFD", "AWD", "DLV", "MAN"];
+    // New manifest on a later leg is lower STATUS_TIER than an older RCF/ARR/DEP; still carrier truth.
+    const laterManifestBeatsPriorLegMovement =
+      t > bt && code === "MAN" && ["RCF", "ARR", "DEP"].includes(bCode);
+    const sameHub = cleanCity(e.location) && cleanCity(e.location) === cleanCity(best.location);
+    // DHL ACS: "Scheduled for Movement" (SFM) often posts after ARR at the same hub — still the freshest status.
+    const laterSfmBeatsPriorHubArrival =
+      t > bt && code === "SFM" && sameHub && ["ARR", "RCF"].includes(bCode);
+    if (
+      tier > bTier ||
+      (tier === bTier && t > bt) ||
+      (muchLater && movementCodes.includes(code) && movementCodes.includes(bCode) && tier >= bTier - 20) ||
+      laterManifestBeatsPriorLegMovement ||
+      laterSfmBeatsPriorHubArrival
+    ) best = e;
   }
-  if (best?.status) return best.status;
+  if (best) {
+    const enriched = enrichOverallStatusDepWithManifest(best, airlinePool)?.trim() ?? "";
+    return enriched.length > 0 ? enriched : best.status ?? best.status_code ?? "In progress";
+  }
   const depEarly = events.find(e => e.status_code === "DEP")?.status;
   if (depEarly) return depEarly;
   return payloadStatus ?? "In progress";
@@ -191,16 +259,22 @@ export function parseExcelPiecesHint(raw: unknown): number | null {
 function dedupeLegGraphEdges(legs: Leg[]): Leg[] {
   const byKey = new Map<string, Leg>();
   for (const leg of legs) {
-    const fk = normalizeFlight(leg.flightNo) || "_";
-    const key = `${leg.from}|${leg.to}|${fk}`;
+    // Collapse same physical route even if the carrier first publishes a booking flight and
+    // later a different actual uplift flight for the same segment (common on Ethiopian).
+    const key = `${leg.from}|${leg.to}`;
     const prev = byKey.get(key);
     if (!prev) {
       byKey.set(key, leg);
       continue;
     }
-    const a = prev.events?.length ?? 9999;
-    const b = leg.events?.length ?? 9999;
-    byKey.set(key, a <= b ? prev : leg);
+    const legScore = (l: Leg) => {
+      const evs = l.events ?? [];
+      const hasActualMovement = evs.some(e => ["DEP", "ARR", "RCF"].includes(e.status_code || "") && safeTime(e) > 0);
+      const hasDeparture = evs.some(e => e.status_code === "DEP" && safeTime(e) > 0);
+      const newest = Math.max(0, ...evs.map(e => safeTime(e)));
+      return (hasDeparture ? 10_000 : 0) + (hasActualMovement ? 1_000 : 0) + newest / 1e12;
+    };
+    byKey.set(key, legScore(leg) > legScore(prev) ? leg : prev);
   }
   return Array.from(byKey.values());
 }
@@ -231,6 +305,12 @@ function rankFlow(flow: Leg[], destination: string, airlineEvents: MilestoneEven
   const flights = flow.map(l => normalizeFlight(l.flightNo)).filter(Boolean);
   points += new Set(flights).size * 8;
   points += chronoFlightOrderScore(flow, airlineEvents);
+  points += flow.reduce((sum, leg) => {
+    const hasDeparture = leg.events.some(e => e.status_code === "DEP" && safeTime(e) > 0);
+    const hasActual = leg.events.some(e => ["DEP", "ARR", "RCF"].includes(e.status_code || "") && safeTime(e) > 0);
+    const newest = Math.max(0, ...leg.events.map(e => safeTime(e)));
+    return sum + (hasDeparture ? 500 : 0) + (hasActual ? 100 : 0) + newest / 1e12;
+  }, 0);
 
   let firstEvt = Infinity;
   for (const ln of flow) {
@@ -286,17 +366,86 @@ function cleanCity(loc?: string | null): string | null {
   return cl;
 }
 
+/** Cargo accepted at station A, physically moved elsewhere, then final DLV at A (e.g. return-to-origin). */
+export function isReturnToOriginDelivery(
+  events: Array<{ status_code?: string | null; location?: string | null; date?: string | null }>,
+): boolean {
+  if (!events.length) return false;
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+  );
+  const firstRcs = sorted.find(e => e.status_code === "RCS" && e.location);
+  const lastDlv = [...sorted].reverse().find(e => e.status_code === "DLV" && e.location);
+  if (!firstRcs || !lastDlv) return false;
+  const originStation = cleanCity(firstRcs.location);
+  const finalDlv = cleanCity(lastDlv.location);
+  if (!originStation || !finalDlv || originStation !== finalDlv) return false;
+  const departedOrigin = sorted.some(
+    e => e.status_code === "DEP" && cleanCity(e.location) === originStation,
+  );
+  // Include airline-specific arrival markers (e.g. Silk Way "AA") so hub touch counts without plain ARR.
+  const touchedElsewhere = sorted.some(e => {
+    const loc = cleanCity(e.location);
+    if (!loc || loc === originStation) return false;
+    const code = e.status_code || "";
+    return ["DEP", "ARR", "RCF", "MAN", "AA"].includes(code);
+  });
+  return departedOrigin && touchedElsewhere;
+}
+
 function normalizeFlight(f?: string | null): string | null {
   if (!f) return null;
   const m = f.replace(/\s+/g, "").toUpperCase().match(/^([A-Z]{2,3})0*(\d{1,4})$/);
   return m ? `${m[1]}${m[2]}` : f.replace(/\s+/g, "").toUpperCase();
 }
 
+const ARROW_IN_TEXT = /(?:\u2192|->)/;
+
 function parseSegmentRemark(remarks?: string | null): SegmentInfo | null {
   if (!remarks) return null;
+  const parenArrow = remarks.match(
+    new RegExp(`\\(([A-Z]{3})\\s*${ARROW_IN_TEXT.source}\\s*([A-Z]{3})\\)`, "i"),
+  );
+  if (parenArrow) {
+    return {
+      from: parenArrow[1].toUpperCase(),
+      to: parenArrow[2].toUpperCase(),
+      service: "FLIGHT",
+      departureStr: null,
+    };
+  }
+  const plainArrow = remarks.match(
+    new RegExp(`\\b([A-Z]{3})\\s*${ARROW_IN_TEXT.source}\\s*([A-Z]{3})\\b`, "i"),
+  );
+  if (plainArrow) {
+    return {
+      from: plainArrow[1].toUpperCase(),
+      to: plainArrow[2].toUpperCase(),
+      service: "FLIGHT",
+      departureStr: null,
+    };
+  }
   const seg = remarks.match(/Segment:\s*([A-Z]{2,4})\s+to\s+([A-Z]{2,4})/i);
   const svc = remarks.match(/Service:\s*([A-Z]+)/i);
   const dep = remarks.match(/Departure:\s*(.+?)(?:$|\n)/i);
+  const scheduledLeg = remarks.match(/Scheduled Leg:\s*([A-Z]{3})\s*-\s*([A-Z]{3})/i);
+  if (scheduledLeg) {
+    return {
+      from: scheduledLeg[1].toUpperCase(),
+      to: scheduledLeg[2].toUpperCase(),
+      service: "FLIGHT",
+      departureStr: null,
+    };
+  }
+  const fromTo = remarks.match(/\bfrom\s+([A-Z]{3})\s+to\s+([A-Z]{3})\b/i);
+  if (fromTo) {
+    return {
+      from: fromTo[1].toUpperCase(),
+      to: fromTo[2].toUpperCase(),
+      service: "FLIGHT",
+      departureStr: null,
+    };
+  }
   if (!seg) return null;
   return {
     from: seg[1].toUpperCase(),
@@ -306,12 +455,58 @@ function parseSegmentRemark(remarks?: string | null): SegmentInfo | null {
   };
 }
 
+/** DHL ACS: "Manifested onto movement K4248 to LEJ" — scan site is origin (TLV), dest is in text. */
+function segmentFromManifestMovementTo(ev: MilestoneEvent): SegmentInfo | null {
+  const hay = `${ev.remarks ?? ""} ${ev.status ?? ""}`;
+  const m = hay.match(/\bmovement\s+[\w]+\s+to\s+([A-Z]{3})\b/i);
+  if (!m) return null;
+  const fromLoc = cleanCity(ev.location ?? "");
+  if (!fromLoc) return null;
+  return {
+    from: fromLoc,
+    to: m[1].toUpperCase(),
+    service: "FLIGHT",
+    departureStr: null,
+  };
+}
+
+function parseSegmentFromEvent(ev: MilestoneEvent): SegmentInfo | null {
+  return (
+    parseSegmentRemark(ev.remarks) ?? parseSegmentRemark(ev.status) ?? segmentFromManifestMovementTo(ev)
+  );
+}
+
+/**
+ * Tie MAN/DEP/ARR into one leg when ACS gives movement + flight only on MAN/FFM
+ * ("… movement Q79824T to BHX") and DEP rows are plain "Depart Facility" with no parsed segment.
+ */
+function eventBelongsToManifestLeg(seg: SegmentInfo, normFlight: string | null, e: MilestoneEvent): boolean {
+  const lf = normalizeFlight(e.flight);
+  const parsed = parseSegmentFromEvent(e);
+  if (parsed?.from === seg.from && parsed?.to === seg.to) {
+    return !normFlight || !lf || lf === normFlight;
+  }
+  if (!normFlight || !lf || lf !== normFlight) return false;
+
+  const ec = cleanCity(e.location ?? "");
+  return (
+    (e.status_code === "DEP" && ec === seg.from) ||
+    (["ARR", "RCF"].includes(e.status_code || "") && ec === seg.to) ||
+    (["MAN", "BKD"].includes(e.status_code || "") && ec === seg.from)
+  );
+}
+
 function normalizeEventFields(ev: MilestoneEvent): MilestoneEvent {
   const e = { ...ev };
   if (e.date) e.date = normalizeEventDate(e.date) || e.date;
   if (e.departure_date) e.departure_date = normalizeEventDate(e.departure_date) || e.departure_date;
   if (e.arrival_date) e.arrival_date = normalizeEventDate(e.arrival_date) || e.arrival_date;
   if (e.estimated_date) e.estimated_date = normalizeEventDate(e.estimated_date) || e.estimated_date;
+  const codeEmpty = !(e.status_code ?? "").trim() || (e.status_code ?? "") === "UNKN";
+  if (codeEmpty && /\bscheduled\s+for\s+movement\b/i.test(`${e.status ?? ""} ${e.remarks ?? ""}`)) {
+    e.status_code = "SFM";
+  }
+
   return e;
 }
 
@@ -327,11 +522,15 @@ function buildLegs(
   const arrByKey = new Map<string, MilestoneEvent>();
   const depByKey = new Map<string, MilestoneEvent>();
   for (const ev of arrEvs) {
-    const s = parseSegmentRemark(ev.remarks);
+    const s = parseSegmentFromEvent(ev);
     if (s) arrByKey.set(`${s.from}-${s.to}-${ev.flight || "NOFLIGHT"}`, ev);
   }
   for (const ev of depEvs) {
-    const s = parseSegmentRemark(ev.remarks);
+    const s = parseSegmentFromEvent(ev);
+    if (s) depByKey.set(`${s.from}-${s.to}-${ev.flight || "NOFLIGHT"}`, ev);
+  }
+  for (const ev of allEvents.filter(e => ["BKD", "MAN"].includes(e.status_code ?? ""))) {
+    const s = parseSegmentFromEvent(ev);
     if (s) depByKey.set(`${s.from}-${s.to}-${ev.flight || "NOFLIGHT"}`, ev);
   }
 
@@ -342,28 +541,64 @@ function buildLegs(
       const dep = depByKey.get(key);
       const arr = arrByKey.get(key);
       const seg =
-        parseSegmentRemark(dep?.remarks ?? arr?.remarks) ??
+        (dep && parseSegmentFromEvent(dep)) ||
+        (arr && parseSegmentFromEvent(arr)) ||
         ({ from: origin, to: destination, service: "FLIGHT" } as SegmentInfo);
+      const normFlight = normalizeFlight(dep?.flight ?? arr?.flight ?? null);
+      const legScopedEvents = allEvents.filter(e => {
+        const parsed = parseSegmentFromEvent(e);
+        const sameSegment = parsed?.from === seg.from && parsed?.to === seg.to;
+        const sameFlight = normFlight && normalizeFlight(e.flight) === normFlight;
+        const strict = sameSegment && (!normFlight || sameFlight);
+        return strict || (!!normFlight && eventBelongsToManifestLeg(seg, normFlight, e));
+      });
+      const scopedDep =
+        legScopedEvents.find(e => e.status_code === "DEP" && e.date) ?? null;
+      const scopedArr =
+        legScopedEvents.find(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date) ?? null;
+
       result.push({
         from: seg.from,
         to: seg.to,
         service: seg.service,
         flightNo: dep?.flight ?? arr?.flight ?? null,
-        atd: dep?.date ?? null,
+        atd: scopedDep?.date ?? dep?.date ?? null,
         etd: seg.departureStr ?? null,
-        ata: arr?.date ?? null,
+        ata: scopedArr?.date ?? arr?.date ?? null,
         eta: null,
         pieces: dep?.pieces ?? arr?.pieces ?? null,
         weight: dep?.weight ?? arr?.weight ?? null,
-        events: allEvents,
+        events: legScopedEvents.length > 0 ? legScopedEvents : allEvents,
       });
     }
-    result.sort((a, b) => {
+    for (const xl of excelLegs) {
+      const xFrom = cleanCity(String(xl.from ?? ""));
+      const xTo = cleanCity(String(xl.to ?? ""));
+      if (!xFrom || !xTo) continue;
+      const exists = result.some(l => l.from === xFrom && l.to === xTo);
+      if (!exists) {
+        result.push({
+          from: xFrom,
+          to: xTo,
+          service: "FLIGHT",
+          flightNo: xl.flight || null,
+          atd: null,
+          etd: null,
+          ata: null,
+          eta: null,
+          pieces: null,
+          weight: null,
+          events: [],
+        });
+      }
+    }
+    const deduped = dedupeLegGraphEdges(result);
+    deduped.sort((a, b) => {
       const ad = new Date(a.atd ?? a.etd ?? "").getTime();
       const bd = new Date(b.atd ?? b.etd ?? "").getTime();
       return (isNaN(ad) ? 0 : ad) - (isNaN(bd) ? 0 : bd);
     });
-    return result;
+    return deduped;
   }
 
   const chronoEvs = [...allEvents].sort((a, b) => safeTime(a) - safeTime(b));
@@ -428,7 +663,11 @@ function buildLegs(
               return lc && lc !== pureFltPath[0] && lc;
             })?.location,
           );
-          if (lastLoc) {
+          const destCity = cleanCity(destination);
+          if (!hasDepOrArrMovement && lastLoc && destCity && lastLoc !== destCity) {
+            pureFltPath.length = 0;
+            pureFltPath.push(lastLoc, destCity);
+          } else if (lastLoc) {
             pureFltPath.push(lastLoc);
           } else {
             const matchingXl = excelLegs.find(xl => cleanCity(String(xl.from)) === pureFltPath[0]);
@@ -475,7 +714,7 @@ function buildLegs(
         eta: null,
         pieces: null,
         weight: null,
-        events: allEvents,
+        events: [],
       });
     }
   }
@@ -622,6 +861,59 @@ function mergeEventOverrides(base: MilestoneEvent | undefined, overrides: Partia
   };
 }
 
+/** Events attributable to `leg`'s endpoints and flight — matches buildStepsForFlow scoping */
+function eventsMatchingLegEndpoints(leg: Leg): MilestoneEvent[] {
+  return leg.events.filter(e => {
+    const isMatch = (target: string) => {
+      if (!target) return true;
+      const upperLoc = (e.location || "").toUpperCase();
+      const upperTarget = target.toUpperCase();
+      if (!upperLoc) return true;
+      if (cleanCity(e.location) === upperTarget) return true;
+      if (upperLoc.startsWith(upperTarget)) return true;
+      const regex = new RegExp(`\\b${upperTarget}\\b`);
+      return regex.test(upperLoc);
+    };
+    const locMatch = isMatch(leg.from) || isMatch(leg.to);
+    const flightMatch =
+      !e.flight || !leg.flightNo || normalizeFlight(e.flight) === normalizeFlight(leg.flightNo);
+    return locMatch && flightMatch;
+  });
+}
+
+/** Past confirmed DEP on a leg segment with no matching inbound carrier scan at that leg's arrival station yet. */
+function deriveAirborneInTransitPhrase(flowLegs: Leg[], airlinePool: MilestoneEvent[], nowMs: number): string | null {
+  let phrase: string | null = null;
+  for (const leg of flowLegs) {
+    if (!leg.from?.trim?.() || !leg.to?.trim?.() || leg.from === "???" || leg.to === "???") continue;
+
+    const legEvents = eventsMatchingLegEndpoints(leg);
+    const depEv =
+      legEvents.find(e => e.status_code === "DEP" && e.date && cleanCity(e.location ?? "") === leg.from) ??
+      null;
+    const depMs = depEv ? safeTime(depEv) : 0;
+    if (!depMs || depMs >= nowMs) continue;
+
+    const legDest = cleanCity(leg.to);
+    const legFl = normalizeFlight(leg.flightNo || undefined);
+    const inboundAtDestination = airlinePool.some(e => {
+      if (!["ARR", "DLV", "RCF"].includes(e.status_code ?? "")) return false;
+      if (cleanCity(e.location ?? "") !== legDest) return false;
+      const t = safeTime(e);
+      if (!t || t + 60_000 < depMs) return false;
+      const ef = normalizeFlight(e.flight);
+      if (!ef || !legFl) return true;
+      return ef === legFl;
+    });
+    if (inboundAtDestination) continue;
+
+    const o = cleanCity(leg.from) || leg.from;
+    const d = cleanCity(leg.to) || leg.to;
+    phrase = `Departed ${o}, in transit to ${d}`;
+  }
+  return phrase;
+}
+
 function buildStepsForFlow(
   flowLegs: Leg[],
   events: MilestoneEvent[],
@@ -631,6 +923,8 @@ function buildStepsForFlow(
 ): MilestoneProjectionStep[] {
   const steps: MilestoneProjectionStep[] = [];
   const presentCodes = new Set(events.map(e => e.status_code ?? ""));
+  const destinationGroundReached = ["NFD", "AWD", "DLV"].some(c => presentCodes.has(c));
+  const destinationArrived = events.some(e => e.status_code === "ARR" && cleanCity(e.location) === cleanCity(destDisp));
   const excelLegs = excelLegArray(excelLegsRaw);
 
   const originFromCodes = ["BKD", "RCS", "FOH", "DIS", "130"];
@@ -645,7 +939,7 @@ function buildStepsForFlow(
     label: "Ground service",
     desc: `Origin: ${originDisp}`,
     done: originDone,
-    active: originDone && !presentCodes.has("DEP"),
+    active: originDone && !presentCodes.has("DEP") && !destinationGroundReached && !destinationArrived,
     location: originDisp,
     ...(originEv
       ? {
@@ -693,30 +987,25 @@ function buildStepsForFlow(
     const xlPieces = bestXl && (bestXl as any).pieces != null ? String((bestXl as any).pieces) : undefined;
     const xlWeight = bestXl && (bestXl as any).weight != null ? String((bestXl as any).weight) : undefined;
 
-    const legEvents = leg.events.filter(e => {
-      const isMatch = (target: string) => {
-        if (!target) return true;
-        const upperLoc = (e.location || "").toUpperCase();
-        const upperTarget = target.toUpperCase();
-        if (!upperLoc) return true;
-        if (cleanCity(e.location) === upperTarget) return true;
-        if (upperLoc.startsWith(upperTarget)) return true;
-        const regex = new RegExp(`\\b${upperTarget}\\b`);
-        return regex.test(upperLoc);
-      };
-      const locMatch = isMatch(leg.from) || isMatch(leg.to);
-      const flightMatch =
-        !e.flight || !leg.flightNo || normalizeFlight(e.flight) === normalizeFlight(leg.flightNo);
-      return locMatch && flightMatch;
-    });
+    const legEvents = eventsMatchingLegEndpoints(leg);
 
-    const takeOffDone =
-      legEvents.some(e => e.status_code === "DEP" && e.date) ||
-      legEvents.some(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date) ||
-      events.some(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date);
+    const depConfirmedOnLeg = legEvents.some(e => e.status_code === "DEP" && e.date);
+    const arrReachedThisLegDestination = legEvents.some(
+      e =>
+        ["ARR", "DLV"].includes(e.status_code || "") &&
+        !!e.date &&
+        cleanCity(e.location) === leg.to,
+    );
+    const arrConfirmedOnLeg = arrReachedThisLegDestination;
+    const preDepartureScanOnLeg =
+      legEvents.some(e => ["MAN", "BKD"].includes(e.status_code ?? "") && e.date) &&
+      !depConfirmedOnLeg &&
+      !arrConfirmedOnLeg;
+
+    const takeOffDone = depConfirmedOnLeg || arrReachedThisLegDestination;
     const landingDone =
-      legEvents.some(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date) ||
-      events.some(e => e.status_code === "DLV" && e.date);
+      arrReachedThisLegDestination ||
+      (i === flowLegs.length - 1 && events.some(e => e.status_code === "DLV" && e.date));
 
     const depEv =
       legEvents.find(e => e.status_code === "DEP" && e.date) ||
@@ -724,8 +1013,8 @@ function buildStepsForFlow(
       legEvents.find(e => e.status_code === "BKD") ||
       legEvents.find(e => ["MAN", "RCS"].includes(e.status_code ?? ""));
     const arrEv =
-      legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? "") && e.date) ||
-      legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? ""));
+      legEvents.find(e => ["ARR", "DLV"].includes(e.status_code ?? "") && e.date) ||
+      legEvents.find(e => ["ARR", "DLV"].includes(e.status_code ?? ""));
 
     steps.push({ kind: "arrow", done: takeOffDone });
 
@@ -743,7 +1032,9 @@ function buildStepsForFlow(
       label: "Take off",
       desc: leg.flightNo ? `Flight ${leg.flightNo}` : "Flight",
       done: takeOffDone,
-      active: takeOffDone && !landingDone,
+      active:
+        (takeOffDone && !landingDone && !destinationGroundReached && !destinationArrived) ||
+        (preDepartureScanOnLeg && !destinationGroundReached && !destinationArrived),
       location: leg.from,
       status_code: depMerged?.status_code,
       flight: depMerged?.flight,
@@ -772,7 +1063,7 @@ function buildStepsForFlow(
       label: "Landing",
       desc: `Arrived at ${leg.to}`,
       done: landingDone,
-      active: landingDone && !presentCodes.has("DLV") && !presentCodes.has("AWD") && !(i < flowLegs.length - 1),
+      active: landingDone && !destinationGroundReached && !(i < flowLegs.length - 1),
       location: leg.to,
       status_code: arrMerged?.status_code,
       flight: arrMerged?.flight,
@@ -789,9 +1080,15 @@ function buildStepsForFlow(
       const transitCodes = ["RCF", "NFD", "RCS", "RCT", "ARR"];
       const transitEvs = events.filter(e => e.location === leg.to);
       const tCodes = new Set(transitEvs.map(e => e.status_code ?? ""));
+      const nextLeg = flowLegs[i + 1];
+      const nextLegManifestOnly =
+        nextLeg &&
+        nextLeg.events.some(e => e.status_code === "MAN" && e.date) &&
+        !nextLeg.events.some(e => e.status_code === "DEP" && e.date) &&
+        !nextLeg.events.some(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date);
       const nextLegTakeOff =
         i < flowLegs.length - 1 &&
-        (flowLegs[i + 1]?.events.some(e => e.status_code === "DEP" && !!e.date) ?? false);
+        (nextLeg?.events.some(e => e.status_code === "DEP" && !!e.date) || !!nextLegManifestOnly);
       const transitDone = transitCodes.some(c => tCodes.has(c)) || landingDone;
       const transitEv = transitEvs.find(e => transitCodes.includes(e.status_code ?? ""));
 
@@ -803,7 +1100,7 @@ function buildStepsForFlow(
         label: "Ground service",
         desc: `Transit: ${leg.to}`,
         done: transitDone,
-        active: transitDone && !nextLegTakeOff,
+        active: transitDone && !nextLegTakeOff && !destinationGroundReached && !destinationArrived,
         location: leg.to,
         date: transitEv?.date,
         status_code: transitEv?.status_code,
@@ -813,18 +1110,31 @@ function buildStepsForFlow(
     }
   }
 
-  const destDone = ["DLV", "AWD"].some(c => presentCodes.has(c));
+  const destDone = destinationGroundReached;
+  const latestEventForCodes = (codes: string[]) =>
+    [...events]
+      .filter(e => codes.includes(e.status_code ?? ""))
+      .sort((a, b) => safeTime(b) - safeTime(a))[0];
   const destEv =
-    events.find(e => ["DLV"].includes(e.status_code ?? "")) ?? events.find(e => ["AWD"].includes(e.status_code ?? ""));
+    latestEventForCodes(["DLV"]) ??
+    latestEventForCodes(["AWD"]) ??
+    latestEventForCodes(["NFD"]);
+  const destNodeCode = destEv?.status_code === "NFD" || destEv?.status_code === "AWD" ? destEv.status_code : "DLV";
+  const destNodeDesc =
+    destEv?.status_code === "NFD"
+      ? (destEv.status || "Notified for Delivery")
+      : destEv?.status_code === "AWD"
+        ? (destEv.status || "Documents Delivered")
+        : "Final Delivery";
 
   if (flowLegs.length > 0) {
     steps.push({ kind: "arrow", done: destDone });
 
     steps.push({
       kind: "node",
-      code: "DLV",
+      code: destNodeCode,
       label: "Ground service",
-      desc: "Final Delivery",
+      desc: destNodeDesc,
       done: destDone,
       active: destDone,
       location: destDisp,
@@ -895,6 +1205,8 @@ export function computeMilestoneProjection(payload: {
   excelLegs?: ExcelLegInput[] | null;
   /** From import / raw_meta.pieces — when 1, phantom multi-path graphs collapse to one itinerary. */
   excelPiecesHint?: string | number | null;
+  /** Test / deterministic comparisons only — compares DEP timestamps vs this instant for airborne wording. */
+  referenceTimeMs?: number | null;
 }): MilestoneProjection {
   const events = payload.events.map(normalizeEventFields);
   const excelLegs = excelLegArray((payload.excelLegs ?? []) as ExcelLegInput[]);
@@ -961,9 +1273,11 @@ export function computeMilestoneProjection(payload: {
 
   const failedFlows = failedUnloadFlows;
 
-  const isDlv = events.some(e => e.status_code === "DLV") || payload.status === "Delivered";
+  const isDlv =
+    events.some(e => e.status_code === "DLV") ||
+    payload.status === "Delivered" ||
+    payload.status === "Delivered to origin";
   const isErr = payload.status === "Partial/Ground Error" || payload.status === "Error";
-  const overallStatus = deriveOverallStatus(events, payload.status, isDlv);
 
   const maxPcs = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
 
@@ -986,7 +1300,42 @@ export function computeMilestoneProjection(payload: {
     };
   });
 
-  const flows_steps = flows.map(fl => buildStepsForFlow(fl, events, originDisp, destDisp, excelLegs));
+  let flows_steps = flows.map(fl => buildStepsForFlow(fl, events, originDisp, destDisp, excelLegs));
+  let terminalCollapseTrace: string | null = null;
+  const terminalDestinationReached = events.some(e => ["NFD", "AWD", "DLV"].includes(e.status_code || ""));
+  if (terminalDestinationReached && flows_steps.length > 1) {
+    const flowScore = (steps: MilestoneProjectionStep[]) => {
+      const nodes = steps.filter((s): s is MilestoneProjectionNode => s.kind === "node");
+      const incomplete = nodes.filter(n => !n.done).length;
+      const done = nodes.filter(n => n.done).length;
+      const terminal = nodes.some(n => ["NFD", "AWD", "DLV"].includes(n.code) && n.active) ? 1 : 0;
+      // Prefer the fully evidenced carrier path once destination ground handling is reached.
+      return terminal * 10000 + done * 100 - incomplete * 1000 - nodes.length;
+    };
+    let bestIdx = 0;
+    let bestScore = flowScore(flows_steps[0]);
+    for (let i = 1; i < flows_steps.length; i++) {
+      const score = flowScore(flows_steps[i]);
+      if (score > bestScore) {
+        bestIdx = i;
+        bestScore = score;
+      }
+    }
+    terminalCollapseTrace = `collapse:terminal_destination_${flows_steps.length}_to_1`;
+    flows = [flows[bestIdx]];
+    flows_steps = [flows_steps[bestIdx]];
+  }
+
+  const terminalGroundReached = events.some(e =>
+    ["NFD", "AWD", "DLV"].includes(e.status_code || ""),
+  );
+  let overallStatus = deriveOverallStatus(events, payload.status, isDlv);
+  const referenceTimeMs = payload.referenceTimeMs ?? Date.now();
+  const airlinePoolForTransit = events.filter(e => !isGroundHandlerTimelineNoise(e));
+  if (!isErr && !isDlv && flows.length === 1 && !terminalGroundReached) {
+    const airborne = deriveAirborneInTransitPhrase(flows[0], airlinePoolForTransit, referenceTimeMs);
+    if (airborne) overallStatus = airborne;
+  }
 
   const interpretation_trace = [
     ...trace,
@@ -995,6 +1344,7 @@ export function computeMilestoneProjection(payload: {
     `flows_kept:${flows.length}`,
     `flows_failed_unload:${failedFlows.length}`,
     ...(collapseSingleTrace ? [collapseSingleTrace] : []),
+    ...(terminalCollapseTrace ? [terminalCollapseTrace] : []),
     ...(failedUnloadFlows.length > 0 ? ["pruned:unload_or_no_transit"] : []),
   ];
 
