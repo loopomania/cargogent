@@ -287,6 +287,51 @@ export function parseExcelPiecesHint(raw: unknown): number | null {
   return n > 0 ? n : null;
 }
 
+/**
+ * Carrier acceptance doc codes at shipment origin — if these show MORE pcs than the HAWB import line,
+ * trust the airline (excel "1" is often schedule noise on multi-pc shipments).
+ * Excludes MAN/DEP/SFM: MAWB manifests often roll up before house-level uplift is visible.
+ */
+const ORIGIN_AIRLINE_DOC_CODES = new Set(["RCS", "BKD", "FOH", "DIS", "130"]);
+
+function airlineOriginDocPiecesExceedHouseDeclaration(
+  events: MilestoneEvent[],
+  originDisp: string,
+  housePieces: number,
+): boolean {
+  if (housePieces <= 0) return false;
+  const o = cleanCity(originDisp);
+  if (!o) return false;
+  for (const e of events) {
+    if (isGroundHandlerTimelineNoise(e)) continue;
+    const code = e.status_code ?? "";
+    if (!ORIGIN_AIRLINE_DOC_CODES.has(code)) continue;
+    if (cleanCity(e.location ?? "") !== o) continue;
+    const n = extractPiecesCount(e.pieces ?? e.actual_pieces);
+    if (n > housePieces) return true;
+  }
+  return false;
+}
+
+/** When HAWB excel line is set and feed shows MAWB rollup, clamp displayed pcs unless origin docs contradict. */
+function resolveHouseDeclarationPiecesCap(
+  events: MilestoneEvent[],
+  originDisp: string,
+  excelHint: number | null,
+): number | null {
+  if (excelHint == null || excelHint <= 0) return null;
+  const maxEvt = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
+  if (maxEvt <= excelHint) return null;
+  if (airlineOriginDocPiecesExceedHouseDeclaration(events, originDisp, excelHint)) return null;
+  return excelHint;
+}
+
+function displayPiecesWithHouseCap(raw: number, cap: number | null): number {
+  if (cap == null || cap <= 0) return raw;
+  const base = raw > 0 ? raw : cap;
+  return Math.min(base, cap);
+}
+
 /** When tracker + excel build a DAG, identical edges collapse to one leg (keep more flight-specific events). */
 function dedupeLegGraphEdges(legs: Leg[]): Leg[] {
   const byKey = new Map<string, Leg>();
@@ -952,6 +997,7 @@ function buildStepsForFlow(
   originDisp: string,
   destDisp: string,
   excelLegsRaw: ExcelLegInput[],
+  houseDeclarationCap: number | null,
 ): MilestoneProjectionStep[] {
   const steps: MilestoneProjectionStep[] = [];
   const presentCodes = new Set(events.map(e => e.status_code ?? ""));
@@ -964,6 +1010,12 @@ function buildStepsForFlow(
   const originEv =
     events.find(e => originFromCodes.includes(e.status_code ?? "") && (e.date || e.departure_date)) ??
     events.find(e => originFromCodes.includes(e.status_code ?? ""));
+  const originPcsNum = originEv
+    ? displayPiecesWithHouseCap(
+        extractPiecesCount(originEv.pieces ?? originEv.actual_pieces),
+        houseDeclarationCap,
+      )
+    : 0;
 
   steps.push({
     kind: "node",
@@ -981,7 +1033,7 @@ function buildStepsForFlow(
           arrival_date: originEv.arrival_date,
           status_code: originEv.status_code,
           flight: originEv.flight,
-          pieces: originEv.pieces ?? undefined,
+          pieces: originPcsNum > 0 ? String(originPcsNum) : undefined,
           weight: originEv.weight ?? undefined,
         }
       : {}),
@@ -1052,10 +1104,13 @@ function buildStepsForFlow(
 
     const legPcsFloor = maxAirlinePiecesForLeg(leg, events);
     const depMerged = depEv ? mergeEventOverrides(depEv, { location: leg.from, pieces: xlPieces || depEv.pieces }) : undefined;
-    const depPiecesNum = Math.max(
-      extractPiecesCount(xlPieces),
-      extractPiecesCount(depMerged?.pieces),
-      legPcsFloor,
+    const depPiecesNum = displayPiecesWithHouseCap(
+      Math.max(
+        extractPiecesCount(xlPieces),
+        extractPiecesCount(depMerged?.pieces),
+        legPcsFloor,
+      ),
+      houseDeclarationCap,
     );
     const depPiecesOut = depPiecesNum > 0 ? String(depPiecesNum) : undefined;
     steps.push({
@@ -1082,10 +1137,13 @@ function buildStepsForFlow(
     steps.push({ kind: "arrow", done: landingDone });
 
     const arrMerged = arrEv ? mergeEventOverrides(arrEv, { location: leg.to, pieces: xlPieces || arrEv.pieces }) : undefined;
-    const arrPiecesNum = Math.max(
-      extractPiecesCount(xlPieces),
-      extractPiecesCount(arrMerged?.pieces),
-      legPcsFloor,
+    const arrPiecesNum = displayPiecesWithHouseCap(
+      Math.max(
+        extractPiecesCount(xlPieces),
+        extractPiecesCount(arrMerged?.pieces),
+        legPcsFloor,
+      ),
+      houseDeclarationCap,
     );
     const arrPiecesOut = arrPiecesNum > 0 ? String(arrPiecesNum) : undefined;
 
@@ -1126,6 +1184,10 @@ function buildStepsForFlow(
 
       steps.push({ kind: "arrow", done: transitDone });
 
+      const transitPcsRaw = extractPiecesCount(transitEv?.pieces ?? transitEv?.actual_pieces);
+      const transitPcsShow =
+        transitPcsRaw > 0 ? displayPiecesWithHouseCap(transitPcsRaw, houseDeclarationCap) : 0;
+
       steps.push({
         kind: "node",
         code: "RCF",
@@ -1137,7 +1199,7 @@ function buildStepsForFlow(
         date: transitEv?.date,
         status_code: transitEv?.status_code,
         flight: transitEv?.flight,
-        pieces: transitEv?.pieces ?? undefined,
+        pieces: transitPcsShow > 0 ? String(transitPcsShow) : transitEv?.pieces ?? undefined,
       });
     }
   }
@@ -1160,9 +1222,16 @@ function buildStepsForFlow(
         : "Final Delivery";
 
   const maxFed = maxPiecesAcrossEvents(events);
-  const summedPartialsAtDest = summedDestinationTerminalPieces(events, destDisp, maxFed);
+  const terminalSumCap =
+    houseDeclarationCap != null && houseDeclarationCap > 0
+      ? Math.min(maxFed, houseDeclarationCap)
+      : maxFed;
+  const summedPartialsAtDest = summedDestinationTerminalPieces(events, destDisp, terminalSumCap);
   const latestTerminalPcs = extractPiecesCount(destEv?.pieces ?? destEv?.actual_pieces);
-  const destPiecesNum = Math.max(maxFed, summedPartialsAtDest, latestTerminalPcs);
+  const destPiecesNum = displayPiecesWithHouseCap(
+    Math.max(maxFed, summedPartialsAtDest, latestTerminalPcs),
+    houseDeclarationCap,
+  );
   const destPiecesOut = destPiecesNum > 0 ? String(destPiecesNum) : undefined;
 
   if (flowLegs.length > 0) {
@@ -1309,6 +1378,8 @@ export function computeMilestoneProjection(payload: {
     collapseSingleTrace = `collapse:single_piece_${nBefore}_to_1`;
   }
 
+  const houseDeclarationCap = resolveHouseDeclarationPiecesCap(events, originDisp, excelHint);
+
   const failedFlows = failedUnloadFlows;
 
   const isDlv =
@@ -1317,7 +1388,11 @@ export function computeMilestoneProjection(payload: {
     payload.status === "Delivered to origin";
   const isErr = payload.status === "Partial/Ground Error" || payload.status === "Error";
 
-  const maxPcs = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
+  const maxPcs = (() => {
+    let m = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
+    if (houseDeclarationCap != null && houseDeclarationCap > 0) m = Math.min(m, houseDeclarationCap);
+    return m;
+  })();
 
   const hasMaman = groundEvents.some(e => e.location?.includes("MAMAN") || e.source === "maman");
   const hasSwissport = groundEvents.some(e => e.location?.includes("Swissport") || e.source === "swissport");
@@ -1338,7 +1413,9 @@ export function computeMilestoneProjection(payload: {
     };
   });
 
-  let flows_steps = flows.map(fl => buildStepsForFlow(fl, events, originDisp, destDisp, excelLegs));
+  let flows_steps = flows.map(fl =>
+    buildStepsForFlow(fl, events, originDisp, destDisp, excelLegs, houseDeclarationCap),
+  );
   let terminalCollapseTrace: string | null = null;
   const terminalDestinationReached = events.some(e => ["NFD", "AWD", "DLV"].includes(e.status_code || ""));
   if (terminalDestinationReached && flows_steps.length > 1) {

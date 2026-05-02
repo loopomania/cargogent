@@ -340,6 +340,49 @@ function testMultiplePartialDlvAtDestinationShowsConsolidatedPieceCount() {
   assert.equal(terminalBlr.pieces, "7", "must not inherit only latest partial DLV (1 pcs)");
 }
 
+function testHouseDeclarationCapsAirlineMawbRollupWhenOriginDocsAgreeWithHawbImport() {
+  const p = computeMilestoneProjection({
+    events: [
+      {
+        status_code: "RCS",
+        source: "maman",
+        status: "At warehouse",
+        location: "TLV — Maman",
+        date: "2026-04-20T10:00:00.000Z",
+        pieces: "1",
+      },
+      {
+        status_code: "DEP",
+        location: "TLV",
+        date: "2026-04-20T14:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        weight: "100",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        location: "JFK",
+        date: "2026-04-21T08:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        source: "airline",
+      },
+    ],
+    origin: "TLV",
+    destination: "JFK",
+    status: null,
+    excelLegs: [],
+    excelPiecesHint: 1,
+  });
+  const nodes = p.flows_steps[0].filter(s => s.kind === "node");
+  const dep = nodes.find(s => s.kind === "node" && s.code === "DEP");
+  const arr = nodes.find(s => s.kind === "node" && s.code === "ARR");
+  assert.equal(dep?.pieces, "1", "MAWB rollup on DEP must cap to HAWB import when no RCS/BKD at origin exceeds hint");
+  assert.equal(arr?.pieces, "1");
+  assert.equal(p.meta.max_pieces, 1);
+}
+
 /** TG0325 with only bookings at hub must use excel BKK→BLR (not TLV→BKK from shipment origin). */
 function testBkOnlyConnectingFlightUsesExcelEndpoints() {
   const p = computeMilestoneProjection({
@@ -1034,6 +1077,7 @@ try {
   testExcelOneHintDoesNotCollapseWhenAirlineShowsFourPcs();
   testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs();
   testMultiplePartialDlvAtDestinationShowsConsolidatedPieceCount();
+  testHouseDeclarationCapsAirlineMawbRollupWhenOriginDocsAgreeWithHawbImport();
   testBkOnlyConnectingFlightUsesExcelEndpoints();
   testBkOnlyHubFlightWithoutExcelFlightUsesHubToDestination();
   testFingerPrintStableAcrossTwoCalls();
