@@ -955,12 +955,17 @@ function LegacyMilestonePlan({ data }: Props) {
 
   const failedFlows = rawFlows.filter(flow => !flows.includes(flow));
 
-  const isDlv = events.some(e => e.status_code === "DLV") || data.status === "Delivered";
+  const isDlv =
+    events.some(e => e.status_code === "DLV") ||
+    data.status === "Delivered" ||
+    data.status === "Delivered to origin";
   const isErr = data.status === "Partial/Ground Error" || data.status === "Error";
 
   // Latest status: prioritize DLV, else last airline event status
   const overallStatus = isDlv
-    ? "Delivered"
+    ? data.status === "Delivered to origin"
+      ? "Delivered to origin"
+      : "Delivered"
     : events.find(e => e.status_code === "DEP")?.status ?? data.status ?? "In progress";
 
   const statusColor = isDlv ? C.green : isErr ? C.amber : C.accent;

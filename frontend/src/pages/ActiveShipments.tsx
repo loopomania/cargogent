@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { fetchAttentionAwbs, fetchOpenAwbs, markDeliveredTrackedAwb, markArchivedTrackedAwb, type CustomerAwb } from "../lib/api";
 import AwbDetailPanel, { StatusBadge } from "../components/AwbDetailPanel";
 
+/** Matches terminal delivered rows that must never appear under Need Attention / Open. */
+function isTerminalDeliveredCustomerStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const t = status.trim();
+  if (/^partial/i.test(t)) return false;
+  return /^delivered/i.test(t) || /^status dlv/i.test(t) || /^archived/i.test(t);
+}
+
 export default function ActiveShipments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -20,8 +28,8 @@ export default function ActiveShipments() {
           fetchOpenAwbs()
         ]);
         if (!cancelled) {
-          setAttentionRows(att);
-          setOpenRows(op);
+          setAttentionRows(att.filter((r) => !isTerminalDeliveredCustomerStatus(r.status)));
+          setOpenRows(op.filter((r) => !isTerminalDeliveredCustomerStatus(r.status)));
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load AWBs");

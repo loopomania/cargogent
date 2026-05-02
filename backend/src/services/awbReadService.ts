@@ -28,13 +28,25 @@ export async function listAttentionAwbsForTenant(tenantId: string, domainName?: 
       (qs.error_count_consecutive >= 3) as error_halt
     FROM query_schedule qs
     LEFT JOIN leg_status_summary ls 
-      ON ls.tenant_id = qs.tenant_id AND ls.shipment_id = COALESCE(qs.hawb, qs.mawb) AND ls.leg_sequence = 1
+      ON ls.tenant_id = qs.tenant_id
+      AND ls.leg_sequence = 1
+      AND LOWER(TRIM(ls.shipment_id)) = LOWER(TRIM(COALESCE(qs.hawb, qs.mawb)))
     WHERE qs.tenant_id = $1::uuid
       AND ($2::text IS NULL OR qs.domain_name = $2 OR qs.domain_name IS NULL)
+      AND NOT (
+        (
+          TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'delivered%'
+          AND TRIM(COALESCE(ls.aggregated_status, '')) NOT ILIKE 'partial%'
+        )
+        OR TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'status dlv%'
+        OR TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'archived%'
+        OR COALESCE((ls.summary::jsonb #>> '{milestone_projection,meta,is_dlv}'), '') = 'true'
+        OR LOWER(TRIM(COALESCE(ls.summary::jsonb #>> '{milestone_projection,meta,overall_status}', ''))) IN ('delivered', 'delivered to origin')
+      )
       AND (ls.last_event_at < NOW() - INTERVAL '24 hours' OR ls.last_event_at IS NULL OR qs.error_count_consecutive >= 3)
     ORDER BY ls.last_event_at ASC NULLS FIRST
     `,
-    [tenantId, domainName || null]
+    [tenantId, domainName || null],
   );
 
   return res.rows.map((r) => ({
@@ -64,9 +76,21 @@ export async function listOpenAwbsForTenant(tenantId: string, domainName?: strin
       ls.last_event_at::text as last_update
     FROM query_schedule qs
     LEFT JOIN leg_status_summary ls 
-      ON ls.tenant_id = qs.tenant_id AND ls.shipment_id = COALESCE(qs.hawb, qs.mawb) AND ls.leg_sequence = 1
+      ON ls.tenant_id = qs.tenant_id
+      AND ls.leg_sequence = 1
+      AND LOWER(TRIM(ls.shipment_id)) = LOWER(TRIM(COALESCE(qs.hawb, qs.mawb)))
     WHERE qs.tenant_id = $1::uuid
       AND ($2::text IS NULL OR qs.domain_name = $2 OR qs.domain_name IS NULL)
+      AND NOT (
+        (
+          TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'delivered%'
+          AND TRIM(COALESCE(ls.aggregated_status, '')) NOT ILIKE 'partial%'
+        )
+        OR TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'status dlv%'
+        OR TRIM(COALESCE(ls.aggregated_status, '')) ILIKE 'archived%'
+        OR COALESCE((ls.summary::jsonb #>> '{milestone_projection,meta,is_dlv}'), '') = 'true'
+        OR LOWER(TRIM(COALESCE(ls.summary::jsonb #>> '{milestone_projection,meta,overall_status}', ''))) IN ('delivered', 'delivered to origin')
+      )
       AND ls.last_event_at >= NOW() - INTERVAL '24 hours'
       AND qs.error_count_consecutive < 3
     ORDER BY ls.last_event_at DESC

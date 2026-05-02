@@ -61,7 +61,9 @@ fi
 
 cd "$AWBS_DIR"
 export AWBTRACKERS_BASE_URL="$BASE_URL"
-if python3 benchmark_trackers.py; then
+if [ ! -f "$AWBS_DIR/benchmark_trackers.py" ]; then
+  echo "  [SKIP] benchmark_trackers.py not in repo — skipping airline benchmark"
+elif python3 benchmark_trackers.py; then
   echo "  [PASS] Benchmark completed; see AWBTrackers/benchmark_results.json"
 else
   echo "  [FAIL] Benchmark script failed"

@@ -330,12 +330,19 @@ function DetailPanel({
               {/* Status badge — derived from events like AWB Query */}
               {(() => {
                 const evts = details.events ?? [];
-                const isDlv = evts.some(e => e.status_code === "DLV") || details.status === "Delivered";
+                const isDlv =
+                  evts.some(e => e.status_code === "DLV") ||
+                  details.status === "Delivered" ||
+                  details.status === "Delivered to origin";
                 const latestEv = [...evts].sort((a, b) =>
                   new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
                 )[0];
                 const code = isDlv ? "DLV" : latestEv?.status_code ?? details.status;
-                const label = isDlv ? "Delivered" : latestEv?.status ?? details.status ?? "";
+                const label = isDlv
+                  ? details.status === "Delivered to origin"
+                    ? "Delivered to origin"
+                    : "Delivered"
+                  : latestEv?.status ?? details.status ?? "";
                 const isGreen = isDlv;
                 const isRed = /error|blocked/i.test(label || "");
                 return (
