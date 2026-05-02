@@ -212,6 +212,134 @@ function testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs() {
   assert.equal(lyDep?.pieces, "4");
 }
 
+/** TG + Thai Cargo: successive DLV at destination shows 1 pc per line — final ground milestone should reflect shipment total (217-07891435 style). */
+function testMultiplePartialDlvAtDestinationShowsConsolidatedPieceCount() {
+  const p = computeMilestoneProjection({
+    events: [
+      {
+        status_code: "RCS",
+        status: "Received from Shipper",
+        location: "TLV",
+        date: "2026-04-21T11:42:00.000Z",
+        pieces: "7",
+        weight: "157",
+        source: "airline",
+      },
+      {
+        status_code: "BKD",
+        status: "Booking Confirmed",
+        location: "TLV",
+        date: "2026-04-21T11:42:00.000Z",
+        flight: "LY0081",
+        pieces: "7",
+        source: "airline",
+      },
+      {
+        status_code: "BKD",
+        status: "Booking Confirmed",
+        location: "TLV",
+        date: "2026-04-21T18:30:00.000Z",
+        flight: "TG0325",
+        pieces: "7",
+        source: "airline",
+      },
+      {
+        status_code: "DEP",
+        status: "Departed",
+        location: "TLV",
+        date: "2026-04-21T21:20:00.000Z",
+        flight: "LY0081",
+        pieces: "7",
+        weight: "157",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        status: "Arrived",
+        location: "BKK",
+        date: "2026-04-22T14:00:00.000Z",
+        flight: "LY0081",
+        pieces: "7",
+        source: "airline",
+      },
+      {
+        status_code: "RCF",
+        status: "Received from Flight",
+        location: "BKK",
+        date: "2026-04-22T13:33:00.000Z",
+        flight: "LY0081",
+        pieces: "4",
+        source: "airline",
+      },
+      {
+        status_code: "RCF",
+        status: "Received from Flight",
+        location: "BKK",
+        date: "2026-04-22T13:33:00.000Z",
+        flight: "LY0081",
+        pieces: "3",
+        source: "airline",
+      },
+      {
+        status_code: "MAN",
+        status: "Manifested",
+        location: "BKK",
+        date: "2026-04-23T19:14:00.000Z",
+        flight: "TG0325",
+        pieces: "7",
+        source: "airline",
+      },
+      {
+        status_code: "DEP",
+        status: "Departed",
+        location: "BKK",
+        date: "2026-04-23T21:50:00.000Z",
+        flight: "TG0325",
+        pieces: "7",
+        weight: "157",
+        source: "airline",
+      },
+      {
+        status_code: "RCF",
+        status: "Received from Flight",
+        location: "BLR",
+        date: "2026-04-24T02:21:00.000Z",
+        flight: "TG0325",
+        pieces: "3",
+        source: "airline",
+      },
+      {
+        status_code: "RCF",
+        status: "Received from Flight",
+        location: "BLR",
+        date: "2026-04-24T02:21:00.000Z",
+        flight: "TG0325",
+        pieces: "4",
+        source: "airline",
+      },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-24T22:07:00.000Z", pieces: "1", weight: "2", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T12:53:00.000Z", pieces: "1", weight: "14", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T12:53:00.000Z", pieces: "1", weight: "18", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T12:54:00.000Z", pieces: "1", weight: "2", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T12:54:00.000Z", pieces: "1", weight: "8", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T12:59:00.000Z", pieces: "1", weight: "107", source: "airline" },
+      { status_code: "DLV", status: "Delivered", location: "BLR", date: "2026-04-25T13:09:00.000Z", pieces: "1", weight: "6", source: "airline" },
+    ],
+    origin: "TLV",
+    destination: "BLR",
+    status: "Delivered",
+    excelLegs: [
+      { from: "TLV", to: "BKK", flight: "LY0081" },
+      { from: "BKK", to: "BLR", flight: "TG0325" },
+    ],
+    excelPiecesHint: 7,
+  });
+  const nodes = p.flows_steps[0].filter(s => s.kind === "node");
+  const terminalBlr = [...nodes].reverse().find(s => s.code === "DLV" && s.location === "BLR");
+  assert.ok(terminalBlr, "expected terminal destination Ground service / DLV node at BLR");
+  assert.equal(terminalBlr.pieces, "7", "must not inherit only latest partial DLV (1 pcs)");
+}
+
 /** TG0325 with only bookings at hub must use excel BKK→BLR (not TLV→BKK from shipment origin). */
 function testBkOnlyConnectingFlightUsesExcelEndpoints() {
   const p = computeMilestoneProjection({
@@ -905,6 +1033,7 @@ try {
   testSinglePieceHintCollapsesMultiPath();
   testExcelOneHintDoesNotCollapseWhenAirlineShowsFourPcs();
   testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs();
+  testMultiplePartialDlvAtDestinationShowsConsolidatedPieceCount();
   testBkOnlyConnectingFlightUsesExcelEndpoints();
   testBkOnlyHubFlightWithoutExcelFlightUsesHubToDestination();
   testFingerPrintStableAcrossTwoCalls();

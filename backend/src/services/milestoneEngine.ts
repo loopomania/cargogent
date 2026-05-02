@@ -116,6 +116,38 @@ function extractPiecesCount(val?: string | null): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+function maxPiecesAcrossEvents(events: MilestoneEvent[]): number {
+  let m = 0;
+  for (const e of events) {
+    m = Math.max(m, extractPiecesCount(e.pieces ?? e.actual_pieces));
+  }
+  return m;
+}
+
+/**
+ * Thai/consolidations often post multiple DLV/AWD rows at destination (1 pc each) while movement rows show 7.
+ * Sum only when there are 2+ positive piece lines; cap to maxDeclared when duplicate full scans would double-count.
+ */
+function summedDestinationTerminalPieces(
+  events: MilestoneEvent[],
+  destDisp: string,
+  maxDeclared: number,
+): number {
+  const d = cleanCity(destDisp);
+  if (!d) return 0;
+  const rows = events.filter(
+    e =>
+      ["DLV", "AWD"].includes(e.status_code ?? "") &&
+      extractPiecesCount(e.pieces ?? e.actual_pieces) > 0 &&
+      cleanCity(e.location ?? "") === d,
+  );
+  const nums = rows.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)).filter(n => n > 0);
+  if (nums.length <= 1) return 0;
+  const sum = nums.reduce((a, b) => a + b, 0);
+  if (maxDeclared > 0 && sum > maxDeclared) return maxDeclared;
+  return sum;
+}
+
 /** Max declared pcs on this leg's endpoints for the same flight (handles split RCF vs full ARR). */
 function maxAirlinePiecesForLeg(leg: Leg, pool: MilestoneEvent[]): number {
   const want = normalizeFlight(leg.flightNo);
@@ -1127,6 +1159,12 @@ function buildStepsForFlow(
         ? (destEv.status || "Documents Delivered")
         : "Final Delivery";
 
+  const maxFed = maxPiecesAcrossEvents(events);
+  const summedPartialsAtDest = summedDestinationTerminalPieces(events, destDisp, maxFed);
+  const latestTerminalPcs = extractPiecesCount(destEv?.pieces ?? destEv?.actual_pieces);
+  const destPiecesNum = Math.max(maxFed, summedPartialsAtDest, latestTerminalPcs);
+  const destPiecesOut = destPiecesNum > 0 ? String(destPiecesNum) : undefined;
+
   if (flowLegs.length > 0) {
     steps.push({ kind: "arrow", done: destDone });
 
@@ -1141,7 +1179,7 @@ function buildStepsForFlow(
       date: destEv?.date,
       status_code: destEv?.status_code,
       flight: destEv?.flight,
-      pieces: destEv?.pieces,
+      pieces: destPiecesOut,
       weight: destEv?.weight,
     });
   }
