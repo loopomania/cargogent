@@ -29,6 +29,18 @@ def _map_status(text: str) -> Tuple[str, str]:
             return result
     return "GND", text or "Ground Processing"
 
+
+def _uniq_nonempty_strs(vals: List[str]) -> List[str]:
+    seen: set[str] = set()
+    out: List[str] = []
+    for x in vals:
+        if x in seen:
+            continue
+        seen.add(x)
+        out.append(x)
+    return out
+
+
 class MamanGroundTracker:
     name = "maman"
     base_url = "https://mamanonline.maman.co.il/Public/{dir_type}/awbstatus"
@@ -58,18 +70,49 @@ class MamanGroundTracker:
     
     @staticmethod
     def _parse_hawb(hawb: str) -> Tuple[Optional[str], Optional[str]]:
-        """Extract prefix and serial from a HAWB string like ISR10049167 or MAWB like 00638686476."""
-        if not hawb: return None, None
+        """Extract prefix and serial from a HAWB string like ISR10049167 or MAWB-like digit runs."""
+        if not hawb:
+            return None, None
         m = re.match(r"^([a-zA-Z]+)(\d+)$", hawb.strip())
         if m:
             return m.group(1).upper(), m.group(2)
-        # Fallback for plain numerics or 11-digit formats if somehow passed:
         digits = "".join(c for c in hawb if c.isdigit())
         if len(digits) >= 11:
-            return digits[:3], digits[3:11]
-        elif len(digits) > 7:
-            return "ISR", digits[-8:]  # assume standard 8 digit serial for Israel ground?
+            dnorm = digits[-11:] if len(digits) > 11 else digits
+            return dnorm[:3], dnorm[3:11]
+        if len(digits) > 7:
+            return "ISR", digits[-8:]
         return None, None
+
+    @staticmethod
+    def _split_mawb_import(mawb: str) -> Tuple[Optional[str], Optional[str]]:
+        """IATA AWB numeric body → MASTER=8-digit serial, AWB_COMP=3-digit prefix (import portal)."""
+        digits = "".join(c for c in str(mawb) if c.isdigit())
+        if len(digits) > 11:
+            digits = digits[-11:]
+        if len(digits) < 11:
+            return None, None
+        return digits[:3], digits[3:11]
+
+    @staticmethod
+    def _hawb_digit_variants_for_import(house: Optional[str]) -> List[str]:
+        """House AWB numeric suffix variants (handles PHX30041037 → …30041037, leading-zero trims)."""
+        if not house or not str(house).strip():
+            return []
+        digits = "".join(c for c in str(house) if c.isdigit())
+        if not digits:
+            return []
+        out = [digits]
+        lz = digits.lstrip("0")
+        if lz and lz != digits:
+            out.append(lz)
+        try:
+            norm = str(int(digits))
+            if norm != digits:
+                out.append(norm)
+        except ValueError:
+            pass
+        return _uniq_nonempty_strs(out)
 
     async def track(self, hawb: str, mawb: str, dir_type: str = "export") -> Tuple[Optional[str], Optional[str], List[TrackingEvent], bool, str]:
         """
@@ -80,16 +123,32 @@ class MamanGroundTracker:
         h_pref, h_short = self._parse_hawb(hawb)
         inner_hawb = str(hawb).strip() if hawb else ""
         digits_m = "".join(c for c in str(mawb) if c.isdigit())
-        
-        # 1. Primary: Both MAWB + HAWB
+
+        if dir_type == "import":
+            im_pref, im_short = self._split_mawb_import(mawb)
+            if not im_pref or not im_short:
+                return None, None, [], False, "failed"
+
+            house_variants = self._hawb_digit_variants_for_import(hawb)
+            trials = _uniq_nonempty_strs([*house_variants]) + [""]
+
+            for clean_h_short in trials:
+                w, p, evs = await self._query_maman(im_pref, im_short, clean_h_short or "", dir_type)
+                if w is not None or evs:
+                    hawb_hit = bool(clean_h_short)
+                    return w, p, evs, hawb_hit, "mawb_hawb_import" if hawb_hit else "only_mawb_import"
+
+            return None, None, [], False, "failed"
+
+        # 1. Primary: Both MAWB + HAWB (Export typically queries by HAWB)
         if h_pref and h_short:
-            w, p, evs = await self._query_maman(h_short, h_pref, dir_type)
+            w, p, evs = await self._query_maman(h_pref, h_short, "", dir_type)
             if w is not None or evs:
                 return w, p, evs, True, "mawb_hawb"
                 
         # 2. Fallback 1: Only MAWB
         if m_pref and m_short:
-            w, p, evs = await self._query_maman(m_short, m_pref, dir_type)
+            w, p, evs = await self._query_maman(m_pref, m_short, "", dir_type)
             if w is not None or evs:
                 return w, p, evs, False, "only_mawb"
                 
@@ -98,23 +157,31 @@ class MamanGroundTracker:
         if hawb_no_prefix and hawb_no_prefix != inner_hawb:
             n_pref, n_short = self._parse_hawb(hawb_no_prefix)
             if n_pref and n_short:
-                w, p, evs = await self._query_maman(n_short, n_pref, dir_type)
+                w, p, evs = await self._query_maman(n_pref, n_short, "", dir_type)
                 if w is not None or evs:
                     return w, p, evs, True, "hawb_prefix_removed"
                     
         # 4. Fallback 3: MAWB mirrored into HAWB
-        if len(digits_m) > 3:
-            w, p, evs = await self._query_maman(digits_m[3:], digits_m[:3], dir_type)
+        if len(digits_m) >= 11:
+            dm11 = digits_m[-11:] if len(digits_m) > 11 else digits_m
+            w, p, evs = await self._query_maman(dm11[:3], dm11[3:11], "", dir_type)
+            if w is not None or evs:
+                return w, p, evs, False, "mawb_in_hawb"
+        elif len(digits_m) > 3:
+            w, p, evs = await self._query_maman(digits_m[:3], digits_m[3:], "", dir_type)
             if w is not None or evs:
                 return w, p, evs, False, "mawb_in_hawb"
                 
         return None, None, [], False, "failed"
 
-    async def _query_maman(self, short: str, prefix: str, dir_type: str) -> Tuple[Optional[str], Optional[str], List[TrackingEvent]]:
+    async def _query_maman(self, prefix: str, short: str, h_short: str, dir_type: str) -> Tuple[Optional[str], Optional[str], List[TrackingEvent]]:
         if not prefix or not short:
             return None, None, []
             
-        url = self.base_url.format(dir_type=dir_type) + f"?handler=Search&SHTAR_MITAN_ID_SHORT={short}&SHTAR_MITAN_ID_PREF={prefix}"
+        if dir_type == "import":
+            url = self.base_url.format(dir_type=dir_type) + f"?handler=Search&MASTER={short}&AWB_COMP={prefix}&AWB={h_short}"
+        else:
+            url = self.base_url.format(dir_type=dir_type) + f"?handler=Search&SHTAR_MITAN_ID_SHORT={short}&SHTAR_MITAN_ID_PREF={prefix}"
         
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -161,8 +228,8 @@ class MamanGroundTracker:
                     remarks_parts = []
                     
                     # Custom clearance
-                    custom_cd  = r.get("CUSTOM_CD", "")   # e.g. 'יש' (yes) or 'אין' (no)
-                    has_custom = r.get("HAS_CUSTOM")        # boolean or string
+                    custom_cd  = r.get("CUSTOM_CD", "") or r.get("CUST_CNFRM", "")   # e.g. 'יש' (yes) or 'אין' (no)
+                    has_custom = r.get("HAS_CUSTOM") or r.get("CUST_CNFRM_Eng")      # boolean or string
 
                     # Map Hebrew/boolean to English
                     if custom_cd in ("יש", "yes", "Y", "1") or has_custom is True or str(has_custom).lower() in ("true", "1", "yes"):
@@ -192,24 +259,72 @@ class MamanGroundTracker:
                     sc, status_eng = _map_status(status_raw)
                     
                     # Flights
-                    flt_cod = r.get("AIR_COD_OUT") or ""
+                    flt_cod = r.get("AIR_COD_OUT") or r.get("AIRLINE_CODE") or ""
                     flt_num = r.get("FLTNO") or ""
                     flt = str(flt_cod) + str(flt_num)
-                    if len(flt) > 3:
-                        remarks_parts.append(f"Assigned Flight: {flt} @ {r.get('FLTIME_STR')}")
                     
-                    date_val = self._clean_date(r.get("RAMPA_DATE") or r.get("WGT_DATE") or r.get("BASE_BILL_DATE"))
+                    # For imports, there's no FLTIME_STR but we have LAND_DATE_STR
+                    flt_time = r.get('FLTIME_STR') or r.get('LAND_DATE_STR') or ""
+                    
+                    if len(flt) > 3:
+                        remarks_parts.append(f"Assigned Flight: {flt} @ {flt_time}")
+                    
+                    date_val = self._clean_date(r.get("RAMPA_DATE") or r.get("WGT_DATE") or r.get("BASE_BILL_DATE") or r.get("RLS_DATE") or r.get("UPDT_DATE"))
+                    
+                    # For imports, weight and pieces might be on the row
+                    row_wgt = r.get("TOT_DEC_WGT") or r.get("CK_WGT")
+                    row_qty = r.get("TOT_DEC_QTY") or r.get("CK_QTY")
+                    if row_wgt is not None and weight is None:
+                        weight = str(row_wgt)
+                    if row_qty is not None and pieces is None:
+                        pieces = str(row_qty)
                     
                     # Location
                     loc = "TLV (MAMAN)"
-                    
+
+                    # Row-level pcs/weight when Maman emits them per status line (house manifest).
+                    row_pcs_raw = (
+                        r.get("QTY_ACCEPT")
+                        or r.get("ACCEPT_QTY")
+                        or r.get("PCS_NUM")
+                        or r.get("QTY_TOTAL")
+                        or r.get("QTY_REAL")
+                        or r.get("QTY_DECL")
+                        or r.get("PCS")
+                        or r.get("MANIFEST_PCS")
+                    )
+                    row_wgt_raw = (
+                        r.get("WGT_ACCEPT")
+                        or r.get("WGT_TOTAL")
+                        or r.get("WGT_REAL")
+                        or r.get("WB_WGT")
+                        or r.get("WGT_MANIFEST")
+                        or r.get("CHARGE_WGT")
+                    )
+                    row_pieces: Optional[str] = None
+                    row_weight: Optional[str] = None
+                    if row_pcs_raw is not None:
+                        rsp = str(row_pcs_raw).strip()
+                        if rsp and rsp not in ("0", "0/0"):
+                            row_pieces = rsp.split("/")[0].strip()
+                    if row_wgt_raw is not None:
+                        rw = str(row_wgt_raw).strip()
+                        if rw and rw not in ("0", "0.0", "0/0"):
+                            row_weight = rw.split("/")[0].strip()
+
+                    ev_pieces = row_pieces or pieces
+                    ev_weight = row_weight or weight
+
+                    # Location
+                    loc = "TLV (MAMAN)"
+
                     events.append(TrackingEvent(
                         location=loc,
                         status=status_eng,
                         status_code=sc,
                         date=date_val,
-                        pieces=pieces,
-                        weight=weight,
+                        pieces=ev_pieces,
+                        weight=ev_weight,
                         customs=customs_status,
                         remarks=" / ".join(remarks_parts) if remarks_parts else None,
                         flight=flt if flt else None,
