@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchTrackedList,
   fetchStoredTracking,
+  hawbQueryParamForLiveTrack,
   trackByAwb,
   removeTrackedAwb,
   markDeliveredTrackedAwb,
@@ -109,7 +110,7 @@ function DetailPanel({
     setError("");
     const previous = details;
     try {
-      const hawbArg = item.hawb !== item.mawb ? item.hawb : undefined;
+      const hawbArg = hawbQueryParamForLiveTrack(item.mawb, item.hawb);
       const res = await trackByAwb(item.mawb, hawbArg);
 
       const hasProjection = Boolean(
@@ -171,7 +172,7 @@ function DetailPanel({
               <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "1.05rem" }}>
                 {item.mawb}
               </span>
-              {item.hawb && item.hawb !== item.mawb && (
+              {hawbQueryParamForLiveTrack(item.mawb, item.hawb) && (
                 <>
                   <span style={{ color: "var(--text-muted)" }}>·</span>
                   <span style={{ fontFamily: "monospace", fontSize: "0.9rem", color: "var(--text-muted)" }}>
@@ -641,7 +642,7 @@ export default function TrackedAwbsList() {
             </p>
             <div style={{ fontFamily: "monospace", fontSize: "0.82rem", padding: "0.6rem 0.9rem", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: "1.5rem" }}>
               <span style={{ fontWeight: 700 }}>{confirmTarget.mawb}</span>
-              {confirmTarget.hawb !== confirmTarget.mawb && (
+              {hawbQueryParamForLiveTrack(confirmTarget.mawb, confirmTarget.hawb) && (
                 <span style={{ color: "var(--text-muted)" }}> / {confirmTarget.hawb}</span>
               )}
             </div>
@@ -674,7 +675,7 @@ export default function TrackedAwbsList() {
             </p>
             <div style={{ fontFamily: "monospace", fontSize: "0.82rem", padding: "0.6rem 0.9rem", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: 8, marginBottom: "1.5rem" }}>
               <span style={{ fontWeight: 700 }}>{confirmDeliveredTarget.mawb}</span>
-              {confirmDeliveredTarget.hawb !== confirmDeliveredTarget.mawb && (
+              {hawbQueryParamForLiveTrack(confirmDeliveredTarget.mawb, confirmDeliveredTarget.hawb) && (
                 <span style={{ color: "var(--text-muted)" }}> / {confirmDeliveredTarget.hawb}</span>
               )}
             </div>

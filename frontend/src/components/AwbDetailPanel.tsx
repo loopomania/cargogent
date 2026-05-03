@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchStoredTracking, trackByAwb, type TrackingResponse } from "../lib/api";
+import { fetchStoredTracking, hawbQueryParamForLiveTrack, trackByAwb, type TrackingResponse } from "../lib/api";
 import { canonicalShipmentPieceCount, parsePiecesCount } from "../lib/shipmentPiecesDisplay";
 import MilestonePlan from "./MilestonePlan";
 import EventTimelineTable from "./EventTimelineTable";
@@ -103,8 +103,8 @@ export default function AwbDetailPanel({
     setError("");
     const previous = details;
     try {
-      const hawbArg = hawb !== mawb ? hawb : undefined;
-      const res = await trackByAwb(mawb, hawbArg || undefined);
+      const hawbArg = hawbQueryParamForLiveTrack(mawb, hawb);
+      const res = await trackByAwb(mawb, hawbArg);
 
       const hasProjection = Boolean(
         res.milestone_projection?.flows_steps?.some((flow) => flow.length > 0),
@@ -168,7 +168,7 @@ export default function AwbDetailPanel({
               <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "1.05rem" }}>
                 {mawb}
               </span>
-              {hawb && hawb !== mawb && (
+              {hawbQueryParamForLiveTrack(mawb, hawb) && (
                 <>
                   <span style={{ color: "var(--text-muted)" }}>·</span>
                   <span style={{ fontFamily: "monospace", fontSize: "0.9rem", color: "var(--text-muted)" }}>

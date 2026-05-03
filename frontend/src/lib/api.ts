@@ -88,6 +88,7 @@ export interface MilestoneProjection {
     overall_status: string;
     max_pieces: number;
     ground_handlers_label: string;
+    ground_data_status?: "ok" | "no_data" | "na";
   };
 }
 
@@ -104,6 +105,23 @@ export interface TrackingResponse {
   blocked: boolean;
   raw_meta?: Record<string, unknown>;
   milestone_projection?: MilestoneProjection;
+}
+
+/** Compare MAWB vs schedule key ignoring airline dash grouping (605-12345678). */
+function normalizeAirWaybillDigits(s: string): string {
+  return s.replace(/-/g, "").trim();
+}
+
+/**
+ * Use as `hawb` query param on live `/api/track` only when the row is not MAWB-only
+ * (`hawb` equals MAWB digits). Fixes cases where raw `hawb !== mawb` is false despite
+ * a real house bill (duplicate field values, formatting).
+ */
+export function hawbQueryParamForLiveTrack(mawb: string, hawb: string | null | undefined): string | undefined {
+  const h = (hawb ?? "").trim();
+  if (!h) return undefined;
+  if (normalizeAirWaybillDigits(h) === normalizeAirWaybillDigits(mawb)) return undefined;
+  return h;
 }
 
 /** GET /api/track/:awb */

@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { trackByAwb, trackByAirline, type TrackingEvent, type TrackingResponse } from "../lib/api";
+import {
+  hawbQueryParamForLiveTrack,
+  trackByAwb,
+  trackByAirline,
+  type TrackingEvent,
+  type TrackingResponse,
+} from "../lib/api";
 import MilestonePlan from "../components/MilestonePlan";
 
 const AIRLINES = [
@@ -218,8 +224,8 @@ export default function AdminDashboard() {
     if (!a) { setError("Enter AWB number"); return; }
     setLoading(true);
     try {
-      const h = hawb.trim() || undefined;
-      const res = airline ? await trackByAirline(airline, a, h) : await trackByAwb(a, h);
+      const hawbOpt = hawbQueryParamForLiveTrack(a, hawb.trim() || null);
+      const res = airline ? await trackByAirline(airline, a, hawbOpt) : await trackByAwb(a, hawbOpt);
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
