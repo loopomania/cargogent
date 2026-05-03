@@ -36,11 +36,156 @@ import {
   computeMilestoneProjection,
   enrichTrackingPayloadWithMilestone,
   isReturnToOriginDelivery,
+  milestoneExcelPiecesHint,
 } from "../services/milestoneEngine.js";
 import { merge047TapIntoTrackingPayload } from "../services/tapCargoRouting.js";
+import { hawbQueryParamForLiveTrack } from "../services/hawbLiveQuery.js";
 
 function milestoneEnrichmentEnabled(): boolean {
   return process.env.SKIP_ENRICH_MILESTONE !== "1";
+}
+
+/** Min positive pieces_pcs across matched Excel legs — stable HAWB declaration vs leg-count SUM noise. */
+function excelHousePiecesHintFromRows(rows: Array<{ pieces_pcs?: unknown }>): number | null {
+  const nums = rows
+    .map((r) => {
+      const v = r.pieces_pcs;
+      if (v == null || v === "") return 0;
+      const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.]/g, ""));
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    })
+    .filter((n) => n > 0);
+  if (nums.length === 0) return null;
+  return Math.min(...nums);
+}
+
+/** IATA-style port for hint matching (ILTLV → TLV, "TLV (MAMAN)" → TLV). */
+function normalizePortForHints(port: string | null | undefined): string {
+  const s = String(port ?? "").trim().toUpperCase();
+  if (!s) return "";
+  if (s.length === 5 && /^[A-Z]{2}[A-Z]{3}$/.test(s)) return s.slice(-3);
+  const m = s.match(/\b([A-Z]{3})\b/);
+  if (m) return m[1];
+  return s.length >= 3 ? s.slice(-3) : s;
+}
+
+function firstIntFromPiecesField(val: unknown): number {
+  if (val == null || val === "") return 0;
+  if (typeof val === "number" && Number.isFinite(val)) return Math.max(0, Math.floor(val));
+  const m = String(val).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+const ORIGIN_GROUND_ACCEPTANCE_CODES = new Set(["RCS", "BKD", "FOH", "DIS", "130"]);
+
+/**
+ * When Excel transport rows exist for this HAWB but `pieces_pcs` was never populated, use ground-handler
+ * acceptance at the shipment origin as the house declaration (Maman TLV RCS showing 1 vs Thai DEP MAWB rollup).
+ */
+function inferHawbPiecesHintFromOriginGround(events: unknown[] | undefined, originAirport: unknown): number | null {
+  const want = normalizePortForHints(String(originAirport ?? ""));
+  if (!want || !Array.isArray(events) || events.length === 0) return null;
+  const found: number[] = [];
+  for (const raw of events) {
+    const ev = raw as Record<string, unknown>;
+    if (!ev || typeof ev !== "object") continue;
+    const src = String(ev.source ?? "").toLowerCase();
+    const loc = String(ev.location ?? "");
+    const u = loc.toUpperCase();
+    const isGround = src === "maman" || src === "swissport" || u.includes("MAMAN") || u.includes("SWISSPORT");
+    if (!isGround) continue;
+    if (normalizePortForHints(loc) !== want) continue;
+    const code = String(ev.status_code ?? "");
+    if (!ORIGIN_GROUND_ACCEPTANCE_CODES.has(code)) continue;
+    const n = firstIntFromPiecesField(ev.actual_pieces ?? ev.pieces);
+    if (n > 0 && n < 500) found.push(n);
+  }
+  if (found.length === 0) return null;
+  return Math.min(...found);
+}
+
+/** Merge excel pieces hint toward the minimum (CargoGent house truth). */
+function mergeExcelPiecesHints(prevRaw: unknown, next: number): number {
+  if (next <= 0) return next;
+  const prevNum =
+    typeof prevRaw === "number" ? prevRaw : prevRaw != null && prevRaw !== "" ? parseFloat(String(prevRaw)) : NaN;
+  if (Number.isFinite(prevNum) && prevNum > 0) return Math.min(Math.floor(prevNum), next);
+  return next;
+}
+
+/**
+ * When Excel has no `pieces_pcs` but this is a HAWB-scoped Excel shipment, infer house pieces from
+ * Maman/Swissport acceptance at origin. Live tracker payloads often omit ground rows that were
+ * persisted separately — fall back to `query_events` for those sources.
+ */
+async function applyHawbPiecesHintInferWithDbFallback(
+  p: import("pg").Pool,
+  tenantId: string | undefined,
+  mawbClean: string,
+  hawbTrimmed: string,
+  data: any,
+): Promise<void> {
+  const hawbNorm = hawbTrimmed.trim();
+  if (!data?.origin || hawbNorm === "" || hawbNorm === mawbClean) return;
+  const tryInfer = (evs: unknown[]) => inferHawbPiecesHintFromOriginGround(evs, data.origin);
+  const evs = Array.isArray(data.events) ? data.events : [];
+  let inf = evs.length > 0 ? tryInfer(evs) : null;
+  if (inf != null && inf > 0) {
+    data.raw_meta = data.raw_meta || {};
+    data.raw_meta.excel_pieces_hint = mergeExcelPiecesHints(data.raw_meta.excel_pieces_hint, inf);
+    data.raw_meta.excel_pieces_hint_from_hawb_line = true;
+    return;
+  }
+  if (!tenantId) return;
+  try {
+    const r = await p.query(
+      `SELECT payload FROM query_events WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3 AND source IN ('maman', 'swissport') ORDER BY occurred_at ASC NULLS LAST`,
+      [tenantId, mawbClean, hawbNorm],
+    );
+    const extra = r.rows.map((row: { payload?: unknown }) =>
+      typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload,
+    );
+    inf = tryInfer([...evs, ...extra]);
+    if (inf != null && inf > 0) {
+      data.raw_meta = data.raw_meta || {};
+      data.raw_meta.excel_pieces_hint = mergeExcelPiecesHints(data.raw_meta.excel_pieces_hint, inf);
+      data.raw_meta.excel_pieces_hint_from_hawb_line = true;
+    }
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** MIN(pieces_pcs) on the HAWB row(s) without shipment_id hop — survives CTE / ingest quirks. */
+async function mergeDirectExcelPiecesHintForHawb(
+  p: import("pg").Pool,
+  tenantId: string | undefined,
+  mawbClean: string,
+  hawbTrimmed: string,
+  data: any,
+): Promise<void> {
+  const isGlobalAdmin = !tenantId || tenantId === "00000000-0000-0000-0000-000000000000";
+  try {
+    const q = isGlobalAdmin
+      ? `SELECT MIN(pieces_pcs) AS m FROM excel_transport_lines WHERE master_awb = $1 AND TRIM(COALESCE(house_ref, '')) = $2 AND COALESCE(pieces_pcs::numeric, 0) > 0`
+      : `SELECT MIN(pieces_pcs) AS m FROM excel_transport_lines WHERE tenant_id = $1::uuid AND master_awb = $2 AND TRIM(COALESCE(house_ref, '')) = $3 AND COALESCE(pieces_pcs::numeric, 0) > 0`;
+    const args = isGlobalAdmin ? [mawbClean, hawbTrimmed] : [tenantId, mawbClean, hawbTrimmed];
+    const r = await p.query<{ m?: unknown }>(q, args);
+    const raw = r.rows[0]?.m;
+    if (raw == null || raw === "") return;
+    const n = typeof raw === "number" ? raw : parseFloat(String(raw));
+    if (!Number.isFinite(n) || n <= 0) return;
+    const dir = Math.floor(n);
+    data.raw_meta = data.raw_meta || {};
+    const prev = data.raw_meta.excel_pieces_hint;
+    const prevNum =
+      typeof prev === "number" ? prev : prev != null && prev !== "" ? parseFloat(String(prev)) : NaN;
+    data.raw_meta.excel_pieces_hint =
+      Number.isFinite(prevNum) && prevNum > 0 ? Math.min(prevNum, dir) : dir;
+    data.raw_meta.excel_pieces_hint_from_hawb_line = true;
+  } catch {
+    /* non-fatal */
+  }
 }
 
 /** When live airline scrape fails, merge last persisted airline events (parity with saveTrackingResult). */
@@ -108,35 +253,47 @@ async function getActualTenantId(user: any, awb: string, hawb?: string): Promise
 
 /** Persist a live enrichment back to queue/summary/events when this tenant already owns the shipment (updates cache on "Sync Now"). */
 async function persistLiveEnrichedTracking(
-  user: { tenant_id?: string; email?: string } | undefined,
+  user: { tenant_id?: string; email?: string; role?: string; sub?: string } | undefined,
   mawbClean: string,
   hawbFromQuery: string | undefined,
   data: any,
 ): Promise<void> {
-  if (!user?.tenant_id) return;
+  if (!user?.sub) return;
   const p = getPool();
   if (!p) return;
   try {
     const shipmentId = hawbFromQuery || mawbClean;
+    let tenantId: string | undefined = user.tenant_id;
+    const globalTenant =
+      !tenantId || tenantId === "00000000-0000-0000-0000-000000000000";
+    if (user.role === "admin" || globalTenant) {
+      const r = await p.query<{ tenant_id: string }>(
+        `SELECT tenant_id FROM leg_status_summary WHERE shipment_id = $1 LIMIT 1`,
+        [shipmentId],
+      );
+      tenantId = r.rows[0]?.tenant_id;
+    }
+    if (!tenantId || tenantId === "00000000-0000-0000-0000-000000000000") return;
+
     const own = await p.query(
       `SELECT 1 FROM leg_status_summary WHERE tenant_id = $1 AND shipment_id = $2 LIMIT 1`,
-      [user.tenant_id, shipmentId]
+      [tenantId, shipmentId],
     );
     if (own.rows.length === 0) return;
-    await saveTrackingResult(user.tenant_id, mawbClean, hawbFromQuery, data, (user as { email?: string }).email);
+    await saveTrackingResult(tenantId, mawbClean, hawbFromQuery, data, (user as { email?: string }).email);
   } catch (e) {
     console.warn("[track] persist enriched snapshot skipped:", e);
   }
 }
 
 /** Helper to append excel dates to the tracking payload before returning to client */
-async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb: string, hawb: string | undefined, data: any) {
+export async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb: string, hawb: string | undefined, data: any) {
   const p = getPool();
   if (!p) return data;
   
   try {
     const mawbClean = mawb.replace(/-/g, "");
-    const isHawbSpecific = hawb && hawb !== mawbClean;
+    const isHawbSpecific = hawbQueryParamForLiveTrack(mawb, hawb) !== undefined;
     
     const isGlobalAdmin = !tenantId || tenantId === '00000000-0000-0000-0000-000000000000';
     
@@ -148,7 +305,7 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
           WHERE master_awb = $1 AND house_ref = $2
           LIMIT 1
        )
-       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta, pieces_pcs
        FROM excel_transport_lines 
        WHERE shipment_id = (SELECT shipment_id FROM target_shipment)
        ORDER BY leg_sequence ASC
@@ -159,7 +316,7 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
           WHERE tenant_id = $1 AND master_awb = $2 AND house_ref = $3
           LIMIT 1
        )
-       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta, pieces_pcs
        FROM excel_transport_lines 
        WHERE tenant_id = $1 AND shipment_id = (SELECT shipment_id FROM target_shipment)
        ORDER BY leg_sequence ASC
@@ -167,13 +324,14 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
     
     const byMawbOnly = isGlobalAdmin ? `
        WITH target_shipment AS (
-          SELECT shipment_id 
-          FROM excel_transport_lines 
-          WHERE master_awb = $1
-          ORDER BY created_at DESC
+          SELECT e.shipment_id
+          FROM excel_transport_lines e
+          INNER JOIN excel_import_batches b ON b.id = e.batch_id
+          WHERE e.master_awb = $1
+          ORDER BY b.ingested_at DESC NULLS LAST, e.id DESC
           LIMIT 1
        )
-       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta, pieces_pcs
        FROM excel_transport_lines 
        WHERE shipment_id = (SELECT shipment_id FROM target_shipment)
        ORDER BY leg_sequence ASC
@@ -182,24 +340,28 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
           SELECT shipment_id 
           FROM excel_transport_lines 
           WHERE tenant_id = $1 AND master_awb = $2
+          ORDER BY id DESC
           LIMIT 1
        )
-       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta 
+       SELECT leg_sequence, leg_load_port, leg_discharge_port, leg_etd, leg_eta, first_leg_etd, israel_landing_eta, pieces_pcs
        FROM excel_transport_lines 
        WHERE tenant_id = $1 AND shipment_id = (SELECT shipment_id FROM target_shipment)
        ORDER BY leg_sequence ASC
     `;
     
     let resExcel = { rows: [] as any[] };
+    let hawbMatchedExcel = false;
 
     if (isHawbSpecific) {
       const args = isGlobalAdmin ? [mawbClean, hawb] : [tenantId, mawbClean, hawb];
       resExcel = await p.query(byMawbHawb, args);
+      hawbMatchedExcel = resExcel.rows.length > 0;
     }
-    
-    if (resExcel.rows.length === 0) {
+
+    if (resExcel.rows.length === 0 && !isHawbSpecific) {
       const args = isGlobalAdmin ? [mawbClean] : [tenantId, mawbClean];
       resExcel = await p.query(byMawbOnly, args);
+      hawbMatchedExcel = false;
     }
 
     if (resExcel.rows.length > 0) {
@@ -213,6 +375,14 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
         etd: r.leg_etd || (i === 0 ? r.first_leg_etd : null),
         eta: r.leg_eta || (i === resExcel.rows.length - 1 ? r.israel_landing_eta : null)
       }));
+
+      if (hawbMatchedExcel) {
+        const hp = excelHousePiecesHintFromRows(resExcel.rows);
+        if (hp != null) {
+          data.raw_meta.excel_pieces_hint = hp;
+          data.raw_meta.excel_pieces_hint_from_hawb_line = true;
+        }
+      }
       
       // Fallback for origin/destination if tracker didn't provide them
       if (!data.origin) {
@@ -224,6 +394,17 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
         data.destination = rawTo ? (rawTo.length === 5 ? rawTo.slice(-3) : rawTo) : null;
       }
     }
+
+    if (isHawbSpecific && hawb) {
+      await mergeDirectExcelPiecesHintForHawb(p, tenantId, mawbClean, hawb.trim(), data);
+    }
+
+    if (isHawbSpecific && hawb && hawbMatchedExcel && resExcel.rows.length > 0) {
+      const rowHp = excelHousePiecesHintFromRows(resExcel.rows);
+      if (rowHp == null) {
+        await applyHawbPiecesHintInferWithDbFallback(p, tenantId, mawbClean, hawb.trim(), data);
+      }
+    }
   } catch (err) {
     console.error("Failed to append excel dates", err);
   }
@@ -231,7 +412,7 @@ async function appendExcelDatesToTrackingData(tenantId: string | undefined, mawb
 }
 export { normalizeEventDate } from "../services/eventDateNormalize.js";
 
-/** Shared helper: persist a tracking result into query_schedule + leg_status_summary + query_events */
+/** Shared helper: persist a tracking result into query_schedule (+ leg_status_summary + query_events). Skips queue upserts when shipment is already Archived so it stays in the archive UI. */
 export async function saveTrackingResult(
   tenantId: string,
   awb: string,
@@ -248,6 +429,16 @@ export async function saveTrackingResult(
 
   const mawb = awb.replace(/-/g, "");
   const hawbKey = hawb || mawb;
+
+  const persistedLeg1 = await p.query<{ aggregated_status?: string | null; last_event_list_hash?: string | null }>(
+    `SELECT aggregated_status, last_event_list_hash FROM leg_status_summary WHERE tenant_id = $1 AND shipment_id = $2 AND leg_sequence = 1`,
+    [tenantId, hawbKey],
+  );
+  const prevPersistedAgg = persistedLeg1.rows[0]?.aggregated_status ?? undefined;
+  const prevPersistedHash = persistedLeg1.rows[0]?.last_event_list_hash ?? undefined;
+  const wasArchivedShipment =
+    persistedLeg1.rows.length > 0 &&
+    String(prevPersistedAgg ?? "").trim().toLowerCase().startsWith("archived");
 
   const domainName = username ? username.split('@')[1] : null;
 
@@ -450,30 +641,32 @@ export async function saveTrackingResult(
     }
   }
 
-  // 1. Upsert into query_schedule so it shows up in Tracked List
-  if (domainName) {
-    await p.query(
-      `INSERT INTO query_schedule (tenant_id, mawb, hawb, next_status_check_at, last_check_at, domain_name, ground_only)
-       VALUES ($1, $2, $3, NOW() + interval '${intervalStr}', NOW(), $4, $5)
-       ON CONFLICT (tenant_id, mawb, hawb) DO UPDATE SET
-         next_status_check_at = NOW() + interval '${intervalStr}',
-         last_check_at = NOW(),
-         error_count_consecutive = 0,
-         ground_only = EXCLUDED.ground_only,
-         domain_name = COALESCE(query_schedule.domain_name, EXCLUDED.domain_name)`,
-      [tenantId, mawb, hawbKey, domainName, groundOnly]
-    );
-  } else {
-    await p.query(
-      `INSERT INTO query_schedule (tenant_id, mawb, hawb, next_status_check_at, last_check_at, ground_only)
-       VALUES ($1, $2, $3, NOW() + interval '${intervalStr}', NOW(), $4)
-       ON CONFLICT (tenant_id, mawb, hawb) DO UPDATE SET
-         next_status_check_at = NOW() + interval '${intervalStr}',
-         error_count_consecutive = 0,
-         ground_only = EXCLUDED.ground_only,
-         last_check_at = NOW()`,
-      [tenantId, mawb, hawbKey, groundOnly]
-    );
+  // Archived rows intentionally omit query_schedule (see POST /mark-archived). Do not recreate schedule on refresh.
+  if (!wasArchivedShipment) {
+    if (domainName) {
+      await p.query(
+        `INSERT INTO query_schedule (tenant_id, mawb, hawb, next_status_check_at, last_check_at, domain_name, ground_only)
+         VALUES ($1, $2, $3, NOW() + interval '${intervalStr}', NOW(), $4, $5)
+         ON CONFLICT (tenant_id, mawb, hawb) DO UPDATE SET
+           next_status_check_at = NOW() + interval '${intervalStr}',
+           last_check_at = NOW(),
+           error_count_consecutive = 0,
+           ground_only = EXCLUDED.ground_only,
+           domain_name = COALESCE(query_schedule.domain_name, EXCLUDED.domain_name)`,
+        [tenantId, mawb, hawbKey, domainName, groundOnly],
+      );
+    } else {
+      await p.query(
+        `INSERT INTO query_schedule (tenant_id, mawb, hawb, next_status_check_at, last_check_at, ground_only)
+         VALUES ($1, $2, $3, NOW() + interval '${intervalStr}', NOW(), $4)
+         ON CONFLICT (tenant_id, mawb, hawb) DO UPDATE SET
+           next_status_check_at = NOW() + interval '${intervalStr}',
+           error_count_consecutive = 0,
+           ground_only = EXCLUDED.ground_only,
+           last_check_at = NOW()`,
+        [tenantId, mawb, hawbKey, groundOnly],
+      );
+    }
   }
   
   // Latest uplift for summary — first `DEP` was always TLV on multi-hop feeders.
@@ -495,20 +688,16 @@ export async function saveTrackingResult(
   }
 
   const currentHash = events.length + "-" + derivedStatus;
-  const prevQuery = await p.query(
-    `SELECT aggregated_status, last_event_list_hash FROM leg_status_summary WHERE tenant_id = $1 AND shipment_id = $2 AND leg_sequence = 1`,
-    [tenantId, hawbKey]
-  );
-  if (prevQuery.rows.length > 0) {
-    const prev = prevQuery.rows[0];
-    if (prev.aggregated_status !== derivedStatus || prev.last_event_list_hash !== currentHash) {
+  const statusStoredInSummary = wasArchivedShipment ? "Archived" : derivedStatus;
+  if (!wasArchivedShipment && persistedLeg1.rows.length > 0) {
+    if (prevPersistedAgg !== derivedStatus || prevPersistedHash !== currentHash) {
       await p.query(
         `INSERT INTO awb_latest_change (tenant_id, mawb, hawb, event_type, payload) VALUES ($1, $2, $3, 'STATUS_CHANGE', $4)`,
-        [tenantId, mawb, hawbKey, JSON.stringify({ old_status: prev.aggregated_status, new_status: derivedStatus })]
+        [tenantId, mawb, hawbKey, JSON.stringify({ old_status: prevPersistedAgg, new_status: derivedStatus })],
       );
       await p.query(
         `UPDATE query_schedule SET last_changed_at = NOW(), stale_alert_sent = false WHERE tenant_id = $1 AND mawb = $2 AND hawb = $3`,
-        [tenantId, mawb, hawbKey]
+        [tenantId, mawb, hawbKey],
       );
     }
   }
@@ -520,28 +709,32 @@ export async function saveTrackingResult(
     destination: data.destination ?? null,
     status: derivedStatus ?? data.status ?? null,
     excelLegs: (data.raw_meta?.excel_legs ?? []) as any,
-    excelPiecesHint: data.raw_meta?.pieces as string | number | undefined,
+    excelPiecesHint: milestoneExcelPiecesHint(data.raw_meta),
+    trustExcelHawbTransportPieces: data.raw_meta?.excel_pieces_hint_from_hawb_line === true,
+    rawMeta: (data.raw_meta ?? null) as Record<string, unknown> | null,
+    message: typeof data.message === "string" ? data.message : null,
+    hawb: hawbKey,
   });
 
   const excelLegs = data.raw_meta?.excel_legs;
-  if (excelLegs && excelLegs.length > 0 && events.length > 0) {
+  if (!wasArchivedShipment && excelLegs && excelLegs.length > 0 && events.length > 0) {
     const lastExcel = excelLegs[excelLegs.length - 1];
     const xlEta = lastExcel?.eta ? new Date(lastExcel.eta).getTime() : 0;
     const trackerEta = etaEvent ? new Date(etaEvent).getTime() : 0;
     const trackerAta = ataEvent ? new Date(ataEvent).getTime() : 0;
-    
+
     // Check missing Arrival updates (>3 hours past Schedule)
-    if (xlEta > 0 && !trackerAta && Date.now() > xlEta + (3 * 3600000)) {
+    if (xlEta > 0 && !trackerAta && Date.now() > xlEta + 3 * 3600000) {
       await p.query(
         `INSERT INTO awb_latest_change (tenant_id, mawb, hawb, event_type, payload) VALUES ($1, $2, $3, 'DISCREPANCY', $4)`,
-        [tenantId, mawb, hawbKey, JSON.stringify({ type: 'MISSING_ARRIVAL', delay_hours: Math.round((Date.now() - xlEta)/3600000) })]
+        [tenantId, mawb, hawbKey, JSON.stringify({ type: "MISSING_ARRIVAL", delay_hours: Math.round((Date.now() - xlEta) / 3600000) })],
       );
     }
     // Check EDD > ADD or EDA > ADA logical discrepancy
     if (trackerEta > 0 && trackerAta > 0 && trackerEta > trackerAta + 60000) {
-       await p.query(
+      await p.query(
         `INSERT INTO awb_latest_change (tenant_id, mawb, hawb, event_type, payload) VALUES ($1, $2, $3, 'DISCREPANCY', $4)`,
-        [tenantId, mawb, hawbKey, JSON.stringify({ type: 'LOGICAL_ERROR_ETA_AHEAD_OF_ATA' })]
+        [tenantId, mawb, hawbKey, JSON.stringify({ type: "LOGICAL_ERROR_ETA_AHEAD_OF_ATA" })],
       );
     }
   }
@@ -562,7 +755,7 @@ export async function saveTrackingResult(
       [
         tenantId,
         hawbKey,
-        derivedStatus,
+        statusStoredInSummary,
         JSON.stringify({
           ata: safeDateStr(ataEvent),
           eta: safeDateStr(etaEvent),
@@ -594,7 +787,7 @@ export async function saveTrackingResult(
       [
         tenantId,
         hawbKey,
-        derivedStatus,
+        statusStoredInSummary,
         JSON.stringify({
           ata: safeDateStr(ataEvent),
           eta: safeDateStr(etaEvent),
@@ -646,7 +839,7 @@ export async function saveTrackingResult(
   // HTTP response must mirror what we persist (merged airline + deduped + milestone),
   // otherwise "Sync Now" showed a projection built before ground_only/DB airline restore.
   data.events = sorted;
-  data.status = derivedStatus;
+  data.status = wasArchivedShipment ? "Archived" : derivedStatus;
   data.milestone_projection = milestone_projection;
 
   // Stop polling once the shipment is terminal-delivered for UX (Need Attention / Open lists).
@@ -1010,7 +1203,8 @@ router.post("/run-scheduled", async (req, res) => {
           (async () => {
             const processingStartMs = Date.now();
             try {
-              const { data } = await trackByAwb(row.mawb, row.hawb, row.ground_only);
+              const hawbForTracker = hawbQueryParamForLiveTrack(row.mawb, row.hawb ?? undefined);
+              const { data } = await trackByAwb(row.mawb, hawbForTracker, row.ground_only);
               await saveTrackingResult(row.tenant_id, row.mawb, row.hawb, data);
               
               const durations = data.raw_meta?.durations as { airline?: number; ground?: number } | undefined;
@@ -1081,20 +1275,23 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
   }
   const startMs = Date.now();
   try {
-    const { data, status } = await trackByAirline(airline, awb, hawb as string);
+    const hawbRaw = typeof hawb === "string" ? hawb.trim() : "";
+    const hawbPersist = hawbRaw !== "" ? hawbRaw : undefined;
+    const hawbForTracker = hawbQueryParamForLiveTrack(awb, hawbPersist);
+    const { data, status } = await trackByAirline(airline, awb, hawbForTracker);
     const user = (req as any).user;
     const durations = data.raw_meta?.durations as { airline?: number; ground?: number } | undefined;
     const attempts = data.raw_meta?.attempts as { airline?: number; ground?: number } | undefined;
-    logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, airline, data.status || (data.events?.length === 0 ? "No Data" : "Success"), Math.round((durations?.airline ?? 0) * 1000) || Date.now() - startMs, data.message);
+    logQueryRequest(user?.sub, user?.tenant_id, awb, hawbPersist ?? "", airline, data.status || (data.events?.length === 0 ? "No Data" : "Success"), Math.round((durations?.airline ?? 0) * 1000) || Date.now() - startMs, data.message);
     // Log ground service if queried
     if (attempts?.ground && attempts.ground > 0) {
       const groundService = data.message?.match(/\| (maman|swissport)/)?.[1] ?? "ground";
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
-      logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
+      logQueryRequest(user?.sub, user?.tenant_id, awb, hawbPersist ?? "", groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
 
     const mawbClean = awb.replace(/-/g, "");
-    const hawbQ = typeof hawb === "string" && hawb.trim() !== "" ? hawb.trim() : undefined;
+    const hawbQ = hawbPersist;
     const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
     await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
     data.events = data.events ?? [];
@@ -1113,7 +1310,7 @@ router.get("/:airline/:awb", authOptional, requireAuthenticated, async (req, res
   } catch (err) {
     console.error("trackByAirline error:", err);
     const user = (req as any).user;
-    logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, airline, "Error", Date.now() - startMs);
+    logQueryRequest(user?.sub, user?.tenant_id, awb, typeof hawb === "string" ? hawb.trim() : "", airline, "Error", Date.now() - startMs);
     res.status(502).json({
       airline,
       awb,
@@ -1134,21 +1331,24 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
   }
   const startMs = Date.now();
   try {
-    const { data, status } = await trackByAwb(awb, hawb as string);
+    const hawbRaw = typeof hawb === "string" ? hawb.trim() : "";
+    const hawbPersist = hawbRaw !== "" ? hawbRaw : undefined;
+    const hawbForTracker = hawbQueryParamForLiveTrack(awb, hawbPersist);
+    const { data, status } = await trackByAwb(awb, hawbForTracker);
     const user = (req as any).user;
     const durations = data.raw_meta?.durations as { airline?: number; ground?: number } | undefined;
     const attempts = data.raw_meta?.attempts as { airline?: number; ground?: number } | undefined;
     // Log airline query
-  logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, data.airline ?? "unknown", data.status || (data.events?.length === 0 ? "No Data" : "Success"), Math.round((durations?.airline ?? 0) * 1000) || Date.now() - startMs);
+    logQueryRequest(user?.sub, user?.tenant_id, awb, hawbPersist ?? "", data.airline ?? "unknown", data.status || (data.events?.length === 0 ? "No Data" : "Success"), Math.round((durations?.airline ?? 0) * 1000) || Date.now() - startMs);
     // Log ground service if queried
     if (attempts?.ground && attempts.ground > 0) {
       const groundService = data.message?.match(/\| (maman|swissport)/)?.[1] ?? "ground";
       const groundStatus = data.message?.includes("timed_out") ? "Timeout" : data.message?.includes("ground_skipped") ? "Skipped" : data.message?.includes(`${groundService}_synced`) ? data.status || "Success" : "No Data";
-      logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
+      logQueryRequest(user?.sub, user?.tenant_id, awb, hawbPersist ?? "", groundService, groundStatus, Math.round((durations?.ground ?? 0) * 1000));
     }
 
     const mawbClean = awb.replace(/-/g, "");
-    const hawbQ = typeof hawb === "string" && hawb.trim() !== "" ? hawb.trim() : undefined;
+    const hawbQ = hawbPersist;
     const tenantId = await getActualTenantId(user, mawbClean, hawbQ);
     await appendExcelDatesToTrackingData(tenantId, mawbClean, hawbQ, data);
     data.events = data.events ?? [];
@@ -1167,7 +1367,7 @@ router.get("/:awb", authOptional, requireAuthenticated, async (req, res) => {
   } catch (err) {
     console.error("trackByAwb error:", err);
     const user = (req as any).user;
-    logQueryRequest(user?.sub, user?.tenant_id, awb, hawb as string, "unknown", "Error", Date.now() - startMs);
+    logQueryRequest(user?.sub, user?.tenant_id, awb, typeof hawb === "string" ? hawb.trim() : "", "unknown", "Error", Date.now() - startMs);
     res.status(502).json({
       airline: "unknown",
       awb,
