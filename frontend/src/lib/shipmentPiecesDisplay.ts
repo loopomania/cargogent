@@ -6,9 +6,18 @@ export function parsePiecesCount(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Prefer `excel_pieces_hint` (CargoGent ingest) over `pieces` (often MAWB rollup from tracker). */
+export function excelPiecesHintFromRawMeta(raw: Record<string, unknown> | undefined | null): unknown {
+  if (!raw || typeof raw !== "object") return undefined;
+  const ex = raw["excel_pieces_hint"];
+  if (ex != null && ex !== "") return ex;
+  return raw["pieces"];
+}
+
 /**
- * Piece count for shipment headers: prefer DEP/ARR (air segment) values so we do not
- * inflate with MAWB-level or ground-handler scans on RCS/RCF/DLV nodes.
+ * Piece count for shipment headers: trust `meta.max_pieces` from the milestone engine first
+ * (house caps, DLV rollups). Then fall back to DEP/ARR-only scan so we do not show MAWB-inflated
+ * node labels when the engine already clamped the summary.
  */
 export function canonicalShipmentPieceCount(
   proj: MilestoneProjection | undefined | null,
@@ -17,6 +26,11 @@ export function canonicalShipmentPieceCount(
   if (!proj?.flows_steps?.length) {
     const imp = parsePiecesCount(importPiecesHint);
     return imp > 0 ? imp : 0;
+  }
+
+  const metaMax = proj.meta?.max_pieces ?? 0;
+  if (typeof metaMax === "number" && metaMax > 0 && Number.isFinite(metaMax)) {
+    return metaMax;
   }
 
   let flightMax = 0;
@@ -28,9 +42,6 @@ export function canonicalShipmentPieceCount(
     }
   }
   if (flightMax > 0) return flightMax;
-
-  const metaMax = proj.meta?.max_pieces ?? 0;
-  if (metaMax > 0) return metaMax;
 
   let anyMax = 0;
   for (const steps of proj.flows_steps) {

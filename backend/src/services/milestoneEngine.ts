@@ -81,6 +81,8 @@ export interface MilestoneProjection {
     overall_status: string;
     max_pieces: number;
     ground_handlers_label: string;
+    /** Tel Aviv handler feed: OK, explicitly missing (`no_data`), or not applicable. */
+    ground_data_status: "ok" | "no_data" | "na";
   };
 }
 
@@ -318,11 +320,18 @@ function resolveHouseDeclarationPiecesCap(
   events: MilestoneEvent[],
   originDisp: string,
   excelHint: number | null,
+  /** Excel `pieces_pcs` matched to this HAWB in `excel_transport_lines` — trumps MAWB-level RCS/BKD inflation. */
+  trustHawbTransportLinePieces: boolean,
 ): number | null {
   if (excelHint == null || excelHint <= 0) return null;
   const maxEvt = Math.max(0, ...events.map(e => extractPiecesCount(e.pieces ?? e.actual_pieces)));
   if (maxEvt <= excelHint) return null;
-  if (airlineOriginDocPiecesExceedHouseDeclaration(events, originDisp, excelHint)) return null;
+  if (
+    !trustHawbTransportLinePieces &&
+    airlineOriginDocPiecesExceedHouseDeclaration(events, originDisp, excelHint)
+  ) {
+    return null;
+  }
   return excelHint;
 }
 
@@ -553,10 +562,6 @@ function parseSegmentFromEvent(ev: MilestoneEvent): SegmentInfo | null {
   );
 }
 
-/**
- * Tie MAN/DEP/ARR into one leg when ACS gives movement + flight only on MAN/FFM
- * ("… movement Q79824T to BHX") and DEP rows are plain "Depart Facility" with no parsed segment.
- */
 function eventBelongsToManifestLeg(seg: SegmentInfo, normFlight: string | null, e: MilestoneEvent): boolean {
   const lf = normalizeFlight(e.flight);
   const parsed = parseSegmentFromEvent(e);
@@ -585,6 +590,71 @@ function normalizeEventFields(ev: MilestoneEvent): MilestoneEvent {
   }
 
   return e;
+}
+
+const LANDING_INBOUND_CODES: ReadonlySet<string> = new Set(["ARR", "DLV", "RCF", "RCT"]);
+
+function eventFingerprintForDedupe(ev: MilestoneEvent): string {
+  return `${ev.status_code ?? ""}|${ev.date ?? ""}|${cleanCity(ev.location ?? "")}|${(ev.status ?? "").slice(0, 80)}`;
+}
+
+/**
+ * Manifest/movement buckets only include rows whose flight field matches that id (see buildLegs).
+ * Inbound ARR / RCF scans at the next hub usually omit movement/truck IDs, so Landing had no ATA and stayed dim.
+ */
+function mergeMovementFlightEventsOntoLeg(
+  fltEvs: MilestoneEvent[],
+  leg: { from: string; to: string },
+  chronoSorted: MilestoneEvent[],
+): MilestoneEvent[] {
+  if (fltEvs.length === 0) return fltEvs;
+  const fromC = cleanCity(leg.from) || leg.from;
+  const toC = cleanCity(leg.to) || leg.to;
+
+  let depFloor = Math.max(
+    0,
+    ...fltEvs
+      .filter(e => e.status_code === "DEP" && cleanCity(e.location ?? "") === fromC)
+      .map(safeTime)
+      .filter(t => t > 0),
+  );
+  const minTs = fltEvs.map(safeTime).filter((t): t is number => t > 0);
+  const minInst = minTs.length ? Math.min(...minTs) : 0;
+  if (!(depFloor > 0) && minInst > 0) depFloor = minInst;
+
+  let ceilingMs = Infinity;
+  for (const e of chronoSorted) {
+    if (e.status_code !== "DEP" || cleanCity(e.location ?? "") !== toC) continue;
+    const t = safeTime(e);
+    if (!t || (depFloor > 0 && t <= depFloor)) continue;
+    if (t < ceilingMs) ceilingMs = t;
+  }
+
+  const seen = new Set(fltEvs.map(eventFingerprintForDedupe));
+  const out = [...fltEvs];
+  for (const e of chronoSorted) {
+    const sc = e.status_code ?? "";
+    if (!LANDING_INBOUND_CODES.has(sc)) continue;
+    if (cleanCity(e.location ?? "") !== toC) continue;
+    if (normalizeFlight(e.flight)) continue;
+    const t = safeTime(e);
+    if (!t) continue;
+    if (depFloor > 0 && t + 60_000 < depFloor) continue;
+    if (Number.isFinite(ceilingMs) && t >= ceilingMs) continue;
+    const fp = eventFingerprintForDedupe(e);
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    out.push(e);
+  }
+  return out;
+}
+
+function pickLandingDisplayEvent(legEvents: MilestoneEvent[]): MilestoneEvent | undefined {
+  for (const code of ["ARR", "DLV", "RCT", "RCF"] as const) {
+    const hit = legEvents.find(e => e.status_code === code && e.date);
+    if (hit) return hit;
+  }
+  return legEvents.find(e => LANDING_INBOUND_CODES.has(e.status_code ?? ""));
 }
 
 function buildLegs(
@@ -734,30 +804,64 @@ function buildLegs(
           pureFltPath.length = 0;
           pureFltPath.push(xlSeg.from, xlSeg.to);
         } else {
-          const lastLoc = cleanCity(
-            [...fltEvs].reverse().find(e => {
-              const lc = cleanCity(e.location);
-              return lc && lc !== pureFltPath[0] && lc;
-            })?.location,
+          const originHub = pureFltPath[0];
+          const originDepMu = Math.max(
+            0,
+            ...fltEvs
+              .filter(e => e.status_code === "DEP" && cleanCity(e.location ?? "") === originHub)
+              .map(safeTime)
+              .filter(t => t > 0),
           );
-          const destCity = cleanCity(destination);
-          if (!hasDepOrArrMovement && lastLoc && destCity && lastLoc !== destCity) {
-            pureFltPath.length = 0;
-            pureFltPath.push(lastLoc, destCity);
-          } else if (lastLoc) {
-            pureFltPath.push(lastLoc);
-          } else {
-            const matchingXl = excelLegs.find(xl => cleanCity(String(xl.from)) === pureFltPath[0]);
-            if (matchingXl && cleanCity(String(matchingXl.to)))
-              pureFltPath.push(cleanCity(String(matchingXl.to))!);
-            else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
-              pureFltPath.push(cleanCity(destination)!);
+          if (originDepMu > 0) {
+            const bridgeEv = chronoEvs.find(
+              ev =>
+                LANDING_INBOUND_CODES.has(ev.status_code ?? "") &&
+                !!ev.date &&
+                !normalizeFlight(ev.flight) &&
+                (() => {
+                  const lc = cleanCity(ev.location ?? "");
+                  if (!lc || lc === originHub) return false;
+                  return safeTime(ev) >= originDepMu;
+                })(),
+            );
+            const bc = bridgeEv ? cleanCity(bridgeEv.location) : null;
+            if (bc) pureFltPath.push(bc);
+          }
+
+          if (pureFltPath.length === 1) {
+            const lastLoc = cleanCity(
+              [...fltEvs].reverse().find(e => {
+                const lc = cleanCity(e.location);
+                return lc && lc !== pureFltPath[0] && lc;
+              })?.location,
+            );
+            const destCity = cleanCity(destination);
+            if (!hasDepOrArrMovement && lastLoc && destCity && lastLoc !== destCity) {
+              pureFltPath.length = 0;
+              pureFltPath.push(lastLoc, destCity);
+            } else if (lastLoc) {
+              pureFltPath.push(lastLoc);
+            } else {
+              const matchingXl = excelLegs.find(xl => cleanCity(String(xl.from)) === pureFltPath[0]);
+              if (matchingXl && cleanCity(String(matchingXl.to)))
+                pureFltPath.push(cleanCity(String(matchingXl.to))!);
+              else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
+                pureFltPath.push(cleanCity(destination)!);
+              }
             }
+          } else if (cleanCity(destination)) {
+            const dc = cleanCity(destination)!;
+            if (pureFltPath[pureFltPath.length - 1] !== dc && !pureFltPath.includes(dc)) pureFltPath.push(dc);
           }
         }
       }
 
       for (let i = 0; i < pureFltPath.length - 1; i++) {
+        const mergedEv = mergeMovementFlightEventsOntoLeg(
+          fltEvs,
+          { from: pureFltPath[i], to: pureFltPath[i + 1] },
+          chronoEvs,
+        );
         legs.push({
           from: pureFltPath[i],
           to: pureFltPath[i + 1],
@@ -769,7 +873,7 @@ function buildLegs(
           eta: null,
           pieces: null,
           weight: null,
-          events: fltEvs,
+          events: mergedEv,
         });
       }
     }
@@ -1076,9 +1180,9 @@ function buildStepsForFlow(
     const depConfirmedOnLeg = legEvents.some(e => e.status_code === "DEP" && e.date);
     const arrReachedThisLegDestination = legEvents.some(
       e =>
-        ["ARR", "DLV"].includes(e.status_code || "") &&
+        LANDING_INBOUND_CODES.has(e.status_code || "") &&
         !!e.date &&
-        cleanCity(e.location) === leg.to,
+        cleanCity(e.location ?? "") === leg.to,
     );
     const arrConfirmedOnLeg = arrReachedThisLegDestination;
     const preDepartureScanOnLeg =
@@ -1096,9 +1200,7 @@ function buildStepsForFlow(
       legEvents.find(e => e.status_code === "DEP") ||
       legEvents.find(e => e.status_code === "BKD") ||
       legEvents.find(e => ["MAN", "RCS"].includes(e.status_code ?? ""));
-    const arrEv =
-      legEvents.find(e => ["ARR", "DLV"].includes(e.status_code ?? "") && e.date) ||
-      legEvents.find(e => ["ARR", "DLV"].includes(e.status_code ?? ""));
+    const arrEv = pickLandingDisplayEvent(legEvents);
 
     steps.push({ kind: "arrow", done: takeOffDone });
 
@@ -1301,6 +1403,33 @@ function resolveOriginDestination(
   return { origin, destination, trace };
 }
 
+/** TLV house AWB shipments: surfacing explicit missing Maman/Swissport feed in milestone header. */
+function resolveTelAvivGroundDataStatus(params: {
+  hawb?: string | null | undefined;
+  rawMeta?: Record<string, unknown> | null | undefined;
+  message?: string | null | undefined;
+  groundEvents: MilestoneEvent[];
+  originDisp: string;
+  destDisp: string;
+}): "ok" | "no_data" | "na" {
+  if (!params.hawb?.trim()) return "na";
+
+  const o = cleanCity(params.originDisp) ?? "";
+  const d = cleanCity(params.destDisp) ?? "";
+  const touchesTlv = o === "TLV" || d === "TLV";
+  if (!touchesTlv) return "na";
+
+  const msg = typeof params.message === "string" ? params.message : "";
+  const gs = params.rawMeta?.ground_status;
+  if (gs === "no_data" || msg.includes("failed to retrieve data from ground")) return "no_data";
+  // Legacy messages from older router builds
+  if (msg.includes("ground_skipped:not_arrived")) return "no_data";
+
+  if (params.groundEvents.length > 0) return "ok";
+
+  return "no_data";
+}
+
 /**
  * Canonical milestone projection — single compilation target for persisted + API responses.
  */
@@ -1312,8 +1441,17 @@ export function computeMilestoneProjection(payload: {
   excelLegs?: ExcelLegInput[] | null;
   /** From import / raw_meta.pieces — when 1, phantom multi-path graphs collapse to one itinerary. */
   excelPiecesHint?: string | number | null;
+  /**
+   * Set when `raw_meta.excel_pieces_hint` was derived from CargoGent Excel rows for this HAWB
+   * (not generic ingest). Allows house `pieces_pcs` to cap MAWB-inflated origin scans.
+   */
+  trustExcelHawbTransportPieces?: boolean | null;
   /** Test / deterministic comparisons only — compares DEP timestamps vs this instant for airborne wording. */
   referenceTimeMs?: number | null;
+  /** TLV ground no-data signalling (passed from persisted message / raw_meta). */
+  rawMeta?: Record<string, unknown> | null;
+  message?: string | null;
+  hawb?: string | null;
 }): MilestoneProjection {
   const events = payload.events.map(normalizeEventFields);
   const excelLegs = excelLegArray((payload.excelLegs ?? []) as ExcelLegInput[]);
@@ -1378,7 +1516,12 @@ export function computeMilestoneProjection(payload: {
     collapseSingleTrace = `collapse:single_piece_${nBefore}_to_1`;
   }
 
-  const houseDeclarationCap = resolveHouseDeclarationPiecesCap(events, originDisp, excelHint);
+  const houseDeclarationCap = resolveHouseDeclarationPiecesCap(
+    events,
+    originDisp,
+    excelHint,
+    payload.trustExcelHawbTransportPieces === true,
+  );
 
   const failedFlows = failedUnloadFlows;
 
@@ -1399,6 +1542,15 @@ export function computeMilestoneProjection(payload: {
   const parts: string[] = [];
   if (hasMaman) parts.push("Maman");
   if (hasSwissport) parts.push("Swissport");
+
+  const groundDataStatus = resolveTelAvivGroundDataStatus({
+    hawb: payload.hawb,
+    rawMeta: payload.rawMeta ?? null,
+    message: payload.message ?? null,
+    groundEvents,
+    originDisp,
+    destDisp,
+  });
 
   const failed_route_summaries: MilestoneFailedRouteSummary[] = failedFlows.map(f => {
     const firstLeg = f[0];
@@ -1483,6 +1635,7 @@ export function computeMilestoneProjection(payload: {
           overall_status: overallStatus,
           max_pieces: maxPcs,
           ground_handlers_label: parts.join(" & "),
+          ground_data_status: groundDataStatus,
         },
       }));
     }
@@ -1507,8 +1660,22 @@ export function computeMilestoneProjection(payload: {
       overall_status: overallStatus,
       max_pieces: maxPcs,
       ground_handlers_label: parts.join(" & "),
+      ground_data_status: groundDataStatus,
     },
   };
+}
+
+/**
+ * Pieces hint for milestone math: prefer CargoGent ingest (`excel_pieces_hint` per HAWB line)
+ * over airline `raw_meta.pieces`, which often reflects MAWB-level rollups on multi-house exports.
+ */
+export function milestoneExcelPiecesHint(raw_meta?: Record<string, unknown> | null): string | number | undefined {
+  if (!raw_meta) return undefined;
+  const ex = raw_meta.excel_pieces_hint;
+  if (ex != null && ex !== "") return ex as string | number;
+  const pcs = raw_meta.pieces;
+  if (pcs != null && pcs !== "") return pcs as string | number;
+  return undefined;
 }
 
 /** Attach `milestone_projection` + version headers on any tracking-shaped payload before JSON. */
@@ -1522,7 +1689,12 @@ export function enrichTrackingPayloadWithMilestone(payload: Record<string, any>)
     destination: payload.destination ?? null,
     status: payload.status ?? null,
     excelLegs,
-    excelPiecesHint: payload.raw_meta?.pieces as string | number | undefined,
+    excelPiecesHint: milestoneExcelPiecesHint(payload.raw_meta as Record<string, unknown>),
+    trustExcelHawbTransportPieces:
+      (payload.raw_meta as Record<string, unknown>)?.excel_pieces_hint_from_hawb_line === true,
+    rawMeta: (payload.raw_meta ?? null) as Record<string, unknown> | null,
+    message: typeof payload.message === "string" ? payload.message : null,
+    hawb: typeof payload.hawb === "string" ? payload.hawb : null,
   });
 
   void import("newrelic")

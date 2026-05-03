@@ -1,7 +1,7 @@
 
-import { Plane, CheckCircle, Clock, Bookmark, Archive, Package, Truck } from "lucide-react";
+import { Plane, CheckCircle, Clock, Bookmark, Archive, Package, Truck, AlertCircle } from "lucide-react";
 import type { TrackingEvent, TrackingResponse, MilestoneProjectionStep } from "../lib/api";
-import { canonicalShipmentPieceCount } from "../lib/shipmentPiecesDisplay";
+import { canonicalShipmentPieceCount, excelPiecesHintFromRawMeta } from "../lib/shipmentPiecesDisplay";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,33 @@ const C = {
   red:     "#f87171",
   connLine:"rgba(255,255,255,0.18)",
 };
+
+/** TLV house AWB: show explicit “No Data” when Maman/Swissport returned nothing (see backend meta + fallbacks). */
+function showTelAvivGroundNoDataBanner(data: TrackingResponse): boolean {
+  const st = data.milestone_projection?.meta?.ground_data_status;
+  if (st === "no_data") return true;
+  if (st === "ok" || st === "na") return false;
+
+  const hawb = data.hawb?.trim();
+  if (!hawb) return false;
+  const origin = cleanCity(data.origin ?? "");
+  const dest = cleanCity(data.destination ?? "");
+  if (origin !== "TLV" && dest !== "TLV") return false;
+
+  const msg = data.message ?? "";
+  const rm = data.raw_meta as Record<string, unknown> | undefined;
+  if (rm?.ground_status === "no_data" || msg.includes("failed to retrieve data from ground")) return true;
+  if (msg.includes("ground_skipped:not_arrived")) return true;
+
+  const hasGround = data.events.some(
+    e =>
+      e.source === "maman" ||
+      e.source === "swissport" ||
+      e.location?.includes("MAMAN") ||
+      e.location?.includes("Swissport"),
+  );
+  return !hasGround;
+}
 
 // ─── Date helpers ───────────────────────────────────────────────────────────────
 
@@ -144,6 +171,60 @@ function normalizeFlight(f?: string | null) {
   return m ? `${m[1]}${m[2]}` : f.replace(/\s+/g, '').toUpperCase();
 }
 
+const LANDING_INBOUND_CODES_LEGACY = new Set(["ARR", "DLV", "RCF", "RCT"]);
+
+function eventFingerprintLegacy(ev: TrackingEvent): string {
+  return `${ev.status_code ?? ""}|${ev.date ?? ""}|${cleanCity(ev.location ?? "")}|${(ev.status ?? "").slice(0, 80)}`;
+}
+
+/** ACS movement legs scope events by flight id; inbound ARR/RCF hub scans omit it — merge so Landing shows ATA. */
+function mergeMovementFlightEventsOntoLegLegacy(
+  fltEvs: TrackingEvent[],
+  leg: { from: string; to: string },
+  chronoSorted: TrackingEvent[],
+): TrackingEvent[] {
+  if (fltEvs.length === 0) return fltEvs;
+  const fromC = cleanCity(leg.from) || leg.from;
+  const toC = cleanCity(leg.to) || leg.to;
+
+  let depFloor = Math.max(
+    0,
+    ...fltEvs
+      .filter(e => e.status_code === "DEP" && cleanCity(e.location ?? "") === fromC)
+      .map(safeTime)
+      .filter(t => t > 0),
+  );
+  const minTs = fltEvs.map(safeTime).filter((t): t is number => t > 0);
+  const minInst = minTs.length ? Math.min(...minTs) : 0;
+  if (!(depFloor > 0) && minInst > 0) depFloor = minInst;
+
+  let ceilingMs = Infinity;
+  for (const e of chronoSorted) {
+    if (e.status_code !== "DEP" || cleanCity(e.location ?? "") !== toC) continue;
+    const t = safeTime(e);
+    if (!t || (depFloor > 0 && t <= depFloor)) continue;
+    if (t < ceilingMs) ceilingMs = t;
+  }
+
+  const seen = new Set(fltEvs.map(eventFingerprintLegacy));
+  const out = [...fltEvs];
+  for (const e of chronoSorted) {
+    const sc = e.status_code ?? "";
+    if (!LANDING_INBOUND_CODES_LEGACY.has(sc)) continue;
+    if (cleanCity(e.location ?? "") !== toC) continue;
+    if (normalizeFlight(e.flight)) continue;
+    const t = safeTime(e);
+    if (!t) continue;
+    if (depFloor > 0 && t + 60_000 < depFloor) continue;
+    if (Number.isFinite(ceilingMs) && t >= ceilingMs) continue;
+    const fp = eventFingerprintLegacy(e);
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    out.push(e);
+  }
+  return out;
+}
+
 function buildLegs(allEvents: TrackingEvent[], origin: string, destination: string, excelLegs: any[] = []): Leg[] {
   // Only true ARR events create legs — RCF is a scan/receipt code, not a segment arrival
   // (El Al uses FOH/DIS/RCF/NFD/DLV; including RCF here causes phantom legs from ghost scans)
@@ -233,28 +314,65 @@ function buildLegs(allEvents: TrackingEvent[], origin: string, destination: stri
           const pureFltPath = fltPath.filter((loc, i, arr) => i === 0 || loc !== arr[i-1]);
 
           if (pureFltPath.length === 1) {
-             const lastLoc = cleanCity([...fltEvs].reverse().find(e => cleanCity(e.location) && cleanCity(e.location) !== pureFltPath[0])?.location);
-             if (lastLoc) {
+             const originHub = pureFltPath[0];
+             const originDepMu = Math.max(
+               0,
+               ...fltEvs
+                 .filter(e => e.status_code === "DEP" && cleanCity(e.location ?? "") === originHub)
+                 .map(safeTime)
+                 .filter(t => t > 0),
+             );
+             if (originDepMu > 0) {
+               const bridgeEv = chronoEvs.find(ev =>
+                 LANDING_INBOUND_CODES_LEGACY.has(ev.status_code ?? "") &&
+                 !!ev.date &&
+                 !normalizeFlight(ev.flight) &&
+                 (() => {
+                   const lc = cleanCity(ev.location ?? "");
+                   if (!lc || lc === originHub) return false;
+                   return safeTime(ev) >= originDepMu;
+                 })(),
+               );
+               const bc = bridgeEv ? cleanCity(bridgeEv.location) : null;
+               if (bc) pureFltPath.push(bc);
+             }
+
+             if (pureFltPath.length === 1) {
+               const lastLoc = cleanCity(
+                 [...fltEvs].reverse().find(e => cleanCity(e.location) && cleanCity(e.location) !== pureFltPath[0])
+                   ?.location,
+               );
+               if (lastLoc) {
                  pureFltPath.push(lastLoc);
-             } else {
+               } else {
                  const matchingXl = excelLegs.find(xl => cleanCity(xl.from) === pureFltPath[0]);
                  if (matchingXl && cleanCity(matchingXl.to)) {
-                     pureFltPath.push(cleanCity(matchingXl.to)!);
+                   pureFltPath.push(cleanCity(matchingXl.to)!);
                  } else if (cleanCity(destination) && pureFltPath[0] !== cleanCity(destination)) {
-                     pureFltPath.push(cleanCity(destination)!);
+                   pureFltPath.push(cleanCity(destination)!);
                  }
+               }
+             } else if (cleanCity(destination)) {
+               const dc = cleanCity(destination)!;
+               if (pureFltPath[pureFltPath.length - 1] !== dc && !pureFltPath.includes(dc))
+                 pureFltPath.push(dc);
              }
           }
 
           for (let i = 0; i < pureFltPath.length - 1; i++) {
+            const mergedEv = mergeMovementFlightEventsOntoLegLegacy(
+              fltEvs,
+              { from: pureFltPath[i], to: pureFltPath[i + 1] },
+              chronoEvs,
+            );
             legs.push({
                from: pureFltPath[i],
                to: pureFltPath[i+1],
                service: "FLIGHT",
                flightNo: fltStr,
                atd: null, etd: null, ata: null, eta: null, pieces: null, weight: null,
-               // Scope events strictly to this instance so MilestoneRow doesn't pull events from other splits
-               events: fltEvs
+               // Scoped movement rows + inbound hub scans lacking movement id (ARR/RCF)
+               events: mergedEv,
             });
           }
       }
@@ -454,7 +572,7 @@ function MilestoneNode({
             borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap"
           }}>{event.flight}</span>
         )}
-        {event?.pieces && (
+        {done && event?.pieces && (
           <span style={{
              fontFamily: "monospace", fontSize: "0.6rem", fontWeight: 600,
              color: C.green, marginTop: "1px"
@@ -623,16 +741,28 @@ function UnifiedTimelineFlow({ legs, events, origin, destination, excelLegs }: {
       };
       
       const locMatch = isMatch(leg.from) || isMatch(leg.to);
-      const flightMatch = !e.flight || !leg.flightNo || e.flight === leg.flightNo;
+      const lf = normalizeFlight(e.flight);
+      const rn = normalizeFlight(leg.flightNo);
+      const flightMatch = !lf || !rn || lf === rn;
       return locMatch && flightMatch;
     });
 
-    const takeOffDone = legEvents.some(e => e.status_code === "DEP" && e.date) || legEvents.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date) || events.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date);
-    const landingDone = legEvents.some(e => ["ARR", "DLV"].includes(e.status_code||"") && e.date) || events.some(e => e.status_code === "DLV" && e.date);
+    const inboundHubCodes = ["ARR", "DLV", "RCF", "RCT"];
+    const takeOffDone =
+      legEvents.some(e => e.status_code === "DEP" && e.date) ||
+      legEvents.some(e => inboundHubCodes.includes(e.status_code || "") && e.date) ||
+      events.some(e => ["ARR", "DLV"].includes(e.status_code || "") && e.date);
+    const landingDone =
+      legEvents.some(e => inboundHubCodes.includes(e.status_code || "") && e.date) ||
+      events.some(e => e.status_code === "DLV" && e.date);
     
     // depEv prefers an actual DEP event, else any DEP, else BKD/RCS/MAN
     const depEv = legEvents.find(e => e.status_code === "DEP" && e.date) || legEvents.find(e => e.status_code === "DEP") || legEvents.find(e => e.status_code === "BKD") || legEvents.find(e => ["MAN", "RCS"].includes(e.status_code ?? ""));
-    const arrEv = legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? "") && e.date) || legEvents.find(e => ["ARR", "DLV", "RCT"].includes(e.status_code ?? ""));
+    const arrEv =
+      legEvents.find(e => e.status_code === "ARR" && e.date) ||
+      legEvents.find(e => e.status_code === "DLV" && e.date) ||
+      legEvents.find(e => ["RCT", "RCF"].includes(e.status_code ?? "") && e.date) ||
+      legEvents.find(e => inboundHubCodes.includes(e.status_code ?? ""));
 
     // Take off
     elements.push(<Arrow key={`arr-dep-${i}`} done={takeOffDone} />);
@@ -742,7 +872,10 @@ function CanonicalMilestonePlan({ data }: Props) {
   const proj = data.milestone_projection!;
   const meta = proj.meta;
   const statusColor = meta.is_dlv ? C.green : meta.is_err ? C.amber : C.accent;
-  const headerPieces = canonicalShipmentPieceCount(proj, data.raw_meta?.pieces);
+  const headerPieces = canonicalShipmentPieceCount(
+    proj,
+    excelPiecesHintFromRawMeta(data.raw_meta as Record<string, unknown>),
+  );
 
   return (
     <div style={{
@@ -782,6 +915,18 @@ function CanonicalMilestonePlan({ data }: Props) {
           }}>
             <Truck size={14} />
             {meta.ground_handlers_label}
+          </div>
+        )}
+        {showTelAvivGroundNoDataBanner(data) && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            fontWeight: 600, fontSize: "0.85rem", color: C.amber,
+            padding: "0.2rem 0.6rem", borderRadius: 6,
+            backgroundColor: "rgba(251, 192, 45, 0.08)",
+            border: "1px solid rgba(251, 192, 45, 0.22)",
+          }}>
+            <AlertCircle size={14} />
+            No Data
           </div>
         )}
         {headerPieces > 0 && (
@@ -1021,6 +1166,18 @@ function LegacyMilestonePlan({ data }: Props) {
           }}>
             <Truck size={14} />
             {groundNames}
+          </div>
+        )}
+        {showTelAvivGroundNoDataBanner(data) && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            fontWeight: 600, fontSize: "0.85rem", color: C.amber,
+            padding: "0.2rem 0.6rem", borderRadius: 6,
+            backgroundColor: "rgba(251, 192, 45, 0.08)",
+            border: "1px solid rgba(251, 192, 45, 0.22)",
+          }}>
+            <AlertCircle size={14} />
+            No Data
           </div>
         )}
 

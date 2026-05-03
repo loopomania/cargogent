@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   computeMilestoneProjection,
   fingerprintProjection,
+  milestoneExcelPiecesHint,
 } from "../services/milestoneEngine.js";
 import { MILESTONE_PROJECTION_VERSION } from "../services/milestoneVersions.js";
 
@@ -379,6 +380,131 @@ function testHouseDeclarationCapsAirlineMawbRollupWhenOriginDocsAgreeWithHawbImp
   const dep = nodes.find(s => s.kind === "node" && s.code === "DEP");
   const arr = nodes.find(s => s.kind === "node" && s.code === "ARR");
   assert.equal(dep?.pieces, "1", "MAWB rollup on DEP must cap to HAWB import when no RCS/BKD at origin exceeds hint");
+  assert.equal(arr?.pieces, "1");
+  assert.equal(p.meta.max_pieces, 1);
+}
+
+/** When tracker raw_meta.pieces is MAWB rollup but ingest set excel_pieces_hint, cap still applies. */
+function testExcelPiecesHintOverridesTrackerRollupForHouseCap() {
+  const p = computeMilestoneProjection({
+    events: [
+      {
+        status_code: "DEP",
+        location: "TLV",
+        date: "2026-04-20T14:00:00.000Z",
+        flight: "LY001",
+        pieces: "7",
+        weight: "100",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        location: "BLR",
+        date: "2026-04-21T08:00:00.000Z",
+        flight: "LY001",
+        pieces: "7",
+        source: "airline",
+      },
+    ],
+    origin: "TLV",
+    destination: "BLR",
+    status: null,
+    excelLegs: [],
+    excelPiecesHint: milestoneExcelPiecesHint({
+      pieces: "7",
+      excel_pieces_hint: 1,
+    }),
+  });
+  const nodes = p.flows_steps[0].filter((s) => s.kind === "node");
+  const dep = nodes.find((s) => s.code === "DEP");
+  const arr = nodes.find((s) => s.code === "ARR");
+  assert.equal(dep?.pieces, "1");
+  assert.equal(arr?.pieces, "1");
+  assert.equal(p.meta.max_pieces, 1);
+}
+
+/** Generic excel hint vs inflated origin RCS: keep trusting airline acceptance (noise guard). */
+function testUntrustedExcelHintYieldsWhenOriginRcsExceedsHouse() {
+  const shared = {
+    events: [
+      {
+        status_code: "RCS",
+        status: "Received from Shipper",
+        location: "TLV",
+        date: "2026-04-20T07:00:00.000Z",
+        pieces: "5",
+        source: "airline",
+      },
+      {
+        status_code: "DEP",
+        location: "TLV",
+        date: "2026-04-20T14:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        location: "BLR",
+        date: "2026-04-21T08:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        source: "airline",
+      },
+    ],
+    origin: "TLV",
+    destination: "BLR",
+    status: null,
+    excelLegs: [],
+    excelPiecesHint: 1 as const,
+  };
+  const p = computeMilestoneProjection(shared);
+  const nodes = p.flows_steps[0].filter((s) => s.kind === "node");
+  const dep = nodes.find((s) => s.code === "DEP");
+  assert.equal(dep?.pieces, "5");
+  assert.equal(p.meta.max_pieces, 5);
+}
+
+/** CargoGent excel_transport_lines-backed HAWB pieces must cap MAWB-inflated origin scans. */
+function testTrustedHawbTransportExcelOverridesOriginRcsInflation() {
+  const p = computeMilestoneProjection({
+    events: [
+      {
+        status_code: "RCS",
+        status: "Received from Shipper",
+        location: "TLV",
+        date: "2026-04-20T07:00:00.000Z",
+        pieces: "5",
+        source: "airline",
+      },
+      {
+        status_code: "DEP",
+        location: "TLV",
+        date: "2026-04-20T14:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        source: "airline",
+      },
+      {
+        status_code: "ARR",
+        location: "BLR",
+        date: "2026-04-21T08:00:00.000Z",
+        flight: "LY001",
+        pieces: "5",
+        source: "airline",
+      },
+    ],
+    origin: "TLV",
+    destination: "BLR",
+    status: null,
+    excelLegs: [],
+    excelPiecesHint: 1,
+    trustExcelHawbTransportPieces: true,
+  });
+  const nodes = p.flows_steps[0].filter((s) => s.kind === "node");
+  const dep = nodes.find((s) => s.code === "DEP");
+  const arr = nodes.find((s) => s.code === "ARR");
+  assert.equal(dep?.pieces, "1");
   assert.equal(arr?.pieces, "1");
   assert.equal(p.meta.max_pieces, 1);
 }
@@ -963,6 +1089,30 @@ function testDhlScheduledMovementAfterHubArrWinsOverall() {
   assert.ok(!/^arrived\b/i.test(p.meta.overall_status.trim()), "overall must not pick stale hub ARR text");
 }
 
+function testFlightlessInboundArrShowsLandingAfterMovementSegment() {
+  const p = computeMilestoneProjection({
+    events: [
+      { status_code: "RCS", location: "TLV", date: "2026-04-28T06:51:00.000Z", source: "airline" },
+      { status_code: "MAN", location: "TLV", date: "2026-04-29T15:56:00.000Z", flight: "MV1TOLEJ", source: "airline" },
+      { status_code: "DEP", location: "TLV", date: "2026-04-29T16:05:00.000Z", flight: "MV1TOLEJ", source: "airline" },
+      { status_code: "ARR", location: "LEJ", date: "2026-04-29T22:30:00.000Z", source: "airline" },
+      { status_code: "MAN", location: "LEJ", date: "2026-04-30T01:35:00.000Z", flight: "MV2TOEMA", source: "airline" },
+      { status_code: "DEP", location: "LEJ", date: "2026-04-30T03:34:00.000Z", flight: "MV2TOEMA", source: "airline" },
+      { status_code: "ARR", location: "EMA", date: "2026-04-30T08:00:00.000Z", source: "airline" },
+    ],
+    origin: "TLV",
+    destination: "EMA",
+    status: "",
+    excelLegs: [],
+  });
+  assert.equal(p.meta.paths_count, 1);
+  const nodes = p.flows_steps[0].filter(s => s.kind === "node");
+  const tlvLejLanding = nodes.find(s => s.kind === "node" && s.label === "Landing" && s.location === "LEJ");
+  assert.ok(tlvLejLanding, "expected Landing at LEJ with ATA from flightless ARR tied to movement leg");
+  assert.equal(tlvLejLanding!.date, "2026-04-29T22:30:00.000Z");
+  assert.ok(tlvLejLanding!.done !== false);
+}
+
 function testCargoPalLatestDestinationAwdWinsOverTransitAwd() {
   const p = computeMilestoneProjection({
     events: [
@@ -1078,6 +1228,9 @@ try {
   testLyHubTransferUsesLatestAirlineStatusAndLegCoalescedPcs();
   testMultiplePartialDlvAtDestinationShowsConsolidatedPieceCount();
   testHouseDeclarationCapsAirlineMawbRollupWhenOriginDocsAgreeWithHawbImport();
+  testExcelPiecesHintOverridesTrackerRollupForHouseCap();
+  testUntrustedExcelHintYieldsWhenOriginRcsExceedsHouse();
+  testTrustedHawbTransportExcelOverridesOriginRcsInflation();
   testBkOnlyConnectingFlightUsesExcelEndpoints();
   testBkOnlyHubFlightWithoutExcelFlightUsesHubToDestination();
   testFingerPrintStableAcrossTwoCalls();
@@ -1091,6 +1244,8 @@ try {
   testAirborneInTransitCopyUsesLegEndpoints();
   testDHLSecondHubDepartJoinsMovementWhenDepHasNoParsedSegment();
   testDhlScheduledMovementAfterHubArrWinsOverall();
+
+  testFlightlessInboundArrShowsLandingAfterMovementSegment();
 
   testCargoPalLatestDestinationAwdWinsOverTransitAwd();
   testChallengeTwoDigitYearTimesPreserveLastLegSchedule();

@@ -55,7 +55,6 @@ export default function ArchivedShipments() {
           hawb={selectedAwb.hawb}
           ata={selectedAwb.ata || selectedAwb.eta}
           onBack={() => setSelectedAwb(null)}
-          disableLiveSync={true} // Archive usually shouldn't run a live tracker update
         />
       </div>
     );
@@ -120,12 +119,13 @@ export default function ArchivedShipments() {
                   <th style={{ padding: "0.9rem 1rem" }}>Status</th>
                   <th style={{ padding: "0.9rem 1rem" }}>ATA</th>
                   <th style={{ padding: "0.9rem 1rem" }}>Last update</th>
+                  <th style={{ padding: "0.9rem 1rem", width: "90px", textAlign: "center" }}> </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, idx) => (
-                  <tr 
-                    key={r.awb_id}
+                  <tr
+                    key={`${r.mawb}|${r.hawb ?? ""}`}
                     onClick={() => setSelectedAwb(r)}
                     style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: "transparent", transition: "background 0.15s" }}
                     onMouseEnter={(e) => e.currentTarget.style.background = "var(--border)"}
@@ -139,6 +139,28 @@ export default function ArchivedShipments() {
                     </td>
                     <td style={{ padding: "0.85rem 1rem" }}>{r.ata ? new Date(r.ata).toLocaleDateString() : r.eta ? new Date(r.eta).toLocaleDateString() : "—"}</td>
                     <td style={{ padding: "0.85rem 1rem" }}>{r.last_update ? new Date(r.last_update).toLocaleString() : "—"}</td>
+                    <td style={{ padding: "0.85rem 1rem", textAlign: "center" }}>
+                      <button
+                        type="button"
+                        aria-label={`View MAWB ${r.mawb} ${r.hawb ?? ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAwb(r);
+                        }}
+                        style={{
+                          padding: "0.35rem 0.65rem",
+                          borderRadius: 6,
+                          border: "1px solid var(--border)",
+                          background: "var(--surface)",
+                          color: "var(--accent)",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontSize: "0.78rem",
+                        }}
+                      >
+                        View
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
